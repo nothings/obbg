@@ -1,1 +1,1 @@
-# obbg
+# obbg - Open Block Building Game
