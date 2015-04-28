@@ -1,4 +1,5 @@
 #define _WIN32_WINNT 0x400
+#define GL_DEBUG
 
 #include <assert.h>
 #include <windows.h>
@@ -33,6 +34,51 @@ char *game_name = "obbg";
 
 #define REVERSE_DEPTH
 
+
+extern int load_crn_to_texture(unsigned char *data, size_t length);
+extern int load_crn_to_texture_array(int slot, unsigned char *data, size_t length);
+
+GLuint debug_tex;
+GLuint voxel_tex[2];
+
+void render_init(void)
+{
+   // @TODO: support non-DXT path
+   char **files = stb_readdir_recursive("data", "*.crn");
+   int i;
+
+   glGenTextures(2, voxel_tex);
+
+   glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, voxel_tex[0]);
+
+   for (i=0; i < 11; ++i) {
+      glTexImage3DEXT(GL_TEXTURE_2D_ARRAY_EXT, i,
+                         GL_COMPRESSED_RGB_S3TC_DXT1_EXT,
+                         1024>>i,1024>>i,128,0,
+                         GL_RGBA,GL_UNSIGNED_BYTE,NULL);
+   }
+
+   for (i=0; i < stb_arr_len(files); ++i) {
+      size_t len;
+      uint8 *data = stb_file(files[i], &len);
+      load_crn_to_texture_array(i, data, len);
+      free(data);
+   }
+
+   // temporary hack:
+   voxel_tex[1] = voxel_tex[0];
+
+   #if 0
+   {
+      size_t len;
+      unsigned char *data = stb_file(files[0], &len);
+      glGenTextures(1, &debug_tex);
+      glBindTexture(GL_TEXTURE_2D, debug_tex);
+      load_crn_to_texture(data, len);
+      free(data);
+   }
+   #endif
+}
 
 
 static void print_string(float x, float y, char *text, float r, float g, float b)
@@ -289,10 +335,18 @@ void draw_main(void)
    gluOrtho2D(0,screen_x/2,screen_y/2,0);
    glMatrixMode(GL_MODELVIEW);
    glLoadIdentity();
-   glDisable(GL_TEXTURE_2D);
    glDisable(GL_BLEND);
    glDisable(GL_CULL_FACE);
+   glDisable(GL_DEPTH_TEST);
+   if (debug_tex) {
+      glEnable(GL_TEXTURE_2D);
+      glBindTexture(GL_TEXTURE_2D, debug_tex);
+      glColor3f(1,1,1);
+      stbgl_drawRectTC(0,0,512,512,0,0,1,1);
+   }
+   glDisable(GL_TEXTURE_2D);
    draw_stats();
+
 }
 
 
@@ -579,7 +633,7 @@ int SDL_main(int argc, char **argv)
 
    SDL_GL_SetSwapInterval(1);
 
-   //render_init();
+   render_init();
    //mesh_init();
    //world_init();
 
