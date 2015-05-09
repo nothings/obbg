@@ -1,0 +1,21 @@
+obbg:
+  open block building game
+  exercise all interesting features
+    of voxel stuff:
+  - mesh generation/rendering
+  - procedural gen
+  - user create/destroy
+  - save/load to disk
+  - networking
+  
+Done before stream:
+  Pixar's 128 1024x1024
+  Loaded with Rich Geldreich's
+     crunch library (DXT)
+  Main loop/top-level cut-n-paste
+     from caveview (Minecraft)
+
+Done so far:
+  - cache proc gen chunks
+  - build & cache meshes
+  - render them poorly

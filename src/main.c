@@ -135,7 +135,7 @@ static void print(char *text, ...)
    pos_y += 10;
 }
 
-float camang[3], camloc[3] = { 60,22,77 };
+float camang[3], camloc[3] = { 0,0,50 };
 float player_zoom = 1.0;
 float rotate_view = 0.0;
 
@@ -620,10 +620,20 @@ void enable_synchronous(void)
 
 //extern void prepare_threads(void);
 
+extern float compute_height_field(int x, int y);
+
+
 //void stbwingraph_main(void)
 int SDL_main(int argc, char **argv)
 {
    SDL_Init(SDL_INIT_VIDEO);
+
+   {
+      int i,j;
+      for (j=-418; j <= -414; ++j)
+         for (i=834; i <= 838; ++i)
+            ods("(%d,%d): %f\n", i,j, compute_height_field(i,j));
+   }
 
    //prepare_threads();
 

@@ -82,9 +82,9 @@ static gen_chunk_cache  gen_cache[ GEN_CHUNK_CACHE_Y][ GEN_CHUNK_CACHE_X];
 
 mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
 {
-   int cx = MESH_CHUNK_X_FOR_WORLD_X(x) & (MESH_CHUNK_CACHE_X-1);
-   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y) & (MESH_CHUNK_CACHE_Y-1);
-   mesh_chunk *mc = &mesh_cache[cy][cx];
+   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   mesh_chunk *mc = &mesh_cache[cy & (MESH_CHUNK_CACHE_Y-1)][cx & (MESH_CHUNK_CACHE_X-1)];
 
    if (mc->chunk_x == cx && mc->chunk_y == cy)
       return mc;
@@ -101,9 +101,9 @@ void free_mesh_chunk(mesh_chunk *mc)
 
 gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
 {
-   int cx = GEN_CHUNK_X_FOR_WORLD_X(x) & (GEN_CHUNK_CACHE_X-1);
-   int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y) & (GEN_CHUNK_CACHE_Y-1);
-   gen_chunk_cache *gc = &gen_cache[cy][cx];
+   int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
+   int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y);
+   gen_chunk_cache *gc = &gen_cache[cy & (GEN_CHUNK_CACHE_Y-1)][cx & (GEN_CHUNK_CACHE_X-1)];
 
    if (gc->chunk_x == cx && gc->chunk_y == cy) {
       assert(gc->chunk != NULL);
@@ -139,33 +139,69 @@ void free_gen_chunk(gen_chunk_cache *gcc)
 }
 
 #define MIN_GROUND 32
+#define AVG_GROUND 64
+
+extern float stb_perlin_noise3(float x, float y, float z, int x_wrap, int y_wrap, int z_wrap); // -1 to 1
+
+float compute_height_field(int x, int y)
+{
+   float ht = AVG_GROUND;
+#if 1
+   float weight=0;
+   int o;
+   weight = (float) stb_linear_remap(stb_perlin_noise3(x/256.0f,y/256.0f,100,256,256,256), -1.5, 1.5, 0.0f, 1.0f);
+   for (o=0; o < 8; ++o) {
+      float scale = (float) (1 << o);
+      float ns = stb_perlin_noise3(x/scale, y/scale, o*2.0f, 256,256,256), heavier;
+      float sign = (ns < 0 ? -1.0f : 1.0f);
+      ns = (float) fabs(ns);
+      heavier = ns*ns;
+      ht += scale/2 * stb_lerp(weight, ns, heavier);
+   }
+#else
+
+   if (x >= 10 && x <= 50 && y >= 30 && y <= 70) {
+      ht += x;
+   }
+
+   if (x >= 110 && x <= 150 && y >= 30 && y <= 70) {
+      ht += y;
+   }
+
+#endif
+   return ht;
+}
 
 gen_chunk *generate_chunk(int x, int y)
 {
    int zs;
    int i,j,z;
-   int ground_plane = MIN_GROUND+4;
+   int ground_top = 0;
    gen_chunk *gc = malloc(sizeof(*gc));
+   float height_field[GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X];
+   int height_field_int[GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X];
+
+   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+      for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+         float ht = compute_height_field(x+i,y+j);
+         height_field[j][i] = ht;
+         height_field_int[j][i] = (int) height_field[j][i];
+         ground_top = stb_max(ground_top, height_field_int[j][i]);
+      }  
 
    for (z=0; z < 16; ++z) {
       memset(gc->partial[z].block, BT_empty, sizeof(gc->partial[z].block));
       memset(gc->partial[z].lighting, 255, sizeof(gc->partial[z].lighting));
    }
 
-   zs = ground_plane >> Z_SEGMENT_SIZE_LOG2;
+   zs = ground_top >> Z_SEGMENT_SIZE_LOG2;
    memset(gc->non_empty, 0, sizeof(gc->non_empty));
-   gc->non_empty[zs] = 1;
+   memset(gc->non_empty, 1, (ground_top+Z_SEGMENT_SIZE-1)>>Z_SEGMENT_SIZE_LOG2);
 
-   {
-      int z_offset = ground_plane - (zs << Z_SEGMENT_SIZE_LOG2);
-      for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
-         for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
-            gc->partial[zs].block[j][i][z_offset] = BT_solid;
-
-
-      for (z = stb_rand() % 240; z >= ground_plane; --z)
-         gc->partial[z>>4].block[0][0][z&15] = BT_solid;
-   }
+   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+      for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
+         for (z=0; z < height_field_int[j][i]; ++z)
+            gc->partial[z>>4].block[j][i][z&15] = BT_solid;
 
    return gc;
 }
@@ -174,15 +210,18 @@ gen_chunk *get_gen_chunk_for_coord(int x, int y)
 {
    gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(x,y);
    if (gcc == NULL) {
-      int cx = GEN_CHUNK_X_FOR_WORLD_X(x) & (GEN_CHUNK_CACHE_X-1);
-      int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y) & (GEN_CHUNK_CACHE_Y-1);
-      gcc = &gen_cache[cy][cx];
+      int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
+      int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y);
+      int slot_x = cx & (GEN_CHUNK_CACHE_X-1);
+      int slot_y = cy & (GEN_CHUNK_CACHE_Y-1);
+      gcc = &gen_cache[slot_y][slot_x];
       if (gcc->chunk != NULL)
          free_gen_chunk(gcc);
       gcc->chunk_x = cx;
       gcc->chunk_y = cy;
       gcc->chunk = generate_chunk(x, y);
    }
+   assert(gcc->chunk_x*GEN_CHUNK_SIZE_X == x && gcc->chunk_y*GEN_CHUNK_SIZE_Y == y);
    return gcc->chunk;
 }
 
@@ -252,7 +291,7 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    mc->chunk_x = (world_coord.x >> MESH_CHUNK_SIZE_X_LOG2);
    mc->chunk_y = (world_coord.y >> MESH_CHUNK_SIZE_Y_LOG2);
 
-   stbvox_set_input_stride(mm, 66*18, 18);
+   stbvox_set_input_stride(mm, 18, 66*18);
 
    map = stbvox_get_input_description(mm);
    map->block_tex1_face = tex1_for_blocktype;
@@ -269,12 +308,12 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    map->lighting = &segment_lighting[1][1][1];
 
    // fill in the top two rows of the buffer
-   for (a=0; a < 66; ++a) {
-      for (b=0; b < 66; ++b) {
-         segment_blocktype[a][b][16] = 0;
-         segment_blocktype[a][b][17] = 0;
-         segment_lighting [a][b][16] = 255;
-         segment_lighting [a][b][17] = 255;
+   for (b=0; b < 66; ++b) {
+      for (a=0; a < 66; ++a) {
+         segment_blocktype[b][a][16] = 0;
+         segment_blocktype[b][a][17] = 0;
+         segment_lighting [b][a][16] = 255;
+         segment_lighting [b][a][17] = 255;
       }
    }
 
@@ -298,12 +337,12 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
       }
 
       // copy the bottom two rows of data up to the top
-      for (a=0; a < 66; ++a) {
-         for (b=0; b < 66; ++b) {
-            segment_blocktype[a][b][16] = segment_blocktype[a][b][0];
-            segment_blocktype[a][b][17] = segment_blocktype[a][b][1];
-            segment_lighting [a][b][16] = segment_lighting [a][b][0];
-            segment_lighting [a][b][17] = segment_lighting [a][b][1];
+      for (b=0; b < 66; ++b) {
+         for (a=0; a < 66; ++a) {
+            segment_blocktype[b][a][16] = segment_blocktype[b][a][0];
+            segment_blocktype[b][a][17] = segment_blocktype[b][a][1];
+            segment_lighting [b][a][16] = segment_lighting [b][a][0];
+            segment_lighting [b][a][17] = segment_lighting [b][a][1];
          }
       }
    }

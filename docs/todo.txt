@@ -1,0 +1,22 @@
+Possible tasks to work on next:
+
+   -  height-field terrain
+   -  stats
+   -  limit mesh cache to max size
+   -  check for memory leaks
+   -  optimize terrain generation
+   -  threaded terrain generation
+   -  optimize mesh building
+   -  threaded mesh building
+   -  disk save/load
+   -  use more textures
+   -  use more block types
+   -  other terrain features
+   -  user block create/destroy
+   -  "physics" (e.g. move on ground)
+   -  shoot light sources
+
+Not right now:
+
+   -  shoot guns
+   -  networking
