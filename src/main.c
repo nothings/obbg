@@ -29,23 +29,33 @@
 // stb_easy_font.h
 #include "stb_easy_font.h" // doesn't require an IMPLEMENTATION
 
+#include "obbg_funcs.h"
+
 char *game_name = "obbg";
 
 
 #define REVERSE_DEPTH
 
 
+char *dumb_fragment_shader =
+   "#version 150 compatibility\n"
+   "uniform sampler2DArray tex;\n"
+   "void main(){gl_FragColor = texture(tex,gl_TexCoord[0].xyz);}";
+
+
 extern int load_crn_to_texture(unsigned char *data, size_t length);
 extern int load_crn_to_texture_array(int slot, unsigned char *data, size_t length);
 
-GLuint debug_tex;
-GLuint voxel_tex[2];
+GLuint debug_tex, dumb_prog;
+unsigned int voxel_tex[2];
 
 void render_init(void)
 {
    // @TODO: support non-DXT path
    char **files = stb_readdir_recursive("data", "*.crn");
    int i;
+
+   init_chunk_caches();
 
    glGenTextures(2, voxel_tex);
 
@@ -67,6 +77,21 @@ void render_init(void)
 
    // temporary hack:
    voxel_tex[1] = voxel_tex[0];
+
+   init_voxel_render(voxel_tex);
+
+   {
+      char *frag[] = { dumb_fragment_shader, NULL };
+      char error[1024];
+      GLuint fragment;
+      fragment = stbgl_compile_shader(STBGL_FRAGMENT_SHADER, frag, -1, error, sizeof(error));
+      if (!fragment) {
+         ods("oops");
+         exit(0);
+      }
+      dumb_prog = stbgl_link_program(0, fragment, NULL, -1, error, sizeof(error));
+      
+   }
 
    #if 0
    {
@@ -325,7 +350,7 @@ void draw_main(void)
    glTranslatef(-camloc[0], -camloc[1], -camloc[2]);
 
    start_time = SDL_GetPerformanceCounter();
-   //render_caves(camloc);
+   render_voxel_world(camloc);
    end_time = SDL_GetPerformanceCounter();
 
    render_time = (end_time - start_time) / (float) SDL_GetPerformanceFrequency();
@@ -338,6 +363,20 @@ void draw_main(void)
    glDisable(GL_BLEND);
    glDisable(GL_CULL_FACE);
    glDisable(GL_DEPTH_TEST);
+
+   if (0) {
+      stbglUseProgram(dumb_prog);
+      glDisable(GL_TEXTURE_2D);
+      glEnable(GL_TEXTURE_2D_ARRAY_EXT);
+      glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, voxel_tex[0]);
+      stbglUniform1i(stbgl_find_uniform(dumb_prog, "tex"), 0);
+      glColor3f(1,1,1);
+      stbgl_drawRectTC(0,0,512,512,0,0,3,3);
+      glDisable(GL_TEXTURE_2D_ARRAY_EXT);
+      stbglUseProgram(0);
+   }
+
+
    if (debug_tex) {
       glEnable(GL_TEXTURE_2D);
       glBindTexture(GL_TEXTURE_2D, debug_tex);
@@ -566,6 +605,9 @@ static float getTimestep(float minimum_time)
 
 void APIENTRY gl_debug(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *param)
 {
+   if (!stb_prefix((char *) message, "Buffer detailed info:")) {
+      id=id;
+   }
    ods("%s\n", message);
 }
 

@@ -60,7 +60,7 @@ extern "C" {
 
 /// EASY API
 
-extern GLuint stbgl_create_program(char const **vertex_source, char const **frag_source, char const **binds, char *error, int error_buflen);
+extern GLuint stbgl_create_program(char const **vertex_source, char const **frag_source, char const **binds, char *error, int error_buflen, int *which_failed);
 // This function returns a compiled program or 0 if there's an error.
 // To free the created program, call stbgl_delete_program.
 //
@@ -81,6 +81,13 @@ extern GLuint stbgl_create_program(char const **vertex_source, char const **frag
 //
 // If the fragment shader is NULL, then fixed-function fragment pipeline
 // is used, if that's legal in your version of GL.
+
+enum
+{
+   STBGL_FAILURE_STAGE_FRAGMENT,
+   STBGL_FAILURE_STAGE_VERTEX,
+   STBGL_FAILURE_STAGE_LINK
+};
 
 extern void stgbl_delete_program(GLuint program);
 // deletes a program created by stbgl_create_program or stbgl_link_program
@@ -415,18 +422,27 @@ STB_GLPROG_DECLARE GLuint stbgl_link_program(GLuint vertex_shader, GLuint fragme
    return 0;   
 }
 
-STB_GLPROG_DECLARE GLuint stbgl_create_program(char const **vertex_source, char const **frag_source, char const **binds, char *error, int error_buflen)
+STB_GLPROG_DECLARE GLuint stbgl_create_program(char const **vertex_source, char const **frag_source, char const **binds, char *error, int error_buflen, int *which_failed)
 {
    GLuint vertex, fragment, prog=0;
    vertex = stbgl_compile_shader(STBGL_VERTEX_SHADER, vertex_source, -1, error, error_buflen);
    if (vertex) {
       fragment = stbgl_compile_shader(STBGL_FRAGMENT_SHADER, frag_source, -1, error, error_buflen);
-      if (fragment)
+      if (fragment) {
          prog = stbgl_link_program(vertex, fragment, binds, -1, error, error_buflen);
+         if (prog == 0 && which_failed)
+            *which_failed = STBGL_FAILURE_STAGE_LINK;
+      } else {
+         if (which_failed)
+            *which_failed = STBGL_FAILURE_STAGE_FRAGMENT;
+      }
       if (fragment)
          stbglDeleteShader(fragment);
       stbglDeleteShader(vertex);
-   }
+   } else
+      if (which_failed)
+         *which_failed = STBGL_FAILURE_STAGE_VERTEX;
+
    return prog;
 }
 

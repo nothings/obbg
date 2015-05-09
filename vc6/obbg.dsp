@@ -68,7 +68,8 @@ LINK32=link.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /YX /FD /GZ /c
-# ADD CPP /nologo /W3 /Gm /GX /ZI /Od /I "../stb" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /YX /FD /GZ /c
+# ADD CPP /nologo /G6 /W3 /WX /Gm /GX /ZI /Od /I "../stb" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /FD /GZ /c
+# SUBTRACT CPP /YX
 # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /win32
 # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
@@ -88,6 +89,10 @@ LINK32=link.exe
 # Name "obbg - Win32 Debug"
 # Begin Source File
 
+SOURCE=..\src\3rd\crn_decomp.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\glext.h
 # End Source File
 # Begin Source File
@@ -100,7 +105,27 @@ SOURCE=..\src\main.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\src\mesh_builder.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\src\obbg_data.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\src\obbg_funcs.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\win32\SDL_windows_main.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\stb\stb.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\stb\stb_easy_font.h
 # End Source File
 # Begin Source File
 
@@ -112,7 +137,19 @@ SOURCE=..\src\stb_glprog.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\stb\stb_image.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\stb\stb_voxel_render.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\texture_loader.cpp
+# End Source File
+# Begin Source File
+
+SOURCE=..\src\voxel_render.c
 # End Source File
 # End Target
 # End Project

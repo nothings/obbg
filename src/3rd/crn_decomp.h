@@ -858,15 +858,7 @@ namespace crnd
                return false;
          }
 
-         if (1)
-            memcpy(m_p, other.m_p, other.m_size * sizeof(T));
-         else
-         {
-            T* pDst = m_p;
-            const T* pSrc = other.m_p;
-            for (uint32 i = other.m_size; i > 0; i--)
-               helpers::construct(pDst++, *pSrc++);
-         }
+         memcpy(m_p, other.m_p, other.m_size * sizeof(T));
 
          m_size = other.m_size;
 
@@ -902,7 +894,6 @@ namespace crnd
       {
          if (m_p)
          {
-            ;//scalar_type<T>::destruct_array(m_p, m_size);
             crnd_free(m_p);
             m_p = NULL;
             m_size = 0;
@@ -1108,7 +1099,7 @@ namespace crnd
       {
          if (!reinterpret_cast<elemental_vector*>(this)->increase_capacity(
             min_new_capacity, grow_hint, sizeof(T),
-            1 ? NULL : object_mover))
+            NULL))
          {
             m_alloc_failed = true;
             return false;
