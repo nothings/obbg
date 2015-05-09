@@ -43,7 +43,7 @@ void init_voxel_render(int voxel_tex[2])
    vox_tex[1] = voxel_tex[1];
 }
 
-int view_distance=256;
+int view_distance=400;
 
 float table3[128][3];
 float table4[64][4];
@@ -149,6 +149,7 @@ void setup_uniforms(float pos[3])
    }
 }
 
+extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 
 void render_voxel_world(float campos[3])
 {
@@ -172,6 +173,15 @@ void render_voxel_world(float campos[3])
    stbglEnableVertexAttribArray(0);
 
    rad = view_distance >> MESH_CHUNK_SIZE_X_LOG2;
+   view_dist_for_display = view_distance;
+
+   quads_rendered = 0;
+   quads_considered = 0;
+   chunk_storage_rendered = 0;
+   chunk_storage_considered = 0;
+   chunk_locations = 0;
+   chunks_considered = 0;
+   chunks_in_frustum = 0;
 
    for (j=-rad; j <= rad; ++j) {
       for (i=-rad; i <= rad; ++i) {
@@ -183,6 +193,12 @@ void render_voxel_world(float campos[3])
          if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
             mc = build_mesh_chunk_for_coord(cx * MESH_CHUNK_CACHE_X, cy * MESH_CHUNK_CACHE_Y);
          }
+
+         ++chunk_locations;
+
+         ++chunks_considered;
+         quads_considered += mc->num_quads;
+         chunk_storage_considered += mc->num_quads * 20;
          
          if (mc->num_quads) {
             // @TODO if in range, frustum cull
@@ -192,9 +208,19 @@ void render_voxel_world(float campos[3])
             glBindTexture(GL_TEXTURE_BUFFER_ARB, mc->fbuf_tex);
 
             glDrawArrays(GL_QUADS, 0, mc->num_quads*4);
+
+            quads_rendered += mc->num_quads;
+            ++chunks_in_frustum;
+            chunk_storage_rendered += mc->num_quads * 20;
          }
       }
    }
+
+   chunk_storage_total = 0;
+   for (j=0; j < MESH_CHUNK_CACHE_Y; ++j)
+      for (i=0; i < MESH_CHUNK_CACHE_X; ++i)
+         if (mesh_cache[j][i].vbuf)
+            chunk_storage_total += mesh_cache[j][i].num_quads * 20;
 
    stbglDisableVertexAttribArray(0);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);

@@ -149,13 +149,14 @@ float compute_height_field(int x, int y)
 #if 1
    float weight=0;
    int o;
-   weight = (float) stb_linear_remap(stb_perlin_noise3(x/256.0f,y/256.0f,100,256,256,256), -1.5, 1.5, 0.0f, 1.0f);
+   weight = (float) stb_linear_remap(stb_perlin_noise3(x/256.0f,y/256.0f,100,256,256,256), -1.5, 1.5, -4.0f, 5.0f);
+   weight = stb_clamp(weight,0,1);
    for (o=0; o < 8; ++o) {
       float scale = (float) (1 << o);
       float ns = stb_perlin_noise3(x/scale, y/scale, o*2.0f, 256,256,256), heavier;
       float sign = (ns < 0 ? -1.0f : 1.0f);
       ns = (float) fabs(ns);
-      heavier = ns*ns;
+      heavier = ns*ns*ns*ns*4;
       ht += scale/2 * stb_lerp(weight, ns, heavier);
    }
 #else

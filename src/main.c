@@ -1,5 +1,5 @@
 #define _WIN32_WINNT 0x400
-#define GL_DEBUG
+//#define GL_DEBUG
 
 #include <assert.h>
 #include <windows.h>
@@ -135,7 +135,7 @@ static void print(char *text, ...)
    pos_y += 10;
 }
 
-float camang[3], camloc[3] = { 0,0,50 };
+float camang[3], camloc[3] = { 0,0,90 };
 float player_zoom = 1.0;
 float rotate_view = 0.0;
 
@@ -261,7 +261,7 @@ int is_synchronous_debug;
 int chunk_locations, chunks_considered, chunks_in_frustum;
 int quads_considered, quads_rendered;
 int chunk_storage_rendered, chunk_storage_considered, chunk_storage_total;
-int view_dist_in_chunks;
+int view_dist_for_display;
 int num_threads_active, num_meshes_started, num_meshes_uploaded;
 float chunk_server_activity;
 
@@ -295,7 +295,7 @@ void draw_stats(void)
    print("Num mesh builds started this frame: %d; num uploaded this frame: %d\n", num_meshes_started, num_meshes_uploaded);
    print("QChunks: %3d in frustum of %3d valid of %3d in range", chunks_in_frustum, chunks_considered, chunk_locations);
    print("Mesh worker threads active: %d", num_threads_active);
-   print("View distance: %d blocks", view_dist_in_chunks*16);
+   print("View distance: %d blocks", view_dist_for_display);
    print("%s", glGetString(GL_RENDERER));
 
    if (is_synchronous_debug) {

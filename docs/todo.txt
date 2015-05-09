@@ -1,6 +1,6 @@
 Possible tasks to work on next:
 
-   -  height-field terrain
+   -  improved height-field terrain 
    -  stats
    -  limit mesh cache to max size
    -  check for memory leaks

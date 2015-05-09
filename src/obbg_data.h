@@ -1,6 +1,8 @@
 #ifndef INCLUDE_OBBG_DATA_H
 #define INCLUDE_OBBG_DATA_H
 
+#include <assert.h>
+
 // block types
 enum
 {
@@ -41,5 +43,11 @@ typedef struct
 #define MESH_CHUNK_Y_FOR_WORLD_Y(y)   ((y) >> MESH_CHUNK_SIZE_Y_LOG2)
 
 mesh_chunk      mesh_cache[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
+
+extern int chunk_locations, chunks_considered, chunks_in_frustum;
+extern int quads_considered, quads_rendered;
+extern int chunk_storage_rendered, chunk_storage_considered, chunk_storage_total;
+extern int view_dist_for_display;
+extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 
 #endif
