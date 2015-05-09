@@ -9,6 +9,8 @@ what's up next.
 
 At the moment, there is almost nothing there!
 
+![obbg screen shot](http://nothings.org/remote/obbg_initial.jpg "obbg screen shot")
+
 # License
 
 Currently the license for this code is public domain.
