@@ -43,8 +43,6 @@ void init_voxel_render(int voxel_tex[2])
    vox_tex[1] = voxel_tex[1];
 }
 
-int view_distance=400;
-
 float table3[128][3];
 float table4[64][4];
 GLint tablei[2];
@@ -149,10 +147,72 @@ void setup_uniforms(float pos[3])
    }
 }
 
+typedef struct
+{
+   float x,y,z,w;
+} plane;
+
+static plane frustum[6];
+
+static void matd_mul(double out[4][4], double src1[4][4], double src2[4][4])
+{
+   int i,j,k;
+   for (j=0; j < 4; ++j) {
+      for (i=0; i < 4; ++i) {
+         double t=0;
+         for (k=0; k < 4; ++k)
+            t += src1[k][i] * src2[j][k];
+         out[i][j] = t;
+      }
+   }
+}
+
+// https://fgiesen.wordpress.com/2012/08/31/frustum-planes-from-the-projection-matrix/
+static void compute_frustum(void)
+{
+   int i;
+   GLdouble mv[4][4],proj[4][4], mvproj[4][4];
+   glGetDoublev(GL_MODELVIEW_MATRIX , mv[0]);
+   glGetDoublev(GL_PROJECTION_MATRIX, proj[0]);
+   matd_mul(mvproj, proj, mv);
+   for (i=0; i < 4; ++i) {
+      (&frustum[0].x)[i] = (float) (mvproj[3][i] + mvproj[0][i]);
+      (&frustum[1].x)[i] = (float) (mvproj[3][i] - mvproj[0][i]);
+      (&frustum[2].x)[i] = (float) (mvproj[3][i] + mvproj[1][i]);
+      (&frustum[3].x)[i] = (float) (mvproj[3][i] - mvproj[1][i]);
+      (&frustum[4].x)[i] = (float) (mvproj[3][i] + mvproj[2][i]);
+      (&frustum[5].x)[i] = (float) (mvproj[3][i] - mvproj[2][i]);
+   }   
+}
+
+static int test_plane(plane *p, float x0, float y0, float z0, float x1, float y1, float z1)
+{
+   // return false if the box is entirely behind the plane
+   float d=0;
+   assert(x0 <= x1 && y0 <= y1 && z0 <= z1);
+   if (p->x > 0) d += x1*p->x; else d += x0*p->x;
+   if (p->y > 0) d += y1*p->y; else d += y0*p->y;
+   if (p->z > 0) d += z1*p->z; else d += z0*p->z;
+   return d + p->w >= 0;
+}
+
+static int is_box_in_frustum(float *bmin, float *bmax)
+{
+   int i;
+   for (i=0; i < 5; ++i)
+      if (!test_plane(&frustum[i], bmin[0], bmin[1], bmin[2], bmax[0], bmax[1], bmax[2]))
+         return 0;
+   return 1;
+}
+
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
+
+int view_distance=400;
 
 void render_voxel_world(float campos[3])
 {
+   int num_build_remaining = 1;
+   int distance;
    float x = campos[0], y = campos[1];
    int qchunk_x, qchunk_y;
    int cam_x, cam_y;
@@ -183,37 +243,79 @@ void render_voxel_world(float campos[3])
    chunks_considered = 0;
    chunks_in_frustum = 0;
 
-   for (j=-rad; j <= rad; ++j) {
-      for (i=-rad; i <= rad; ++i) {
-         int cx = qchunk_x + i;
-         int cy = qchunk_y + j;
-         int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
-         int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-         mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
-         if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
-            mc = build_mesh_chunk_for_coord(cx * MESH_CHUNK_CACHE_X, cy * MESH_CHUNK_CACHE_Y);
-         }
+   compute_frustum();
 
-         ++chunk_locations;
+   for (distance = 0; distance <= rad; ++distance) {
+      for (j=-rad; j <= rad; ++j) {
+         for (i=-rad; i <= rad; ++i) {
+            int cx = qchunk_x + i;
+            int cy = qchunk_y + j;
+            int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
+            int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
+            mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
 
-         ++chunks_considered;
-         quads_considered += mc->num_quads;
-         chunk_storage_considered += mc->num_quads * 20;
-         
-         if (mc->num_quads) {
-            // @TODO if in range, frustum cull
-            stbglUniform3fv(stbgl_find_uniform(main_prog, "transform"), 3, mc->transform[0]);
-            glBindBufferARB(GL_ARRAY_BUFFER_ARB, mc->vbuf);
-            glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, 4, (void*) 0);
-            glBindTexture(GL_TEXTURE_BUFFER_ARB, mc->fbuf_tex);
+            if (stb_max(abs(i),abs(j)) != distance)
+               continue;
 
-            glDrawArrays(GL_QUADS, 0, mc->num_quads*4);
+            if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
+               float estimated_bounds[2][3];
+               if (num_build_remaining == 0)
+                  continue;
+               estimated_bounds[0][0] = (float) ( cx    << MESH_CHUNK_SIZE_X_LOG2);
+               estimated_bounds[0][1] = (float) ( cy    << MESH_CHUNK_SIZE_Y_LOG2);
+               estimated_bounds[0][2] = (float) (0);
+               estimated_bounds[1][0] = (float) ((cx+1) << MESH_CHUNK_SIZE_X_LOG2);
+               estimated_bounds[1][1] = (float) ((cy+1) << MESH_CHUNK_SIZE_Y_LOG2);
+               estimated_bounds[1][2] = (float) (255);
+               if (!is_box_in_frustum(estimated_bounds[0], estimated_bounds[1]))
+                  continue;
+               mc = build_mesh_chunk_for_coord(cx * MESH_CHUNK_CACHE_X, cy * MESH_CHUNK_CACHE_Y);
+               --num_build_remaining;
+            }
 
-            quads_rendered += mc->num_quads;
-            ++chunks_in_frustum;
-            chunk_storage_rendered += mc->num_quads * 20;
+            ++chunk_locations;
+
+            ++chunks_considered;
+            quads_considered += mc->num_quads;
+            chunk_storage_considered += mc->num_quads * 20;
+
+            if (mc->num_quads) {
+               if (is_box_in_frustum(mc->bounds[0], mc->bounds[1])) {
+                  // @TODO if in range, frustum cull
+                  stbglUniform3fv(stbgl_find_uniform(main_prog, "transform"), 3, mc->transform[0]);
+                  glBindBufferARB(GL_ARRAY_BUFFER_ARB, mc->vbuf);
+                  glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, 4, (void*) 0);
+                  glBindTexture(GL_TEXTURE_BUFFER_ARB, mc->fbuf_tex);
+
+                  glDrawArrays(GL_QUADS, 0, mc->num_quads*4);
+
+                  quads_rendered += mc->num_quads;
+                  ++chunks_in_frustum;
+                  chunk_storage_rendered += mc->num_quads * 20;
+               }
+            }
          }
       }
+   }
+
+   if (num_build_remaining) {
+      for (j=-rad; j <= rad; ++j) {
+         for (i=-rad; i <= rad; ++i) {
+            int cx = qchunk_x + i;
+            int cy = qchunk_y + j;
+            int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
+            int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
+            mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
+            if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
+               mc = build_mesh_chunk_for_coord(cx * MESH_CHUNK_CACHE_X, cy * MESH_CHUNK_CACHE_Y);
+               --num_build_remaining;
+               if (num_build_remaining == 0)
+                  goto done;
+            }
+         }
+      }
+      done:
+      ;
    }
 
    chunk_storage_total = 0;

@@ -68,12 +68,14 @@ void render_init(void)
                          GL_RGBA,GL_UNSIGNED_BYTE,NULL);
    }
 
-   for (i=0; i < stb_arr_len(files); ++i) {
+   #if 1
+   for (i=0; i < 1+0*stb_arr_len(files); ++i) {
       size_t len;
-      uint8 *data = stb_file(files[i], &len);
+      uint8 *data = stb_file(files[i+1], &len);
       load_crn_to_texture_array(i, data, len);
       free(data);
    }
+   #endif
 
    // temporary hack:
    voxel_tex[1] = voxel_tex[0];

@@ -16,6 +16,6 @@ Done before stream:
      from caveview (Minecraft)
 
 Done so far:
-  - cache proc gen chunks
+  - cache procedural genation chunks
   - build & cache meshes
   - render them poorly
