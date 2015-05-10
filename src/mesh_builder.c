@@ -17,7 +17,7 @@
 #define STBVOX_CONFIG_DISABLE_TEX2
 #define STBVOX_CONFIG_OPENGL_MODELVIEW
 //#define STBVOX_CONFIG_PREFER_TEXBUFFER
-//#define STBVOX_CONFIG_LIGHTING_SIMPLE
+#define STBVOX_CONFIG_LIGHTING_SIMPLE
 #define STBVOX_CONFIG_FOG_SMOOTHSTEP
 //#define STBVOX_CONFIG_PREMULTIPLIED_ALPHA  // this doesn't work properly alpha test without next #define
 //#define STBVOX_CONFIG_UNPREMULTIPLY  // slower, fixes alpha test makes windows & fancy leaves look better
@@ -191,33 +191,68 @@ gen_chunk *generate_chunk(int x, int y)
    int i,j,z;
    int ground_top = 0;
    gen_chunk *gc = malloc(sizeof(*gc));
-   float height_field[GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X];
-   int height_field_int[GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X];
+   float height_field[GEN_CHUNK_SIZE_Y+2][GEN_CHUNK_SIZE_X+2];
+   int height_field_int[GEN_CHUNK_SIZE_Y+2][GEN_CHUNK_SIZE_X+2];
 
-   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
-      for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+   for (j=-1; j <= GEN_CHUNK_SIZE_Y; ++j)
+      for (i=-1; i <= GEN_CHUNK_SIZE_X; ++i) {
          float ht = compute_height_field(x+i,y+j);
-         height_field[j][i] = ht;
-         height_field_int[j][i] = (int) height_field[j][i];
-         ground_top = stb_max(ground_top, height_field_int[j][i]);
+         height_field[j+1][i+1] = ht;
+         height_field_int[j+1][i+1] = (int) height_field[j+1][i+1];
+         ground_top = stb_max(ground_top, height_field_int[j+1][i+1]);
       }  
 
    for (z=0; z < 16; ++z) {
       memset(gc->partial[z].block, BT_empty, sizeof(gc->partial[z].block));
-      memset(gc->partial[z].lighting, 255, sizeof(gc->partial[z].lighting));
+      //memset(gc->partial[z].lighting, 255, sizeof(gc->partial[z].lighting));
    }
 
    zs = ground_top >> Z_SEGMENT_SIZE_LOG2;
    memset(gc->non_empty, 0, sizeof(gc->non_empty));
    memset(gc->non_empty, 1, (ground_top+Z_SEGMENT_SIZE-1)>>Z_SEGMENT_SIZE_LOG2);
 
-   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
       for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
          unsigned int val = fast_noise(x+i,y+j,3,777);
+         int ht = height_field_int[j+1][i+1];
          val = (val*16)/65536;
-         for (z=0; z < height_field_int[j][i]; ++z)
+         for (z=0; z < ht; ++z)
             gc->partial[z>>4].block[j][i][z&15] = (uint8) (BT_solid + val);
       }
+   }
+
+   // compute lighting for every block by weighted average of neighbors
+   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
+      for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+         for (z=0; z < ground_top+1; ++z) {
+            int light;
+            if (z < height_field_int[j+1][i+1]) {
+               light = 0;
+            } else {
+               int m,n;
+               light = 0;
+               for (m=-1; m <= 1; ++m) {
+                  for (n=-1; n <= 1; ++n) {
+                     int ht = height_field_int[j+1+m][i+1+n];
+                     int val = z-ht+2;
+
+                     if (val < 0) val=0;
+                     if (val > 3) val = 3;
+                     light += val;
+                  }
+               }
+               // 27 ?
+               light += 4;
+               light = light << 3;
+            }
+
+            gc->partial[z>>4].lighting[j][i][z&15] = light;
+         }
+         for (; z < MAX_Z; ++z)
+            gc->partial[z>>4].lighting[j][i][z&15] = 255;
+      }
+   }
+
 
    return gc;
 }

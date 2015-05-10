@@ -88,6 +88,9 @@ LINK32=link.exe
 
 # Name "obbg - Win32 Release"
 # Name "obbg - Win32 Debug"
+# Begin Group "libs"
+
+# PROP Default_Filter ""
 # Begin Source File
 
 SOURCE=..\src\3rd\crn_decomp.h
@@ -99,26 +102,6 @@ SOURCE=..\src\glext.h
 # Begin Source File
 
 SOURCE=..\src\glext_list.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\src\main.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\src\mesh_builder.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\src\obbg_data.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\src\obbg_funcs.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\docs\overview.txt
 # End Source File
 # Begin Source File
 
@@ -148,13 +131,38 @@ SOURCE=..\stb\stb_image.h
 
 SOURCE=..\stb\stb_voxel_render.h
 # End Source File
+# End Group
+# Begin Group "docs"
+
+# PROP Default_Filter ""
 # Begin Source File
 
-SOURCE=..\src\texture_loader.cpp
+SOURCE=..\docs\overview.txt
 # End Source File
 # Begin Source File
 
 SOURCE=..\docs\todo.txt
+# End Source File
+# End Group
+# Begin Source File
+
+SOURCE=..\src\main.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\src\mesh_builder.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\src\obbg_data.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\src\obbg_funcs.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\src\texture_loader.cpp
 # End Source File
 # Begin Source File
 

@@ -214,8 +214,9 @@ static int is_box_in_frustum(float *bmin, float *bmax)
 }
 
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
+extern float light_pos[3];
 
-int view_distance=400;
+int view_distance=1200;
 
 void render_voxel_world(float campos[3])
 {
@@ -242,6 +243,18 @@ void render_voxel_world(float campos[3])
 
    rad = view_distance >> MESH_CHUNK_SIZE_X_LOG2;
    view_dist_for_display = view_distance;
+
+   {
+      float lighting[2][3] = { { 0,0,0 }, { 0.75,0.75,0.65f } };
+      float bright = 32;
+      lighting[0][0] = light_pos[0];
+      lighting[0][1] = light_pos[1];
+      lighting[0][2] = light_pos[2];
+      lighting[1][0] *= bright;
+      lighting[1][1] *= bright;
+      lighting[1][2] *= bright;
+      stbglUniform3fv(stbgl_find_uniform(main_prog, "light_source"), 2, lighting[0]);
+   }
 
    quads_rendered = 0;
    quads_considered = 0;

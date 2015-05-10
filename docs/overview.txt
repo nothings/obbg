@@ -1,13 +1,26 @@
 obbg:
   open block building game
-  exercise all interesting features
-    of voxel stuff:
+  exercise all interesting
+    features of voxel stuff:
   - mesh generation/rendering
   - procedural gen
   - user create/destroy
   - save/load to disk
   - networking
   
+Done this stream:
+   -  optimize rendering
+      -  frustum culling
+      -  limit # chunks rebuilt per frame
+   -  use more textures
+   -  vertex ambient occlusion
+   -  launch one light source at a time
+
+Previous stream:
+  - cache procedural genation chunks
+  - build & cache meshes
+  - render them poorly
+
 Done before stream:
   Pixar's 128 1024x1024
   Loaded with Rich Geldreich's
@@ -15,7 +28,3 @@ Done before stream:
   Main loop/top-level cut-n-paste
      from caveview (Minecraft)
 
-Done so far:
-  - cache procedural genation chunks
-  - build & cache meshes
-  - render them poorly

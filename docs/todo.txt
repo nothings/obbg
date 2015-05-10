@@ -1,14 +1,10 @@
 Possible tasks to work on next:
 
-   -  use more textures
-   -  add lighting
-   -  launch light sources
    -  use more block types
    -  improved height-field terrain 
    -  other terrain features
    -  dynamically set view distance
       - adjust fog distance to match
-   -  vertex ambient occlusion
    -  limit mesh cache to max size
    -  texture improvements
      -  tweak pixar textures to be more grey so can dynamically recolor
@@ -27,6 +23,7 @@ Possible tasks to work on next:
    -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
    -  "physics" (e.g. move on ground, needs physics rep)
    -  raycast (needs physics rep)
+   -  add better lighting
 
 Not right now:
 

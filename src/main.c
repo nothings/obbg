@@ -1,5 +1,5 @@
 #define _WIN32_WINNT 0x400
-#define GL_DEBUG
+//#define GL_DEBUG
 
 #include <assert.h>
 #include <windows.h>
@@ -198,6 +198,7 @@ void camera_to_worldspace(float world[3], float cam_x, float cam_y, float cam_z)
 
 // camera worldspace velocity
 float cam_vel[3];
+float light_pos[3];
 
 int controls;
 
@@ -220,6 +221,8 @@ float pending_view_x;
 float pending_view_z;
 float pending_view_x;
 float pending_view_z;
+
+float light_vel[3];
 
 void process_tick_raw(float dt)
 {
@@ -259,6 +262,10 @@ void process_tick_raw(float dt)
    camloc[0] += cam_vel[0] * dt;
    camloc[1] += cam_vel[1] * dt;
    camloc[2] += cam_vel[2] * dt;
+
+   light_pos[0] += light_vel[0] * dt;
+   light_pos[1] += light_vel[1] * dt;
+   light_pos[2] += light_vel[2] * dt;
 
    view_x_vel *= (float) pow(0.75, dt);
    view_z_vel *= (float) pow(0.75, dt);
@@ -353,6 +360,14 @@ void stbgl_drawRectTCArray(float x0, float y0, float x1, float y1, float s0, flo
    glEnd();
 }
 
+void render_objects(void)
+{
+   glColor3f(1,1,1);
+   glDisable(GL_TEXTURE_2D);
+   stbgl_drawBox(light_pos[0], light_pos[1], light_pos[2], 3,3,3, 0);
+}
+
+
 void draw_main(void)
 {
    glEnable(GL_CULL_FACE);
@@ -398,6 +413,9 @@ void draw_main(void)
 
    start_time = SDL_GetPerformanceCounter();
    render_voxel_world(camloc);
+
+   render_objects();
+
    end_time = SDL_GetPerformanceCounter();
 
    render_time = (end_time - start_time) / (float) SDL_GetPerformanceFrequency();
@@ -578,6 +596,10 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_D)   active_control_set(7);
          if (k == '1') global_hack = !global_hack;
          if (k == '2') global_hack = -1;
+         if (s == SDL_SCANCODE_R) {
+            camera_to_worldspace(light_vel, 0,32,0);
+            memcpy(light_pos, camloc, sizeof(light_pos));
+         }
 
          #if 0
          if (game_mode == GAME_editor) {
