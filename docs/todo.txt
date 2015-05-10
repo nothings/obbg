@@ -1,20 +1,31 @@
 Possible tasks to work on next:
 
-   -  improved height-field terrain 
-   -  stats
-   -  limit mesh cache to max size
-   -  check for memory leaks
-   -  optimize terrain generation
-   -  threaded terrain generation
-   -  optimize mesh building
-   -  threaded mesh building
-   -  disk save/load
+   -  optimize rendering
+      -  frustum culling
+      -  limit # chunks rebuilt per frame
    -  use more textures
    -  use more block types
+   -  improved height-field terrain 
    -  other terrain features
-   -  user block create/destroy
-   -  "physics" (e.g. move on ground)
-   -  shoot light sources
+   -  dynamically set view distance
+      - adjust fog distance to match
+   -  vertex ambient occlusion
+   -  limit mesh cache to max size
+   -  check for memory leaks
+   -  optimize mesh building
+   -  threaded mesh building
+   -  optimize terrain generation
+   -  threaded terrain generation
+   -  disk save/load
+      - lz4 compression?
+   -  user block create/destroy (needs raycast?)
+   -  object (non-terrain) rendering
+      - what model-file format?
+      - animation? skinning?
+   -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
+   -  "physics" (e.g. move on ground, needs physics rep)
+   -  raycast (needs physics rep)
+   -  launch light sources
 
 Not right now:
 
