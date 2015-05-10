@@ -8,6 +8,9 @@ enum
 {
    BT_empty,
    BT_solid,
+   BT_1,
+   BT_2,
+   BT_3,
 };
 
 typedef struct
@@ -23,6 +26,8 @@ typedef struct
    unsigned int fbuf, fbuf_tex;
    int num_quads;
 } mesh_chunk;
+
+extern float texture_scales[256];
 
 #define MAX_Z                    255
 

@@ -1,5 +1,5 @@
 #define _WIN32_WINNT 0x400
-//#define GL_DEBUG
+#define GL_DEBUG
 
 #include <assert.h>
 #include <windows.h>
@@ -49,6 +49,38 @@ extern int load_crn_to_texture_array(int slot, unsigned char *data, size_t lengt
 GLuint debug_tex, dumb_prog;
 unsigned int voxel_tex[2];
 
+typedef struct
+{
+   float scale;
+   char *filename;
+} texture_info;
+
+texture_info textures[] =
+{
+   1.0/8,"ground/Beach_sand_pxr128",
+   1.0/4,"ground/Bowling_grass_pxr128",
+   1,"ground/Dirt_and_gravel_pxr128",
+   1,"ground/Fine_gravel_pxr128",
+   1.0/2,"ground/Ivy_pxr128",
+   1,"ground/Lawn_grass_pxr128",
+   1,"ground/Pebbles_in_mortar_pxr128",
+   1,"ground/Peetmoss_pxr128",
+   1,"ground/Red_gravel_pxr128",
+   1,"ground/Street_asphalt_pxr128",
+   1,"floor/Wool_carpet_pxr128",
+   1,"brick/Pink-brown_painted_pxr128",
+   1,"brick/Building_block_pxr128",
+   1,"brick/Standard_red_pxr128",
+   1,"siding/Diagonal_cedar_pxr128",
+   1,"siding/Vertical_redwood_pxr128",
+   1,"stone/Gray_marble_pxr128",
+   1,"stone/Buffed_marble_pxr128",
+   1,"stone/Black_marble_pxr128",
+   1,"stone/Blue_marble_pxr128",
+};
+
+float texture_scales[256];
+
 void render_init(void)
 {
    // @TODO: support non-DXT path
@@ -56,6 +88,7 @@ void render_init(void)
    int i;
 
    init_chunk_caches();
+   init_mesh_building();
 
    glGenTextures(2, voxel_tex);
 
@@ -69,11 +102,13 @@ void render_init(void)
    }
 
    #if 1
-   for (i=0; i < 1+0*stb_arr_len(files); ++i) {
+   for (i=0; i < sizeof(textures)/sizeof(textures[0]); ++i) {
       size_t len;
-      uint8 *data = stb_file(files[i+1], &len);
+      char *filename = stb_sprintf("data/pixar/crn/%s.crn", textures[i].filename);
+      uint8 *data = stb_file(filename, &len);
       load_crn_to_texture_array(i, data, len);
       free(data);
+      texture_scales[i] = 1.0f/4;// textures[i].scale;
    }
    #endif
 
@@ -308,6 +343,16 @@ void draw_stats(void)
    }
 }
 
+void stbgl_drawRectTCArray(float x0, float y0, float x1, float y1, float s0, float t0, float s1, float t1, float i)
+{
+   glBegin(GL_POLYGON);
+      glTexCoord3f(s0,t0,i); glVertex2f(x0,y0);
+      glTexCoord3f(s1,t0,i); glVertex2f(x1,y0);
+      glTexCoord3f(s1,t1,i); glVertex2f(x1,y1);
+      glTexCoord3f(s0,t1,i); glVertex2f(x0,y1);
+   glEnd();
+}
+
 void draw_main(void)
 {
    glEnable(GL_CULL_FACE);
@@ -369,12 +414,10 @@ void draw_main(void)
    if (0) {
       stbglUseProgram(dumb_prog);
       glDisable(GL_TEXTURE_2D);
-      glEnable(GL_TEXTURE_2D_ARRAY_EXT);
       glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, voxel_tex[0]);
       stbglUniform1i(stbgl_find_uniform(dumb_prog, "tex"), 0);
       glColor3f(1,1,1);
-      stbgl_drawRectTC(0,0,512,512,0,0,3,3);
-      glDisable(GL_TEXTURE_2D_ARRAY_EXT);
+      stbgl_drawRectTCArray(0,0,512,512,0,0,1,1, 0.0);
       stbglUseProgram(0);
    }
 

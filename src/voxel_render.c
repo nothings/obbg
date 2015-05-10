@@ -44,7 +44,7 @@ void init_voxel_render(int voxel_tex[2])
 }
 
 float table3[128][3];
-float table4[64][4];
+float table4[128][4];
 GLint tablei[2];
 GLuint uniform_loc[STBVOX_UNIFORM_count];
 
@@ -81,12 +81,17 @@ void setup_uniforms(float pos[3])
                data = tablei;
                break;
 
-            #if 0
             case STBVOX_UNIFORM_texscale:
-               compute_texscale();
-               data = texscale;
+               for (j=0; j < 128; ++j) {
+                  table4[j][0] = texture_scales[j];
+                  table4[j][1] = 1.0f;
+                  table4[j][2] = 0;
+                  table4[j][3] = 0;
+               }
+               data = table4;
                break;
 
+            #if 0
             case STBVOX_UNIFORM_color_table:
                compute_colortable();
                data = colortable;
@@ -112,6 +117,7 @@ void setup_uniforms(float pos[3])
                table4[0][0] =  0.3f;
                table4[0][1] = -0.5f;
                table4[0][2] =  0.9f;
+               table4[0][3] = 0;
 
                amb[1][0] = 0.3f; amb[1][1] = 0.3f; amb[1][2] = 0.3f; // dark-grey
                amb[2][0] = 1.0; amb[2][1] = 1.0; amb[2][2] = 1.0; // white
@@ -126,6 +132,8 @@ void setup_uniforms(float pos[3])
                   table4[1][j] = (amb[2][j] - amb[1][j])/2 * bright;
                   table4[2][j] = (amb[1][j] + amb[2][j])/2 * bright;
                }
+               table4[1][3] = 0;
+               table4[2][3] = 0;
 
                // fog color
                table4[3][0] = 0.6f, table4[3][1] = 0.7f, table4[3][2] = 0.9f;

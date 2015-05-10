@@ -1,9 +1,8 @@
 Possible tasks to work on next:
 
-   -  optimize rendering
-      -  frustum culling
-      -  limit # chunks rebuilt per frame
    -  use more textures
+   -  add lighting
+   -  launch light sources
    -  use more block types
    -  improved height-field terrain 
    -  other terrain features
@@ -11,6 +10,9 @@ Possible tasks to work on next:
       - adjust fog distance to match
    -  vertex ambient occlusion
    -  limit mesh cache to max size
+   -  texture improvements
+     -  tweak pixar textures to be more grey so can dynamically recolor
+     -  find better open textures or pay someone to make them
    -  check for memory leaks
    -  optimize mesh building
    -  threaded mesh building
@@ -25,7 +27,6 @@ Possible tasks to work on next:
    -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
    -  "physics" (e.g. move on ground, needs physics rep)
    -  raycast (needs physics rep)
-   -  launch light sources
 
 Not right now:
 

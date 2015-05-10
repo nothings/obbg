@@ -6,12 +6,15 @@
 #include "stb.h"
 #include "sdl.h"
 #include "sdl_thread.h"
+
 #include <math.h>
 
+#include "u_noise.h"
 #include "obbg_data.h"
 
 #define STBVOX_CONFIG_MODE  1
 
+#define STBVOX_CONFIG_DISABLE_TEX2
 #define STBVOX_CONFIG_OPENGL_MODELVIEW
 //#define STBVOX_CONFIG_PREFER_TEXBUFFER
 //#define STBVOX_CONFIG_LIGHTING_SIMPLE
@@ -28,6 +31,9 @@ extern void ods(char *fmt, ...);
 unsigned char geom_map[] =
 {
    STBVOX_GEOM_empty,
+   STBVOX_GEOM_solid,
+   STBVOX_GEOM_solid,
+   STBVOX_GEOM_solid,
    STBVOX_GEOM_solid,
 };
 
@@ -112,6 +118,14 @@ gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
       return NULL;
 }
 
+void init_mesh_building(void)
+{
+   int i,j;
+   for (i=0; i < 256; ++i)
+      for (j=0; j < 6; ++j)
+         tex1_for_blocktype[i][j] = (uint8) i-1;
+}
+
 void init_chunk_caches(void)
 {
    int i,j;
@@ -140,8 +154,6 @@ void free_gen_chunk(gen_chunk_cache *gcc)
 
 #define MIN_GROUND 32
 #define AVG_GROUND 64
-
-extern float stb_perlin_noise3(float x, float y, float z, int x_wrap, int y_wrap, int z_wrap); // -1 to 1
 
 float compute_height_field(int x, int y)
 {
@@ -200,9 +212,12 @@ gen_chunk *generate_chunk(int x, int y)
    memset(gc->non_empty, 1, (ground_top+Z_SEGMENT_SIZE-1)>>Z_SEGMENT_SIZE_LOG2);
 
    for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
-      for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
+      for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+         unsigned int val = fast_noise(x+i,y+j,3,777);
+         val = (val*16)/65536;
          for (z=0; z < height_field_int[j][i]; ++z)
-            gc->partial[z>>4].block[j][i][z&15] = BT_solid;
+            gc->partial[z>>4].block[j][i][z&15] = (uint8) (BT_solid + val);
+      }
 
    return gc;
 }
