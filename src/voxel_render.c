@@ -267,8 +267,8 @@ void render_voxel_world(float campos[3])
    compute_frustum();
 
    for (distance = 0; distance <= rad; ++distance) {
-      for (j=-rad; j <= rad; ++j) {
-         for (i=-rad; i <= rad; ++i) {
+      for (j=-distance; j <= distance; ++j) {
+         for (i=-distance; i <= distance; ++i) {
             int cx = qchunk_x + i;
             int cy = qchunk_y + j;
             int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
@@ -276,6 +276,9 @@ void render_voxel_world(float campos[3])
             mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
 
             if (stb_max(abs(i),abs(j)) != distance)
+               continue;
+
+            if (i*i + j*j > rad*rad)
                continue;
 
             if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {

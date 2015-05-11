@@ -8,6 +8,7 @@
 #include "sdl_thread.h"
 
 #include <math.h>
+#include <assert.h>
 
 #include "u_noise.h"
 #include "obbg_data.h"
@@ -71,11 +72,11 @@ typedef struct
    uint8 overlay [GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X][Z_SEGMENT_SIZE];
 } gen_chunk_partial;
 
-typedef struct
+struct st_gen_chunk
 {
    gen_chunk_partial partial  [NUM_Z_SEGMENTS];
    unsigned char     non_empty[NUM_Z_SEGMENTS];
-} gen_chunk;
+};
 
 typedef struct
 {
@@ -187,12 +188,14 @@ float compute_height_field(int x, int y)
 
 gen_chunk *generate_chunk(int x, int y)
 {
-   int zs;
+   int z_seg;
    int i,j,z;
    int ground_top = 0;
    gen_chunk *gc = malloc(sizeof(*gc));
    float height_field[GEN_CHUNK_SIZE_Y+2][GEN_CHUNK_SIZE_X+2];
    int height_field_int[GEN_CHUNK_SIZE_Y+2][GEN_CHUNK_SIZE_X+2];
+   int corner_tex[2][2], corner_weight[2][2];
+   int block_type[GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X];
 
    for (j=-1; j <= GEN_CHUNK_SIZE_Y; ++j)
       for (i=-1; i <= GEN_CHUNK_SIZE_X; ++i) {
@@ -202,75 +205,139 @@ gen_chunk *generate_chunk(int x, int y)
          ground_top = stb_max(ground_top, height_field_int[j+1][i+1]);
       }  
 
-   for (z=0; z < 16; ++z) {
-      memset(gc->partial[z].block, BT_empty, sizeof(gc->partial[z].block));
-      //memset(gc->partial[z].lighting, 255, sizeof(gc->partial[z].lighting));
-   }
-
-   zs = ground_top >> Z_SEGMENT_SIZE_LOG2;
    memset(gc->non_empty, 0, sizeof(gc->non_empty));
    memset(gc->non_empty, 1, (ground_top+Z_SEGMENT_SIZE-1)>>Z_SEGMENT_SIZE_LOG2);
 
+   for (j=0; j < 2; ++j) {
+      for (i=0; i < 2; ++i) {
+         unsigned int val = fast_noise(x+i*GEN_CHUNK_SIZE_X,y+j*GEN_CHUNK_SIZE_Y,3,777);
+         val = (val*16)/65536;
+         corner_tex[j][i] = val;
+         corner_weight[j][i] = 32+(fast_noise(x+i*GEN_CHUNK_SIZE_X,y+j*GEN_CHUNK_SIZE_Y,3,666)&255);
+      }
+   }
+   
    for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
       for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
-         unsigned int val = fast_noise(x+i,y+j,3,777);
-         int ht = height_field_int[j+1][i+1];
-         val = (val*16)/65536;
-         for (z=0; z < ht; ++z)
-            gc->partial[z>>4].block[j][i][z&15] = (uint8) (BT_solid + val);
+         int best=0, best_w=0, w;
+         w = corner_weight[0][0]*(GEN_CHUNK_SIZE_X+i)*(GEN_CHUNK_SIZE_Y-j);
+         if (w >= best_w) {
+            best_w = w;
+            best = corner_tex[0][0];
+         }
+         w = corner_weight[0][1]*(i)*(GEN_CHUNK_SIZE_Y-j);
+         if (w >= best_w) {
+            best_w = w;
+            best = corner_tex[0][1];
+         }
+         w = corner_weight[1][0]*(GEN_CHUNK_SIZE_X-i)*(j);
+         if (w >= best_w) {
+            best_w = w;
+            best = corner_tex[1][0];
+         }
+         w = corner_weight[1][1]*(i)*(j);
+         if (w >= best_w) {
+            best_w = w;
+            best = corner_tex[1][1];
+         }
+         block_type[j][i] = (BT_solid + best);
+      }
+   }
+
+   for (z_seg=0; z_seg < NUM_Z_SEGMENTS; ++z_seg) {
+      int z0 = z_seg * Z_SEGMENT_SIZE;
+      gen_chunk_partial *gcp = &gc->partial[z_seg];
+      for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
+         for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+            int ht = height_field_int[j+1][i+1];
+            int z_limit = stb_clamp(ht-z0, 0, Z_SEGMENT_SIZE);
+            assert(z_limit >= 0 && Z_SEGMENT_SIZE - z_limit >= 0);
+            memset(&gcp->block[j][i][   0   ], block_type[j][i], z_limit);
+            memset(&gcp->block[j][i][z_limit],     BT_empty    , Z_SEGMENT_SIZE - z_limit);
+         }
       }
    }
 
    // compute lighting for every block by weighted average of neighbors
-   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
-      for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
-         for (z=0; z < ground_top+1; ++z) {
-            int light;
-            if (z < height_field_int[j+1][i+1]) {
-               light = 0;
-            } else {
-               int m,n;
-               light = 0;
-               for (m=-1; m <= 1; ++m) {
-                  for (n=-1; n <= 1; ++n) {
-                     int ht = height_field_int[j+1+m][i+1+n];
-                     int val = z-ht+2;
 
-                     if (val < 0) val=0;
-                     if (val > 3) val = 3;
-                     light += val;
+   // loop through every partial chunk separately
+
+   for (z_seg=0; (z_seg < NUM_Z_SEGMENTS); ++z_seg) {
+      gen_chunk_partial *gcp = &gc->partial[z_seg];
+      int z0 = z_seg * Z_SEGMENT_SIZE;
+      int z_limit;
+      z_limit = Z_SEGMENT_SIZE;
+      if (z_limit + z0 > ground_top+1)
+         z_limit = ground_top+1 - z0;
+      if (z_limit < 0)
+         break;
+      for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
+         for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+            unsigned char *lt = &gcp->lighting[j][i][0];
+            for (z=0; z < z_limit; ++z) {
+               int light;
+               if (z0+z < height_field_int[j+1][i+1]) {
+                  light = 0;
+               } else {
+                  int m,n;
+                  light = 0;
+                  for (m=-1; m <= 1; ++m) {
+                     for (n=-1; n <= 1; ++n) {
+                        int ht = height_field_int[j+1+m][i+1+n];
+                        int val = z0+z-ht+2;
+
+                        if (val < 0) val=0;
+                        if (val > 3) val = 3;
+                        light += val;
+                     }
                   }
+                  // 27 ?
+                  light += 4;
+                  light = light << 3;
                }
-               // 27 ?
-               light += 4;
-               light = light << 3;
-            }
 
-            gc->partial[z>>4].lighting[j][i][z&15] = light;
+               *lt++ = light;
+            }
+            for (; z < Z_SEGMENT_SIZE; ++z)
+               *lt++ = 255;
          }
-         for (; z < MAX_Z; ++z)
-            gc->partial[z>>4].lighting[j][i][z&15] = 255;
       }
    }
 
+   for (; z_seg < NUM_Z_SEGMENTS; ++z_seg) {
+      gen_chunk_partial *gcp = &gc->partial[z_seg];
+      for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+         for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+            unsigned char *lt = &gcp->lighting[j][i][0];
+            for (z=0; z < Z_SEGMENT_SIZE; ++z)
+               *lt++ = 255;
+         }
+   }
 
    return gc;
+}
+
+gen_chunk_cache * put_chunk_in_cache(int x, int y, gen_chunk *gc)
+{
+   int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
+   int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y);
+   int slot_x = cx & (GEN_CHUNK_CACHE_X-1);
+   int slot_y = cy & (GEN_CHUNK_CACHE_Y-1);
+   gen_chunk_cache *gcc = &gen_cache[slot_y][slot_x];
+   assert(gcc->chunk_x != x || gcc->chunk_y != y || gcc->chunk == NULL);
+   if (gcc->chunk != NULL)
+      free_gen_chunk(gcc);
+   gcc->chunk_x = cx;
+   gcc->chunk_y = cy;
+   gcc->chunk = gc;
+   return gcc;
 }
 
 gen_chunk *get_gen_chunk_for_coord(int x, int y)
 {
    gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(x,y);
    if (gcc == NULL) {
-      int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
-      int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y);
-      int slot_x = cx & (GEN_CHUNK_CACHE_X-1);
-      int slot_y = cy & (GEN_CHUNK_CACHE_Y-1);
-      gcc = &gen_cache[slot_y][slot_x];
-      if (gcc->chunk != NULL)
-         free_gen_chunk(gcc);
-      gcc->chunk_x = cx;
-      gcc->chunk_y = cy;
-      gcc->chunk = generate_chunk(x, y);
+      gcc = put_chunk_in_cache(x, y, generate_chunk(x, y));
    }
    assert(gcc->chunk_x*GEN_CHUNK_SIZE_X == x && gcc->chunk_y*GEN_CHUNK_SIZE_Y == y);
    return gcc->chunk;
@@ -292,11 +359,6 @@ gen_chunk *get_gen_chunk_for_coord(int x, int y)
 
 typedef struct
 {
-   gen_chunk *chunk[4][4];
-} chunk_set;
-
-typedef struct
-{
    int x,y,z;
 } vec3i;
 
@@ -305,9 +367,11 @@ uint8 segment_lighting[66][66][18];
 
 void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg)
 {
-   int j,i,x,y,z;
+   int j,i,x,y;
    for (j=0; j < 4; ++j)
       for (i=0; i < 4; ++i) {
+         gen_chunk_partial *gcp;
+
          int x_off = (i-1) * GEN_CHUNK_SIZE_X + 1;
          int y_off = (j-1) * GEN_CHUNK_SIZE_Y + 1;
 
@@ -321,16 +385,19 @@ void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg)
          if (y_off + y0 <  0) y0 = 0 - y_off;
          if (y_off + y1 > 66) y1 = 66 - y_off;
 
-         for (y=y0; y < y1; ++y)
-            for (x=x0; x < x1; ++x)
-               for (z=0; z < 16; ++z) {
-                  segment_blocktype[y+y_off][x+x_off][z] = chunks->chunk[j][i]->partial[z_seg].block[y][x][z];
-                  segment_lighting[y+y_off][x+x_off][z] = chunks->chunk[j][i]->partial[z_seg].lighting[y][x][z];
-               }
+         gcp = &chunks->chunk[j][i]->partial[z_seg];
+         for (y=y0; y < y1; ++y) {
+            uint8 *bt = &segment_blocktype[y+y_off][x_off][0];
+            uint8 *lt = &segment_lighting [y+y_off][x_off][0];
+            for (x=x0; x < x1; ++x) {
+               memcpy(bt + sizeof(segment_blocktype[0][0])*x, &gcp->block   [y][x][0], 16);
+               memcpy(lt + sizeof(segment_lighting [0][0])*x, &gcp->lighting[y][x][0], 16);
+            }
+         }
       }
 }
 
-void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i world_coord, chunk_set *chunks, uint8 *build_buffer, size_t build_size, uint8 *face_buffer)
+void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i world_coord, chunk_set *chunks, uint8 *vertex_build_buffer, size_t build_size, uint8 *face_buffer)
 {
    int a,b,z;
 
@@ -352,7 +419,7 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    //map->block_geometry = minecraft_geom_for_blocktype;
 
    //stbvox_reset_buffers(mm);
-   stbvox_set_buffer(mm, 0, 0, build_buffer, build_size);
+   stbvox_set_buffer(mm, 0, 0, vertex_build_buffer, build_size);
    stbvox_set_buffer(mm, 0, 1, face_buffer , build_size>>2);
 
    map->blocktype = &segment_blocktype[1][1][1]; // this is (0,0,0), but we need to be able to query off the edges
@@ -407,11 +474,11 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    mc->num_quads = stbvox_get_quad_count(mm, 0);
 }
 
-void upload_mesh(mesh_chunk *mc, uint8 *build_buffer, uint8 *face_buffer)
+void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer)
 {
    glGenBuffersARB(1, &mc->vbuf);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, mc->vbuf);
-   glBufferDataARB(GL_ARRAY_BUFFER_ARB, mc->num_quads*4*sizeof(uint32), build_buffer, GL_STATIC_DRAW_ARB);
+   glBufferDataARB(GL_ARRAY_BUFFER_ARB, mc->num_quads*4*sizeof(uint32), vertex_build_buffer, GL_STATIC_DRAW_ARB);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
 
    glGenBuffersARB(1, &mc->fbuf);
@@ -425,14 +492,16 @@ void upload_mesh(mesh_chunk *mc, uint8 *build_buffer, uint8 *face_buffer)
    glBindTexture(GL_TEXTURE_BUFFER_ARB, 0);
 }
 
-static uint8 build_buffer[64*1024*1024];
+static uint8 vertex_build_buffer[64*1024*1024];
 static uint8 face_buffer[16*1024*1024];
 
 mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
 {
-   int cx = MESH_CHUNK_X_FOR_WORLD_X(x) & (MESH_CHUNK_CACHE_X-1);
-   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y) & (MESH_CHUNK_CACHE_Y-1);
-   mesh_chunk *mc = &mesh_cache[cy][cx];
+   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
+   int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
+   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
+   mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
 
    if (mc->vbuf) {
       assert(mc->chunk_x != cx || mc->chunk_y != cy);
@@ -450,9 +519,397 @@ mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
             cs.chunk[j][i] = get_gen_chunk_for_coord(x + (i-1)*GEN_CHUNK_SIZE_X, y + (j-1)*GEN_CHUNK_SIZE_Y);
 
       stbvox_init_mesh_maker(&mm);
-      generate_mesh_for_chunk_set(&mm, mc, wc, &cs, build_buffer, sizeof(build_buffer), face_buffer);
-      upload_mesh(mc, build_buffer, face_buffer);
+      generate_mesh_for_chunk_set(&mm, mc, wc, &cs, vertex_build_buffer, sizeof(vertex_build_buffer), face_buffer);
+      upload_mesh(mc, vertex_build_buffer, face_buffer);
    }
 
    return mc;
 }
+
+
+#if 1
+void init_mesh_build_threads(void)
+{
+}
+#else
+/*
+         SDL_SemPost(mw->request_received);
+      SDL_SemWait(mw->request_received);
+      SDL_LockMutex(chunk_cache_mutex);
+      for (j=0; j < 4; ++j)
+         for (i=0; i < 4; ++i) {
+            deref_fastchunk(mw->chunks[j][i]);
+            mw->chunks[j][i] = NULL;
+         }
+      SDL_UnlockMutex(chunk_cache_mutex);
+      data->request_received = SDL_CreateSemaphore(0);
+      data->chunk_server_done_processing = SDL_CreateSemaphore(0);
+      SDL_CreateThread(mesh_worker_handler, "mesh worker", data);
+   int num_proc = SDL_GetCPUCount();
+*/
+
+#define MAX_MESH_WORKERS 32
+
+enum
+{
+   JOB_none,
+
+   JOB_build_mesh,
+   JOB_generate_terrain,
+};
+
+typedef struct
+{
+   int task_type;
+   int world_x, world_y;
+
+   // build_mesh:
+   chunk_set cs;
+
+   // generate_terrain:
+} task;
+
+typedef struct
+{
+   SDL_mutex *mutex;
+   unsigned char padding[64];
+   int  head,tail;
+   int length;
+} threadsafe_queue;
+
+void init_threadsafe_queue(threadsafe_queue *tq, int length)
+{
+   tq->mutex = SDL_CreateMutex();
+   tq->head = tq->tail = 0;
+   tq->length = length;
+}
+
+threadsafe_queue built_meshes, pending_tasks, finished_gen;
+
+typedef struct
+{
+   gen_chunk *gc;
+   int world_x;
+   int world_y;
+} finished_gen_chunk;
+
+#define MAX_TASKS          1024
+#define MAX_GEN_CHUNKS     256
+
+task                task_queue[MAX_TASKS];
+finished_gen_chunk   gen_queue[MAX_GEN_CHUNKS];
+
+
+
+
+#if 0
+
+   @TODO: reference count chunks
+
+   1. Iterate over world around player
+   2. Determine meshes that are needed;
+      build list of meshes needed in
+      priority order, update requested
+      list with those.
+#endif
+
+
+
+typedef struct
+{
+   SDL_mutex *lock;
+   SDL_cond *cond;
+   int event;
+} WakeableWaiter;
+
+void waiter_wait(WakeableWaiter *ww)
+{
+   SDL_LockMutex(ww->lock);
+   while (!ww->event)
+      SDL_CondWait(ww->cond, ww->lock);
+   ww->event = 0;
+   SDL_UnlockMutex(ww->lock);
+}
+ 
+void waiter_wake(WakeableWaiter *ww)
+{
+   SDL_LockMutex(ww->lock);
+   ww->event = 1;
+   SDL_CondSignal(ww->cond);
+   SDL_UnlockMutex(ww->lock);
+}
+
+void init_WakeableWaiter(WakeableWaiter *ww)
+{
+   ww->lock = SDL_CreateMutex();
+   ww->cond = SDL_CreateCond();
+   ww->event = 0;
+}
+ 
+void shutdown_WakeableWaiter(WakeableWaiter *ww)
+{ 
+   SDL_DestroyCond(ww->cond);
+   SDL_DestroyMutex(ww->lock);
+}
+
+WakeableWaiter manager_monitor;
+SDL_sem *pending_task_count;
+
+int get_pending_task(task *t)
+{
+   int retval = false;
+   SDL_SemWait(pending_task_count);
+   SDL_LockMutex(pending_tasks.mutex);
+   if (pending_tasks.head != pending_tasks.tail) {
+      *t = task_queue[pending_tasks.tail++];
+      if (pending_tasks.tail >= pending_tasks.length)
+         pending_tasks.tail = 0;
+      retval = true;
+   } else
+      assert(0);
+   SDL_UnlockMutex(pending_tasks.mutex);
+
+   return retval;
+}
+
+int add_task(task *t)
+{
+   int retval = false;
+   SDL_LockMutex(pending_tasks.mutex);
+   if ((pending_tasks.head+1) % pending_tasks.length != pending_tasks.tail) {
+      task_queue[pending_tasks.head] = *t;
+      pending_tasks.head = (pending_tasks.head+1) % pending_tasks.length;
+      retval = true;
+   }
+   SDL_UnlockMutex(pending_tasks.mutex);
+   SDL_SemPost(pending_task_count);
+
+   return retval;
+}
+
+int add_gen(finished_gen_chunk fgc)
+{
+   int retval = false;
+   SDL_LockMutex(finished_gen.mutex);
+   if ((finished_gen.head+1) % pending_tasks.length != pending_tasks.tail) {
+      gen_queue[finished_gen.head] = fgc;
+      finished_gen.head = (finished_gen.head+1) % pending_tasks.length;
+      retval = true;
+   }
+   SDL_UnlockMutex(finished_gen.mutex);
+   return retval;
+}
+
+
+// @TODO: get_built_mesh  -- no, we wnat to batch these
+
+int add_built_mesh(built_mesh *bm)
+{
+   int retval = false;
+   SDL_LockMutex(built_meshes.mutex);
+   if ((built_meshes.head+1) % built_meshes.length != built_meshes.tail) {
+      built_queue[built_meshes.head] = *bm;
+      built_meshes.head = (built_meshes.head+1) % built_meshes.length;
+      retval = true;
+   }
+   SDL_UnlockMutex(built_meshes.mutex);
+   return retval;
+}
+
+typedef struct
+{
+   int x,y;
+   int in_use;
+} procgen_status;
+
+#define IN_PROGRESS_CACHE_SIZE 128
+
+procgen_status procgen_in_progress[IN_PROGRESS_CACHE_SIZE][IN_PROGRESS_CACHE_SIZE];
+
+int is_in_progress(int x, int y)
+{
+   int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
+   int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y);
+   int slot_x = cx & (IN_PROGRESS_CACHE_SIZE-1);
+   int slot_y = cy & (IN_PROGRESS_CACHE_SIZE-1);
+   return procgen_in_progress[slot_y][slot_x].x == x && procgen_in_progress[slot_y][slot_x].y == y && procgen_in_progress[slot_y][slot_x].in_use;
+}
+
+void start_procgen(int x, int y)
+{
+   int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
+   int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y);
+   int slot_x = cx & (IN_PROGRESS_CACHE_SIZE-1);
+   int slot_y = cy & (IN_PROGRESS_CACHE_SIZE-1);
+   procgen_in_progress[slot_y][slot_x].x = x;
+   procgen_in_progress[slot_y][slot_x].y = y;
+   procgen_in_progress[slot_y][slot_x].in_use = true;
+}
+
+void end_procgen(int x, int y)
+{
+   int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
+   int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y);
+   int slot_x = cx & (IN_PROGRESS_CACHE_SIZE-1);
+   int slot_y = cy & (IN_PROGRESS_CACHE_SIZE-1);
+   procgen_in_progress[slot_y][slot_x].x = x;
+   procgen_in_progress[slot_y][slot_x].y = y;
+   procgen_in_progress[slot_y][slot_x].in_use = false;
+}
+
+int can_start_procgen(int x, int y)
+{
+   int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
+   int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y);
+   int slot_x = cx & (IN_PROGRESS_CACHE_SIZE-1);
+   int slot_y = cy & (IN_PROGRESS_CACHE_SIZE-1);
+   return !procgen_in_progress[slot_y][slot_x].in_use;
+}
+
+
+int mesh_worker_handler(void *data)
+{
+   for(;;) {
+      task t;
+      if (get_pending_task(&t)) {
+         switch (t.task_type) {
+            case JOB_build_mesh: {
+               stbvox_mesh_maker mm;
+               mesh_chunk *mc = malloc(sizeof(*mc));
+               built_mesh out_mesh;
+               vec3i wc = { t.world_x, t.world_y, 0 };
+
+               stbvox_init_mesh_maker(&mm);
+
+               mc->chunk_x = t.world_x >> MESH_CHUNK_CACHE_X_LOG2;
+               mc->chunk_y = t.world_y >> MESH_CHUNK_CACHE_Y_LOG2;
+
+               generate_mesh_for_chunk_set(&mm, mc, wc, &t.cs, vertex_build_buffer, sizeof(vertex_build_buffer), face_buffer);
+
+               out_mesh.vertex_build_buffer = malloc(mc->num_quads * 16);
+               out_mesh.face_buffer  = malloc(mc->num_quads *  4);
+               memcpy(out_mesh.vertex_build_buffer, vertex_build_buffer, mc->num_quads * 16);
+               memcpy(out_mesh.face_buffer, face_buffer, mc->num_quads * 4);
+               out_mesh.mc = mc;
+               if (!add_built_mesh(&out_mesh)) {
+                  free(out_mesh.vertex_build_buffer);
+                  free(out_mesh.face_buffer);
+               }
+               break;
+            }
+            case JOB_generate_terrain: {
+               finished_gen_chunk fgc;
+               fgc.world_x = t.world_x;
+               fgc.world_y = t.world_y;
+               fgc.gc = generate_chunk(t.world_x, t.world_y);
+               if (!add_gen(fgc))
+                  free(fgc.gc);
+               break;
+            }
+         }
+      }
+   }
+}
+
+enum
+{
+   RMS_invalid,
+   
+   RMS_requested,
+   RMS_chunks_completed_waiting_for_meshing,
+};
+
+SDL_mutex *requested_mesh_mutex;
+
+int worker_manager(void *data)
+{
+   for(;;) {
+      int i,j,k;
+      waiter_wait(&manager_monitor);
+
+      SDL_LockMutex(finished_gen.mutex);
+      while (finished_gen.head != finished_gen.tail) {
+         int h = finished_gen.head;
+         end_procgen(gen_queue[h].world_x, gen_queue[h].world_y);
+         put_chunk_in_cache(gen_queue[h].world_x, gen_queue[h].world_y, gen_queue[h].gc);
+         finished_gen.head = (h+1) % finished_gen.length;
+      }
+      SDL_UnlockMutex(finished_gen.mutex);
+
+      SDL_LockMutex(requested_mesh_mutex);
+      for (i=0; i < MAX_BUILT_MESHES; ++i) {
+         requested_mesh *rm = &renderer_requested_meshes[i];
+
+         if (rm->state == RMS_requested) {
+            int valid_chunks=0;
+            for (k=0; k < 4; ++k) {
+               for (j=0; j < 4; ++j) {
+                  if (!rm->chunk_set_valid[k][j]) {
+                     int cx = rm->x + j * GEN_CHUNK_SIZE_X, cy = rm->y + k * GEN_CHUNK_SIZE_Y;
+                     gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(cx, cy);
+                     if (gcc) {
+                        rm->cs.chunk[k][j] = gcc->chunk;
+                     } else if (is_in_progress(cx, cy)) {
+                        // it's already in progress, so do nothing
+                     } else if (can_start_procgen(cx, cy)) {
+                        task t;
+                        start_procgen(cx,cy);
+                        t.world_x = cx;
+                        t.world_y = cy;
+                        t.task_type = JOB_generate_terrain;
+                        add_task(&t);
+                     }
+                  } else {
+                     ++valid_chunks;
+                  }
+               }
+            }
+            if (valid_chunks == 16) {
+               task t;
+               t.cs = rm->cs;
+               assert(rm->state == RMS_requested);
+               rm->state = RMS_chunks_completed_waiting_for_meshing;
+               t.task_type = JOB_build_mesh;
+               t.world_x = rm->x;
+               t.world_y = rm->y;
+               add_task(&t);
+            }
+         }
+      }
+      SDL_UnlockMutex(requested_mesh_mutex);
+   }
+}
+
+int num_mesh_workers;
+
+void init_mesh_build_threads(void)
+{
+   int i;
+
+   int num_proc = SDL_GetCPUCount();
+
+   init_WakeableWaiter(&manager_monitor);
+   init_threadsafe_queue(&built_meshes, MAX_BUILT_MESHES);
+   init_threadsafe_queue(&pending_tasks, MAX_TASKS);
+   init_threadsafe_queue(&finished_gen, MAX_GEN_CHUNKS);
+   pending_task_count = SDL_CreateSemaphore(0);
+
+   if (num_proc > 6)
+      num_mesh_workers = num_proc/2;
+   else if (num_proc > 4)
+      num_mesh_workers = 4;
+   else 
+      num_mesh_workers = num_proc-1;
+
+   if (num_mesh_workers > MAX_MESH_WORKERS)
+      num_mesh_workers = MAX_MESH_WORKERS;
+
+   if (num_mesh_workers < 1)
+      num_mesh_workers = 1;
+
+   for (i=0; i < num_mesh_workers; ++i)
+      SDL_CreateThread(mesh_worker_handler, "mesh worker", NULL);
+
+   SDL_CreateThread(worker_manager, "thread manager thread", NULL);
+}
+#endif

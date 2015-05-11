@@ -1,19 +1,11 @@
 Possible tasks to work on next:
 
-   -  use more block types
-   -  improved height-field terrain 
-   -  other terrain features
+   -  threaded mesh building - in progress!
+   -  threaded terrain generation - in progress!
    -  dynamically set view distance
       - adjust fog distance to match
    -  limit mesh cache to max size
-   -  texture improvements
-     -  tweak pixar textures to be more grey so can dynamically recolor
-     -  find better open textures or pay someone to make them
    -  check for memory leaks
-   -  optimize mesh building
-   -  threaded mesh building
-   -  optimize terrain generation
-   -  threaded terrain generation
    -  disk save/load
       - lz4 compression?
    -  user block create/destroy (needs raycast?)
@@ -24,6 +16,14 @@ Possible tasks to work on next:
    -  "physics" (e.g. move on ground, needs physics rep)
    -  raycast (needs physics rep)
    -  add better lighting
+   -  use more block types
+   -  improved height-field terrain 
+   -  other terrain features
+   -  texture improvements
+     -  tweak pixar textures to be more grey so can dynamically recolor
+     -  find better open textures or pay someone to make them
+   -  optimize mesh building
+   -  optimize terrain generation
 
 Not right now:
 

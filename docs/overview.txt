@@ -8,13 +8,15 @@ obbg:
   - save/load to disk
   - networking
   
-Done this stream:
+Done in today's streams:
    -  optimize rendering
       -  frustum culling
       -  limit # chunks rebuilt per frame
    -  use more textures
    -  vertex ambient occlusion
    -  launch one light source at a time
+   -  optimize mesh building
+   -  optimize terrain generation
 
 Previous stream:
   - cache procedural genation chunks

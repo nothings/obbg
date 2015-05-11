@@ -3,6 +3,9 @@
 
 #include <assert.h>
 
+#define true   (0==0)
+#define false  (0==1)
+
 // block types
 enum
 {
@@ -47,7 +50,38 @@ extern float texture_scales[256];
 #define MESH_CHUNK_X_FOR_WORLD_X(x)   ((x) >> MESH_CHUNK_SIZE_X_LOG2)
 #define MESH_CHUNK_Y_FOR_WORLD_Y(y)   ((y) >> MESH_CHUNK_SIZE_Y_LOG2)
 
-mesh_chunk      mesh_cache[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
+extern mesh_chunk      mesh_cache[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
+
+
+
+#define MAX_BUILT_MESHES   256
+
+typedef struct
+{
+   mesh_chunk *mc;
+   uint8 *vertex_build_buffer; // malloc/free
+   uint8 *face_buffer;  // malloc/free
+} built_mesh;
+
+extern built_mesh         built_queue[MAX_BUILT_MESHES];
+
+typedef struct st_gen_chunk gen_chunk;
+
+typedef struct
+{
+   gen_chunk *chunk[4][4];
+} chunk_set;
+
+typedef struct
+{
+   int x,y;
+   int state;
+   chunk_set cs;
+   int chunk_set_valid[4][4];
+} requested_mesh;
+
+extern requested_mesh renderer_requested_meshes[MAX_BUILT_MESHES];
+
 
 extern int chunk_locations, chunks_considered, chunks_in_frustum;
 extern int quads_considered, quads_rendered;

@@ -89,6 +89,7 @@ void render_init(void)
 
    init_chunk_caches();
    init_mesh_building();
+   init_mesh_build_threads();
 
    glGenTextures(2, voxel_tex);
 
