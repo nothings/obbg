@@ -63,8 +63,6 @@ typedef struct
    uint8 *face_buffer;  // malloc/free
 } built_mesh;
 
-extern built_mesh         built_queue[MAX_BUILT_MESHES];
-
 typedef struct st_gen_chunk gen_chunk;
 
 typedef struct
@@ -79,9 +77,6 @@ typedef struct
    chunk_set cs;
    int chunk_set_valid[4][4];
 } requested_mesh;
-
-extern requested_mesh renderer_requested_meshes[MAX_BUILT_MESHES];
-
 
 extern int chunk_locations, chunks_considered, chunks_in_frustum;
 extern int quads_considered, quads_rendered;

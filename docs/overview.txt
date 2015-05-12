@@ -7,8 +7,10 @@ obbg:
   - user create/destroy
   - save/load to disk
   - networking
+
+Done in today's stream:
   
-Done in today's streams:
+Previous stream:
    -  optimize rendering
       -  frustum culling
       -  limit # chunks rebuilt per frame

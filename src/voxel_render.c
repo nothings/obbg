@@ -213,10 +213,64 @@ static int is_box_in_frustum(float *bmin, float *bmax)
    return 1;
 }
 
+void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer)
+{
+   glGenBuffersARB(1, &mc->vbuf);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, mc->vbuf);
+   glBufferDataARB(GL_ARRAY_BUFFER_ARB, mc->num_quads*4*sizeof(uint32), vertex_build_buffer, GL_STATIC_DRAW_ARB);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+
+   glGenBuffersARB(1, &mc->fbuf);
+   glBindBufferARB(GL_TEXTURE_BUFFER_ARB, mc->fbuf);
+   glBufferDataARB(GL_TEXTURE_BUFFER_ARB, mc->num_quads*sizeof(uint32), face_buffer , GL_STATIC_DRAW_ARB);
+   glBindBufferARB(GL_TEXTURE_BUFFER_ARB, 0);
+
+   glGenTextures(1, &mc->fbuf_tex);
+   glBindTexture(GL_TEXTURE_BUFFER_ARB, mc->fbuf_tex);
+   glTexBufferARB(GL_TEXTURE_BUFFER_ARB, GL_RGBA8UI, mc->fbuf);
+   glBindTexture(GL_TEXTURE_BUFFER_ARB, 0);
+}
+
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 extern float light_pos[3];
 
 int view_distance=1200;
+
+
+#if 0
+
+   @TODO: reference count chunks
+
+   1. Iterate over world around player
+   2. Determine meshes that are needed;
+      build list of meshes needed in
+      priority order, update requested
+      list with those.
+#endif
+
+// Change worker_manager to store pending chunk_sets in a globally indexed
+// data structure so the renderer algorithm below can see into it. Also,
+// store in that same data structure if a mesh-build task has already been
+// enqueued.
+//
+// Renderer:
+//  Iterate over mesh chunks in slightly-larger-than-view-radius around player
+//  If mesh chunk doesn't exist add to list of needed meshes
+//  Prioritize needed meshes by:
+//     1. distance from player
+//     2. in-front of player
+//  Sort by prioritization
+//  Lock the render_requested_meshes queue
+//  Rebuild the queue from scratch based on current priority order, but
+//     omitting any entries that already have corresponding tasks (create
+//     another direct-mapped table for meshes that have their status) and
+//     entries that were in the old queue but don't survive to the new
+//     queue need to have their chunk sets cleaned up (while those that
+//     do survive need to have the chunk sets copied over (primarily
+//     to maintain correct reference counts))
+//  (do this by swapping the array (pointers) that are the store for the queue?)
+//  Unlock the renderer_requested_meshes queue
+
 
 void render_voxel_world(float campos[3])
 {
@@ -322,6 +376,7 @@ void render_voxel_world(float campos[3])
       }
    }
 
+   #if 1
    if (num_build_remaining) {
       for (j=-rad; j <= rad; ++j) {
          for (i=-rad; i <= rad; ++i) {
@@ -340,6 +395,14 @@ void render_voxel_world(float campos[3])
       }
       done:
       ;
+   }
+   #endif
+
+   {
+      built_mesh bm;
+      while (get_next_built_mesh(&bm)) {
+         upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
+      }
    }
 
    chunk_storage_total = 0;
