@@ -236,19 +236,7 @@ void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer)
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 extern float light_pos[3];
 
-int view_distance=1920;
-
-
-#if 0
-
-   @TODO: reference count chunks
-
-   1. Iterate over world around player
-   2. Determine meshes that are needed;
-      build list of meshes needed in
-      priority order, update requested
-      list with those.
-#endif
+int view_distance=960;
 
 
 

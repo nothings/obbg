@@ -9,7 +9,8 @@ obbg:
   - networking
 
 Done in today's stream:
-  
+   -  threaded procgen&meshing
+
 Previous stream:
    -  optimize rendering
       -  frustum culling

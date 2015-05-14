@@ -1,11 +1,9 @@
 Possible tasks to work on next:
 
-   -  threaded mesh building - in progress!
-   -  threaded terrain generation - in progress!
+   -  check for memory leaks
    -  dynamically set view distance
       - adjust fog distance to match
    -  limit mesh cache to max size
-   -  check for memory leaks
    -  disk save/load
       - lz4 compression?
    -  user block create/destroy (needs raycast?)
