@@ -1,3 +1,5 @@
+//#define SINGLE_THREADED_MESHBUILD
+
 #define STB_GLEXT_DECLARE "glext_list.h"
 #include "stb_gl.h"
 #include "stb_image.h"
@@ -234,7 +236,7 @@ void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer)
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 extern float light_pos[3];
 
-int view_distance=1200;
+int view_distance=1920;
 
 
 #if 0
@@ -248,44 +250,82 @@ int view_distance=1200;
       list with those.
 #endif
 
-// Change worker_manager to store pending chunk_sets in a globally indexed
-// data structure so the renderer algorithm below can see into it. Also,
-// store in that same data structure if a mesh-build task has already been
-// enqueued.
-//
-// Renderer:
-//  Iterate over mesh chunks in slightly-larger-than-view-radius around player
-//  If mesh chunk doesn't exist add to list of needed meshes
-//  Prioritize needed meshes by:
-//     1. distance from player
-//     2. in-front of player
-//  Sort by prioritization
-//  Lock the render_requested_meshes queue
-//  Rebuild the queue from scratch based on current priority order, but
-//     omitting any entries that already have corresponding tasks (create
-//     another direct-mapped table for meshes that have their status) and
-//     entries that were in the old queue but don't survive to the new
-//     queue need to have their chunk sets cleaned up (while those that
-//     do survive need to have the chunk sets copied over (primarily
-//     to maintain correct reference counts))
-//  (do this by swapping the array (pointers) that are the store for the queue?)
-//  Unlock the renderer_requested_meshes queue
+
+
+#define MAX_CONSIDER_MESHES 4096
+
+typedef struct
+{
+   int x,y;
+   float priority;
+} consider_mesh_t;
+
+static consider_mesh_t consider_mesh[MAX_CONSIDER_MESHES];
+
+void request_mesh_generation(int qchunk_x, int qchunk_y)
+{
+   int i,j, n=0;
+   int rad = (view_distance >> MESH_CHUNK_SIZE_X_LOG2) + 1;
+   requested_mesh *rm = get_requested_mesh_alternate();
+
+   for (j=-rad; j <= rad; ++j) {
+      for (i=-rad; i <= rad; ++i) {
+         if (i*i + j*j <= rad*rad) {
+            int cx = qchunk_x + i;
+            int cy = qchunk_y + j;
+            int wx = cx * MESH_CHUNK_SIZE_X;
+            int wy = cy * MESH_CHUNK_SIZE_Y;
+            int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
+            int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
+            mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
+            if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
+               consider_mesh[n].x = wx;
+               consider_mesh[n].y = wy;  
+               consider_mesh[n].priority = (float) (i*i + j*j);
+               ++n;
+            }
+         }
+      }
+   }
+
+   qsort(consider_mesh, n, sizeof(consider_mesh[0]), stb_floatcmp(offsetof(consider_mesh_t, priority)));
+
+   n = stb_min(n, MAX_BUILT_MESHES);
+
+   for (i=0; i < n; ++i) {
+      rm[i].x = consider_mesh[i].x;
+      rm[i].y = consider_mesh[i].y;
+      rm[i].state = RMS_requested;
+   }
+   for (; i < MAX_BUILT_MESHES; ++i)
+      rm[i].state = RMS_invalid;
+
+   swap_requested_meshes();
+}
 
 
 void render_voxel_world(float campos[3])
 {
-   int num_build_remaining = 1;
+   int num_build_remaining;
    int distance;
    float x = campos[0], y = campos[1];
    int qchunk_x, qchunk_y;
    int cam_x, cam_y;
    int i,j, rad;
 
+#ifdef SINGLE_THREADED_MESHBUILD
+   num_build_remaining = 1;
+#else
+   num_build_remaining = 0;
+#endif
+
    cam_x = (int) floor(x);
    cam_y = (int) floor(y);
 
    qchunk_x = MESH_CHUNK_X_FOR_WORLD_X(cam_x);
    qchunk_y = MESH_CHUNK_Y_FOR_WORLD_Y(cam_y);
+
+   request_mesh_generation(qchunk_x, qchunk_y);
 
    glEnable(GL_ALPHA_TEST);
    glAlphaFunc(GL_GREATER, 0.5);
@@ -376,7 +416,6 @@ void render_voxel_world(float campos[3])
       }
    }
 
-   #if 1
    if (num_build_remaining) {
       for (j=-rad; j <= rad; ++j) {
          for (i=-rad; i <= rad; ++i) {
@@ -396,12 +435,12 @@ void render_voxel_world(float campos[3])
       done:
       ;
    }
-   #endif
 
    {
       built_mesh bm;
       while (get_next_built_mesh(&bm)) {
          upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
+         set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
       }
    }
 

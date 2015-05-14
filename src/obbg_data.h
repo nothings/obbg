@@ -53,6 +53,15 @@ extern float texture_scales[256];
 extern mesh_chunk      mesh_cache[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
 
 
+enum
+{
+   RMS_invalid,
+   
+   RMS_requested,
+
+   //RMS_chunks_completed_waiting_for_meshing,
+};
+
 
 #define MAX_BUILT_MESHES   256
 
@@ -74,8 +83,6 @@ typedef struct
 {
    int x,y;
    int state;
-   chunk_set cs;
-   int chunk_set_valid[4][4];
 } requested_mesh;
 
 extern int chunk_locations, chunks_considered, chunks_in_frustum;

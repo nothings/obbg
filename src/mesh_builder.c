@@ -86,9 +86,70 @@ typedef struct
    gen_chunk *chunk;
 } gen_chunk_cache;
 
-       mesh_chunk      mesh_cache[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
-static gen_chunk_cache  gen_cache[ GEN_CHUNK_CACHE_Y][ GEN_CHUNK_CACHE_X];
+typedef struct
+{
+   int chunk_x, chunk_y;
+   int in_new_list;
+   int status;
+   chunk_set cs;
+   int chunk_set_valid[4][4];
+} mesh_chunk_status;
 
+enum
+{
+   CHUNK_STATUS_invalid,
+   CHUNK_STATUS_empty_chunk_set,
+   CHUNK_STATUS_nonempty_chunk_set,
+   CHUNK_STATUS_processing
+};
+
+       mesh_chunk        mesh_cache [MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
+static mesh_chunk_status mesh_status[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
+static gen_chunk_cache    gen_cache [ GEN_CHUNK_CACHE_Y][ GEN_CHUNK_CACHE_X];
+
+static mesh_chunk_status *get_chunk_status(int x, int y)
+{
+   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   mesh_chunk_status *mcs = &mesh_status[cy & (MESH_CHUNK_CACHE_Y-1)][cx & (MESH_CHUNK_CACHE_X-1)];
+   if (mcs->chunk_x == cx && mcs->chunk_y == cy)
+      return mcs;
+   return NULL;
+}
+
+void release_gen_chunk(gen_chunk *gc);
+
+static void abandon_mesh_chunk_status(mesh_chunk_status *mcs)
+{
+   int i,j;
+   for (j=0; j < 4; ++j)
+      for (i=0; i < 4; ++i)
+         if (mcs->chunk_set_valid[j][i])
+            release_gen_chunk(mcs->cs.chunk[j][i]);
+   mcs->status = CHUNK_STATUS_invalid;
+   memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
+   memset(&mcs->cs, 0, sizeof(mcs->cs));
+}
+
+static mesh_chunk_status *get_chunk_status_alloc(int x, int y)
+{
+   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   mesh_chunk_status *mcs = &mesh_status[cy & (MESH_CHUNK_CACHE_Y-1)][cx & (MESH_CHUNK_CACHE_X-1)];
+   if (mcs->chunk_x == cx && mcs->chunk_y == cy)
+      return mcs;
+
+   if (mcs->status == CHUNK_STATUS_nonempty_chunk_set)
+      abandon_mesh_chunk_status(mcs);
+
+   mcs->status = CHUNK_STATUS_empty_chunk_set;
+   mcs->chunk_x = cx;
+   mcs->chunk_y = cy;
+
+   return mcs;
+}
+
+#if 0
 mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
 {
    int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
@@ -100,6 +161,7 @@ mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
    else
       return NULL;
 }
+#endif
 
 void free_mesh_chunk(mesh_chunk *mc)
 {
@@ -149,12 +211,26 @@ void init_chunk_caches(void)
    }
 }
 
+
+SDL_mutex *ref_count_mutex;
+
 void release_gen_chunk(gen_chunk *gc)
 {
    assert(gc->ref_count > 0);
+   SDL_LockMutex(ref_count_mutex);
    --gc->ref_count;
-   if (gc->ref_count == 0)
+   if (gc->ref_count == 0) {
+      SDL_UnlockMutex(ref_count_mutex);
       free(gc);
+   } else
+      SDL_UnlockMutex(ref_count_mutex);
+}
+
+void add_ref_count(gen_chunk *gc)
+{
+   SDL_LockMutex(ref_count_mutex);
+   ++gc->ref_count;
+   SDL_UnlockMutex(ref_count_mutex);
 }
 
 void free_gen_chunk(gen_chunk_cache *gcc)
@@ -206,6 +282,7 @@ gen_chunk *generate_chunk(int x, int y)
    int height_field_int[GEN_CHUNK_SIZE_Y+2][GEN_CHUNK_SIZE_X+2];
    int corner_tex[2][2], corner_weight[2][2];
    int block_type[GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X];
+   assert(gc);
 
    for (j=-1; j <= GEN_CHUNK_SIZE_Y; ++j)
       for (i=-1; i <= GEN_CHUNK_SIZE_X; ++i) {
@@ -213,7 +290,7 @@ gen_chunk *generate_chunk(int x, int y)
          height_field[j+1][i+1] = ht;
          height_field_int[j+1][i+1] = (int) height_field[j+1][i+1];
          ground_top = stb_max(ground_top, height_field_int[j+1][i+1]);
-      }  
+      }
 
    memset(gc->non_empty, 0, sizeof(gc->non_empty));
    memset(gc->non_empty, 1, (ground_top+Z_SEGMENT_SIZE-1)>>Z_SEGMENT_SIZE_LOG2);
@@ -342,7 +419,7 @@ gen_chunk_cache * put_chunk_in_cache(int x, int y, gen_chunk *gc)
    gcc->chunk_x = cx;
    gcc->chunk_y = cy;
    gcc->chunk = gc;
-   ++gc->ref_count;
+   add_ref_count(gc);
    return gcc;
 }
 
@@ -375,10 +452,18 @@ typedef struct
    int x,y,z;
 } vec3i;
 
-uint8 segment_blocktype[66][66][18];
-uint8 segment_lighting[66][66][18];
+typedef struct
+{
+   uint8 *vertex_build_buffer;
+   uint8 *face_buffer;
+   uint8 segment_blocktype[66][66][18];
+   uint8 segment_lighting[66][66][18];
+} build_data;
 
-void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg)
+//uint8 segment_blocktype[66][66][18];
+//uint8 segment_lighting[66][66][18];
+
+void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg, build_data *bd)
 {
    int j,i,x,y;
    for (j=0; j < 4; ++j)
@@ -400,17 +485,17 @@ void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg)
 
          gcp = &chunks->chunk[j][i]->partial[z_seg];
          for (y=y0; y < y1; ++y) {
-            uint8 *bt = &segment_blocktype[y+y_off][x_off][0];
-            uint8 *lt = &segment_lighting [y+y_off][x_off][0];
+            uint8 *bt = &bd->segment_blocktype[y+y_off][x_off][0];
+            uint8 *lt = &bd->segment_lighting [y+y_off][x_off][0];
             for (x=x0; x < x1; ++x) {
-               memcpy(bt + sizeof(segment_blocktype[0][0])*x, &gcp->block   [y][x][0], 16);
-               memcpy(lt + sizeof(segment_lighting [0][0])*x, &gcp->lighting[y][x][0], 16);
+               memcpy(bt + sizeof(bd->segment_blocktype[0][0])*x, &gcp->block   [y][x][0], 16);
+               memcpy(lt + sizeof(bd->segment_lighting [0][0])*x, &gcp->lighting[y][x][0], 16);
             }
          }
       }
 }
 
-void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i world_coord, chunk_set *chunks, uint8 *vertex_build_buffer, size_t build_size, uint8 *face_buffer)
+void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i world_coord, chunk_set *chunks, size_t build_size, build_data *bd)
 {
    int a,b,z;
 
@@ -432,19 +517,19 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    //map->block_geometry = minecraft_geom_for_blocktype;
 
    //stbvox_reset_buffers(mm);
-   stbvox_set_buffer(mm, 0, 0, vertex_build_buffer, build_size);
-   stbvox_set_buffer(mm, 0, 1, face_buffer , build_size>>2);
+   stbvox_set_buffer(mm, 0, 0, bd->vertex_build_buffer, build_size);
+   stbvox_set_buffer(mm, 0, 1, bd->face_buffer , build_size>>2);
 
-   map->blocktype = &segment_blocktype[1][1][1]; // this is (0,0,0), but we need to be able to query off the edges
-   map->lighting = &segment_lighting[1][1][1];
+   map->blocktype = &bd->segment_blocktype[1][1][1]; // this is (0,0,0), but we need to be able to query off the edges
+   map->lighting = &bd->segment_lighting[1][1][1];
 
    // fill in the top two rows of the buffer
    for (b=0; b < 66; ++b) {
       for (a=0; a < 66; ++a) {
-         segment_blocktype[b][a][16] = 0;
-         segment_blocktype[b][a][17] = 0;
-         segment_lighting [b][a][16] = 255;
-         segment_lighting [b][a][17] = 255;
+         bd->segment_blocktype[b][a][16] = 0;
+         bd->segment_blocktype[b][a][17] = 0;
+         bd->segment_lighting [b][a][16] = 255;
+         bd->segment_lighting [b][a][17] = 255;
       }
    }
 
@@ -456,10 +541,10 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
       int z1 = z+16;
       if (z1 == 256) z1 = 255;  // @TODO use MAX_Z and Z_SEGMENT_SIZE
 
-      copy_chunk_set_to_segment(chunks, z >> 4);   // @TODO use MAX_Z and Z_SEGMENT_SIZE
+      copy_chunk_set_to_segment(chunks, z >> 4, bd);   // @TODO use MAX_Z and Z_SEGMENT_SIZE
 
-      map->blocktype = &segment_blocktype[1][1][1-z];
-      map->lighting = &segment_lighting[1][1][1-z];
+      map->blocktype = &bd->segment_blocktype[1][1][1-z];
+      map->lighting = &bd->segment_lighting[1][1][1-z];
 
       {
          stbvox_set_input_range(mm, 0,0,z0, 64,64,z1);
@@ -470,10 +555,10 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
       // copy the bottom two rows of data up to the top
       for (b=0; b < 66; ++b) {
          for (a=0; a < 66; ++a) {
-            segment_blocktype[b][a][16] = segment_blocktype[b][a][0];
-            segment_blocktype[b][a][17] = segment_blocktype[b][a][1];
-            segment_lighting [b][a][16] = segment_lighting [b][a][0];
-            segment_lighting [b][a][17] = segment_lighting [b][a][1];
+            bd->segment_blocktype[b][a][16] = bd->segment_blocktype[b][a][0];
+            bd->segment_blocktype[b][a][17] = bd->segment_blocktype[b][a][1];
+            bd->segment_lighting [b][a][16] = bd->segment_lighting [b][a][0];
+            bd->segment_lighting [b][a][17] = bd->segment_lighting [b][a][1];
          }
       }
    }
@@ -487,8 +572,26 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    mc->num_quads = stbvox_get_quad_count(mm, 0);
 }
 
-static uint8 vertex_build_buffer[64*1024*1024];
-static uint8 face_buffer[16*1024*1024];
+void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc)
+{
+   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
+   int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
+   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
+   mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
+   if (mc->vbuf) {
+      free_mesh_chunk(mc);
+   }
+
+   *mc = *new_mc;
+   free(new_mc);
+}
+
+
+static uint8 vertex_build_buffer[16*1024*1024];
+static uint8 face_buffer[4*1024*1024];
+
+static build_data static_build_data;
 
 mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
 {
@@ -514,7 +617,9 @@ mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
             cs.chunk[j][i] = get_gen_chunk_for_coord(x + (i-1)*GEN_CHUNK_SIZE_X, y + (j-1)*GEN_CHUNK_SIZE_Y);
 
       stbvox_init_mesh_maker(&mm);
-      generate_mesh_for_chunk_set(&mm, mc, wc, &cs, vertex_build_buffer, sizeof(vertex_build_buffer), face_buffer);
+      static_build_data.vertex_build_buffer = vertex_build_buffer;
+      static_build_data.face_buffer = face_buffer;
+      generate_mesh_for_chunk_set(&mm, mc, wc, &cs, sizeof(vertex_build_buffer), &static_build_data);
       upload_mesh(mc, vertex_build_buffer, face_buffer);
    }
 
@@ -522,11 +627,6 @@ mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
 }
 
 
-#if 0
-void init_mesh_build_threads(void)
-{
-}
-#else
 /*
          SDL_SemPost(mw->request_received);
       SDL_SemWait(mw->request_received);
@@ -573,10 +673,6 @@ typedef struct
 
 #define MAX_TASKS          1024
 #define MAX_GEN_CHUNKS     256
-
-task                mesh_task_queue[MAX_TASKS];
-task                gen_task_queue[MAX_TASKS];
-finished_gen_chunk  gen_queue[MAX_GEN_CHUNKS];
 
 
 typedef struct
@@ -629,15 +725,14 @@ typedef struct
    uint8 *data;
 } threadsafe_queue;
 
-void init_threadsafe_queue(threadsafe_queue *tq, int count, size_t size, void *data)
+void init_threadsafe_queue(threadsafe_queue *tq, int count, size_t size)
 {
    tq->mutex = SDL_CreateMutex();
    tq->head = tq->tail = 0;
    tq->count = count;
    tq->itemsize = size;
-   tq->data = data;
+   tq->data = malloc(size * count); // @TODO cache-align
 }
-
 
 int add_to_queue(threadsafe_queue *tq, void *item)
 {
@@ -683,9 +778,6 @@ int get_from_queue_nonblocking(threadsafe_queue *tq, void *item)
    SDL_UnlockMutex(tq->mutex);
    return retval;
 }
-
-built_mesh     built_queue              [MAX_BUILT_MESHES];
-requested_mesh renderer_requested_meshes[MAX_BUILT_MESHES];
 
 threadsafe_queue built_meshes, finished_gen;
 threadsafe_queue pending_meshes, pending_gen;
@@ -774,9 +866,25 @@ int can_start_procgen(int x, int y)
    return !procgen_in_progress[slot_y][slot_x].in_use;
 }
 
+void validate(gen_chunk *chunk)
+{
+   int i;
+   for (i=0; i < GEN_CHUNK_SIZE_X*GEN_CHUNK_SIZE_Y*Z_SEGMENT_SIZE; ++i) {
+      assert(chunk->partial[0].block[0][0][i] != 0);
+      assert(chunk->partial[11].block[0][0][i] == 0);
+      assert(chunk->partial[12].block[0][0][i] == 0);
+      assert(chunk->partial[13].block[0][0][i] == 0);
+      assert(chunk->partial[14].block[0][0][i] == 0);
+      assert(chunk->partial[15].block[0][0][i] == 0);
+   }
+}
 
 int mesh_worker_handler(void *data)
 {
+   build_data *bd = malloc(sizeof(*bd));
+   size_t vert_buf_size = 16*1024*1024;
+   bd->vertex_build_buffer = malloc(vert_buf_size);
+   bd->face_buffer = malloc(4*1024*1024);
    for(;;) {
       task t;
       if (get_pending_task(&t)) {
@@ -792,12 +900,18 @@ int mesh_worker_handler(void *data)
                mc->chunk_x = t.world_x >> MESH_CHUNK_CACHE_X_LOG2;
                mc->chunk_y = t.world_y >> MESH_CHUNK_CACHE_Y_LOG2;
 
-               generate_mesh_for_chunk_set(&mm, mc, wc, &t.cs, vertex_build_buffer, sizeof(vertex_build_buffer), face_buffer);
+               //validate(t.cs.chunk[1][1]);
+               //validate(t.cs.chunk[2][1]);
+               //validate(t.cs.chunk[1][2]);
+               //validate(t.cs.chunk[2][2]);
+
+               generate_mesh_for_chunk_set(&mm, mc, wc, &t.cs, vert_buf_size, bd);
 
                out_mesh.vertex_build_buffer = malloc(mc->num_quads * 16);
                out_mesh.face_buffer  = malloc(mc->num_quads *  4);
-               memcpy(out_mesh.vertex_build_buffer, vertex_build_buffer, mc->num_quads * 16);
-               memcpy(out_mesh.face_buffer, face_buffer, mc->num_quads * 4);
+
+               memcpy(out_mesh.vertex_build_buffer, bd->vertex_build_buffer, mc->num_quads * 16);
+               memcpy(out_mesh.face_buffer, bd->face_buffer, mc->num_quads * 4);
                {
                   int i;
                   for (i=0; i < 16; ++i)
@@ -807,6 +921,7 @@ int mesh_worker_handler(void *data)
                if (!add_to_queue(&built_meshes, &out_mesh)) {
                   free(out_mesh.vertex_build_buffer);
                   free(out_mesh.face_buffer);
+                  free(out_mesh.mc);
                } else
                   waiter_wake(&manager_monitor);
                break;
@@ -819,7 +934,7 @@ int mesh_worker_handler(void *data)
                if (!add_to_queue(&finished_gen, &fgc))
                   release_gen_chunk(fgc.gc);
                else {
-                  ++fgc.gc->ref_count;
+                  add_ref_count(fgc.gc);
                   waiter_wake(&manager_monitor);
                }
                break;
@@ -829,17 +944,32 @@ int mesh_worker_handler(void *data)
    }
 }
 
-enum
-{
-   RMS_invalid,
-   
-   RMS_requested,
-   RMS_chunks_completed_waiting_for_meshing,
-};
-
 #define MAX_PROC_GEN 16
 
 SDL_mutex *requested_mesh_mutex;
+requested_mesh rm_list1[MAX_BUILT_MESHES], rm_list2[MAX_BUILT_MESHES];
+requested_mesh *renderer_requested_meshes = rm_list1, *requested_meshes_alternate = rm_list2;
+
+requested_mesh *get_requested_mesh_alternate(void)
+{
+   return requested_meshes_alternate;
+}
+
+void check_chunk_sets(void)
+{
+   int i,j,m,n;
+   for (j=0; j < MESH_CHUNK_CACHE_Y; ++j) {
+      for (i=0; i < MESH_CHUNK_CACHE_X; ++i) {
+         mesh_chunk_status *mcs = &mesh_status[j][i];
+         if (mcs->status == CHUNK_STATUS_nonempty_chunk_set) {
+            for (n=0; n < 4; ++n)
+               for (m=0; m < 4; ++m)
+                  if (mcs->chunk_set_valid[n][m])
+                     validate(mcs->cs.chunk[n][m]);
+         }
+      }
+   }
+}
 
 int worker_manager(void *data)
 {
@@ -848,14 +978,17 @@ int worker_manager(void *data)
       int i,j,k;
       waiter_wait(&manager_monitor);
 
+      //check_chunk_sets();
+
       SDL_LockMutex(finished_gen.mutex);
       while (finished_gen.head != finished_gen.tail) {
-         int h = finished_gen.head;
-         end_procgen(gen_queue[h].world_x, gen_queue[h].world_y);
+         int t = finished_gen.tail;
+         finished_gen_chunk *fgc = (finished_gen_chunk *) (finished_gen.data + finished_gen.itemsize * t);
+         end_procgen(fgc->world_x, fgc->world_y);
          --outstanding_proc_gen;
-         put_chunk_in_cache(gen_queue[h].world_x, gen_queue[h].world_y, gen_queue[h].gc);
-         --gen_queue[h].gc->ref_count;
-         finished_gen.head = (h+1) % finished_gen.count;
+         put_chunk_in_cache(fgc->world_x, fgc->world_y, fgc->gc);
+         release_gen_chunk(fgc->gc);
+         finished_gen.tail = (t+1) % finished_gen.count;
       }
       SDL_UnlockMutex(finished_gen.mutex);
 
@@ -865,14 +998,18 @@ int worker_manager(void *data)
 
          if (rm->state == RMS_requested) {
             int valid_chunks=0;
+            mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y);
             for (k=0; k < 4; ++k) {
                for (j=0; j < 4; ++j) {
-                  if (!rm->chunk_set_valid[k][j]) {
+                  if (!mcs->chunk_set_valid[k][j]) {
                      int cx = rm->x + j * GEN_CHUNK_SIZE_X, cy = rm->y + k * GEN_CHUNK_SIZE_Y;
                      gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(cx, cy);
                      if (gcc) {
-                        rm->cs.chunk[k][j] = gcc->chunk;
-                        ++gcc->chunk->ref_count;
+                        mcs->status = CHUNK_STATUS_nonempty_chunk_set;
+                        mcs->cs.chunk[k][j] = gcc->chunk;
+                        mcs->chunk_set_valid[k][j] = true;
+                        assert(gcc->chunk != 0);
+                        add_ref_count(gcc->chunk);
                      } else {
                         if (outstanding_proc_gen >= MAX_PROC_GEN)
                            continue;
@@ -895,9 +1032,17 @@ int worker_manager(void *data)
             }
             if (valid_chunks == 16) {
                task t;
-               t.cs = rm->cs;
+               int i,j;
+               mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y);
+               t.cs = mcs->cs;
+               for (j=0; j < 4; ++j)
+                  for (i=0; i < 4; ++i)
+                     assert(mcs->chunk_set_valid[j][i]);
+               mcs->status = CHUNK_STATUS_processing;
+               memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
+               memset(&mcs->cs, 0, sizeof(mcs->cs));
                assert(rm->state == RMS_requested);
-               rm->state = RMS_chunks_completed_waiting_for_meshing;
+               rm->state = RMS_invalid;
                t.task_type = JOB_build_mesh;
                t.world_x = rm->x;
                t.world_y = rm->y;
@@ -918,11 +1063,12 @@ void init_mesh_build_threads(void)
    int num_proc = SDL_GetCPUCount();
 
    init_WakeableWaiter(&manager_monitor);
-   init_threadsafe_queue(&built_meshes, MAX_BUILT_MESHES, sizeof(built_queue[0]), built_queue);
-   init_threadsafe_queue(&pending_meshes, MAX_TASKS, sizeof(mesh_task_queue[0]), mesh_task_queue);
-   init_threadsafe_queue(&pending_gen   , MAX_TASKS, sizeof(gen_task_queue[0]), gen_task_queue);
-   init_threadsafe_queue(&finished_gen, MAX_GEN_CHUNKS, sizeof(gen_queue[0]), gen_queue);
+   init_threadsafe_queue(&built_meshes  , MAX_BUILT_MESHES, sizeof(built_mesh));
+   init_threadsafe_queue(&pending_meshes, MAX_TASKS       , sizeof(task));
+   init_threadsafe_queue(&pending_gen   , MAX_TASKS       , sizeof(task));
+   init_threadsafe_queue(&finished_gen  , MAX_GEN_CHUNKS  , sizeof(finished_gen_chunk));
    pending_task_count = SDL_CreateSemaphore(0);
+   ref_count_mutex = SDL_CreateMutex();
 
    if (num_proc > 6)
       num_mesh_workers = num_proc/2;
@@ -937,9 +1083,83 @@ void init_mesh_build_threads(void)
    if (num_mesh_workers < 1)
       num_mesh_workers = 1;
 
+   num_mesh_workers = 2;
+
    for (i=0; i < num_mesh_workers; ++i)
-      SDL_CreateThread(mesh_worker_handler, "mesh worker", NULL);
+      SDL_CreateThread(mesh_worker_handler, "mesh worker", (void *) i);
 
    SDL_CreateThread(worker_manager, "thread manager thread", NULL);
 }
-#endif
+
+// Renderer:
+//  Lock the render_requested_meshes queue
+//  Rebuild the queue from scratch based on current priority order, but
+//     omitting any entries that already have corresponding tasks (create
+//     another direct-mapped table for meshes that have their status) and
+//     entries that were in the old queue but don't survive to the new
+//     queue need to have their chunk sets cleaned up (while those that
+//     do survive need to have the chunk sets copied over (primarily
+//     to maintain correct reference counts))
+//  (do this by swapping the array (pointers) that are the store for the queue?)
+//  Unlock the renderer_requested_meshes queue
+
+static int starvation_count;
+
+void swap_requested_meshes(void)
+{
+   int locked = false;
+
+   if (starvation_count > 2) {
+      SDL_LockMutex(requested_mesh_mutex);
+      locked = true;
+   } else
+      locked = (SDL_TryLockMutex(requested_mesh_mutex) == SDL_MUTEX_TIMEDOUT);
+   
+   if (locked) {
+      int i=0, n=0;
+      starvation_count = 0;
+      for (i=0; i < MAX_BUILT_MESHES; ++i) {
+         requested_mesh *rm = &requested_meshes_alternate[i];
+         mesh_chunk_status *mcs;
+         if (rm->state == RMS_invalid)
+            break;
+         mcs = get_chunk_status_alloc(rm->x, rm->y);
+
+         if (mcs->status == CHUNK_STATUS_processing)
+            ; // delete
+         else {
+            mcs->in_new_list = true;
+            requested_meshes_alternate[n++] = *rm;
+         }
+      }
+      if (n < MAX_BUILT_MESHES)
+         requested_meshes_alternate[n].state = RMS_invalid;
+
+      for (i=0; i < MAX_BUILT_MESHES; ++i) {
+         requested_mesh *rm = &requested_meshes_alternate[i];
+         mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y);
+         if (mcs && !mcs->in_new_list) {
+            abandon_mesh_chunk_status(mcs);
+         }
+      }
+
+      for (i=0; i < MAX_BUILT_MESHES; ++i) {
+         requested_mesh *rm = &requested_meshes_alternate[i];
+         mesh_chunk_status *mcs;
+         if (rm->state == RMS_invalid)
+            break;
+         mcs = get_chunk_status(rm->x, rm->y);
+         mcs->in_new_list = false;
+      }
+
+      {
+         requested_mesh *temp = renderer_requested_meshes;
+         renderer_requested_meshes = requested_meshes_alternate;
+         requested_meshes_alternate = temp;
+      }
+      SDL_UnlockMutex(requested_mesh_mutex);
+      waiter_wake(&manager_monitor);
+   } else
+      ++starvation_count;
+}
+
