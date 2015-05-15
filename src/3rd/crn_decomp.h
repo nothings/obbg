@@ -13,8 +13,6 @@
 #ifndef CRND_INCLUDE_CRND_H
 #define CRND_INCLUDE_CRND_H
 
-#define WIN32 1
-
 // definitions from crnlib.h
 // Various library/file format limits.
 typedef enum
@@ -1651,7 +1649,7 @@ namespace crnd
       static uint32        pack_endpoints(uint32 lo, uint32 hi);
    };
 
-   int CRND_DEFINE_BITWISE_MOVABLE(dxt1_block);
+   CRND_DEFINE_BITWISE_MOVABLE(dxt1_block);
 
    struct dxt3_block
    {
@@ -1662,7 +1660,7 @@ namespace crnd
       uint32 get_alpha(uint32 x, uint32 y, bool scaled) const;
    };
 
-   int CRND_DEFINE_BITWISE_MOVABLE(dxt3_block);
+   CRND_DEFINE_BITWISE_MOVABLE(dxt3_block);
 
    struct dxt5_block
    {
@@ -1755,7 +1753,7 @@ namespace crnd
       static uint32          pack_endpoints(uint32 lo, uint32 hi);
    };
 
-   int CRND_DEFINE_BITWISE_MOVABLE(dxt5_block);
+   CRND_DEFINE_BITWISE_MOVABLE(dxt5_block);
 
 } // namespace crnd
 
