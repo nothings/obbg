@@ -3,7 +3,6 @@
 
 # User-specific files
 *.suo
-*.user
 *.userosscache
 *.sln.docstates
 
@@ -67,3 +66,7 @@ dlldata.c
 *.ncb
 *.opt
 *.plg
+
+# VC12
+*.sdf
+*.opensdf
