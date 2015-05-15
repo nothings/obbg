@@ -44,7 +44,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>src;src\win32;src\3rd;$(SolutionDir)..\include;$(SolutionDir)..\stb</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>src;src\win32;src\3rd;$(SolutionDir)..\include;$(SolutionDir)..\stb\stb.h;$(SolutionDir)..\stb\stb_image.h;$(SolutionDir)..\stb\stb_easy_font.h;$(SolutionDir)..\stb\stb_voxel_renderer.h</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -60,7 +60,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>src;src\win32;src\3rd;$(SolutionDir)..\include;$(SolutionDir)..\stb</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>src;src\win32;src\3rd;$(SolutionDir)..\include;$(SolutionDir)..\stb\stb.h;$(SolutionDir)..\stb\stb_image.h;$(SolutionDir)..\stb\stb_easy_font.h;$(SolutionDir)..\stb\stb_voxel_renderer.h</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
