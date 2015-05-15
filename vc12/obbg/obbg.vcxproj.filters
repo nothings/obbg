@@ -1,0 +1,117 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{fd35fcf2-b6b6-4521-9fb9-5ddf5fc0fb16}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="stb">
+      <UniqueIdentifier>{c0461e5c-8e34-455c-85bf-6a4589d42c88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\3rd">
+      <UniqueIdentifier>{5553d617-d699-42f4-a1cd-bfc21dc8d900}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\win32">
+      <UniqueIdentifier>{5f2f49cd-712a-4465-889f-1376355a74ed}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\stb\stb_perlin.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_rect_pack.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_textedit.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_tilemap_editor.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_truetype.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_voxel_render.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stretchy_buffer.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_c_lexer.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_divide.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_dxt.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_easy_font.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_herringbone_wang_tile.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_image.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_image_resize.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_image_write.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\stb\stb_leakcheck.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\u_noise.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\glext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\glext_list.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\obbg_data.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\obbg_funcs.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\stb_gl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\stb_glprog.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\3rd\crn_decomp.h">
+      <Filter>src\3rd</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\stb\stb_vorbis.c">
+      <Filter>stb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\u_noise.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\voxel_render.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\main.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\mesh_builder.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\texture_loader.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\win32\SDL_windows_main.c">
+      <Filter>src\win32</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
