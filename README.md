@@ -7,9 +7,9 @@ See docs/overview.txt for information about the scope
 of the project, and docs/todo.txt for some idea of
 what's up next.
 
-At the moment, there is almost nothing there!
+![obbg screen shot](http://nothings.org/remote/obbg_3.jpg "obbg screen shot")
 
-![obbg screen shot](http://nothings.org/remote/obbg_initial.jpg "obbg screen shot")
+![Development stream archive](https://www.youtube.com/playlist?list=PLMkT-w6m06QvQaGJKw7vRuPlnYJWczvPj)
 
 # License
 
