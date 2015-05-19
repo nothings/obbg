@@ -39,7 +39,7 @@ unsigned char geom_map[] =
    STBVOX_GEOM_solid,
 };
 
-static unsigned char tex1_for_blocktype[256][6];
+unsigned char tex1_for_blocktype[256][6];
 static unsigned char tex2_for_blocktype[256][6];
 static unsigned char color_for_blocktype[256][6];
 static unsigned char geom_for_blocktype[256];
@@ -183,14 +183,6 @@ gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
       return NULL;
 }
 
-void init_mesh_building(void)
-{
-   int i,j;
-   for (i=0; i < 256; ++i)
-      for (j=0; j < 6; ++j)
-         tex1_for_blocktype[i][j] = (uint8) i-1;
-}
-
 void init_chunk_caches(void)
 {
    int i,j;
@@ -229,6 +221,7 @@ void release_gen_chunk(gen_chunk *gc)
 void add_ref_count(gen_chunk *gc)
 {
    SDL_LockMutex(ref_count_mutex);
+   if (gc == NULL) __asm int 3;
    ++gc->ref_count;
    SDL_UnlockMutex(ref_count_mutex);
 }
@@ -242,21 +235,18 @@ void free_gen_chunk(gen_chunk_cache *gcc)
 #define MIN_GROUND 32
 #define AVG_GROUND 64
 
-float compute_height_field(int x, int y)
+float compute_height_field(int x, int y, float weight)
 {
    float ht = AVG_GROUND;
 #if 1
-   float weight=0;
    int o;
-   weight = (float) stb_linear_remap(stb_perlin_noise3(x/256.0f,y/256.0f,100,256,256,256), -1.5, 1.5, -4.0f, 5.0f);
-   weight = stb_clamp(weight,0,1);
    for (o=0; o < 8; ++o) {
       float scale = (float) (1 << o);
       float ns = stb_perlin_noise3(x/scale, y/scale, o*2.0f, 256,256,256), heavier;
       float sign = (ns < 0 ? -1.0f : 1.0f);
       ns = (float) fabs(ns);
-      heavier = ns*ns*ns*ns*4;
-      ht += scale/2 * stb_lerp(weight, ns, heavier);
+      heavier = ns*ns*ns*ns*4*sign;
+      ht += scale/2 * stb_lerp(weight, ns, heavier) / 2;
    }
 #else
 
@@ -272,75 +262,91 @@ float compute_height_field(int x, int y)
    return ht;
 }
 
+void build_column(gen_chunk *gc, int x, int y, int z0, int z1, int bt)
+{
+   int z;
+   if (x >= 0 && x < GEN_CHUNK_SIZE_X && y >= 0 && y < GEN_CHUNK_SIZE_Y)
+      for (z=z0; z < z1; ++z)
+         gc->partial[z >> Z_SEGMENT_SIZE_LOG2].block[y][x][z & 15] = bt;
+}
+
 gen_chunk *generate_chunk(int x, int y)
 {
    int z_seg;
    int i,j,z;
    int ground_top = 0;
    gen_chunk *gc = malloc(sizeof(*gc));
-   float height_field[GEN_CHUNK_SIZE_Y+2][GEN_CHUNK_SIZE_X+2];
-   int height_field_int[GEN_CHUNK_SIZE_Y+2][GEN_CHUNK_SIZE_X+2];
-   int corner_tex[2][2], corner_weight[2][2];
+   float height_lerp[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
+   float height_field[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
+   int height_field_int[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    int block_type[GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X];
+   int tree[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8] = { { 0 } };
    assert(gc);
-
-   for (j=-1; j <= GEN_CHUNK_SIZE_Y; ++j)
-      for (i=-1; i <= GEN_CHUNK_SIZE_X; ++i) {
-         float ht = compute_height_field(x+i,y+j);
-         height_field[j+1][i+1] = ht;
-         height_field_int[j+1][i+1] = (int) height_field[j+1][i+1];
-         ground_top = stb_max(ground_top, height_field_int[j+1][i+1]);
-      }
 
    memset(gc->non_empty, 0, sizeof(gc->non_empty));
    memset(gc->non_empty, 1, (ground_top+Z_SEGMENT_SIZE-1)>>Z_SEGMENT_SIZE_LOG2);
 
-   for (j=0; j < 2; ++j) {
-      for (i=0; i < 2; ++i) {
-         unsigned int val = fast_noise(x+i*GEN_CHUNK_SIZE_X,y+j*GEN_CHUNK_SIZE_Y,3,777);
-         val = (val*16)/65536;
-         corner_tex[j][i] = val;
-         corner_weight[j][i] = 32+(fast_noise(x+i*GEN_CHUNK_SIZE_X,y+j*GEN_CHUNK_SIZE_Y,3,666)&255);
+   for (j=-4; j < GEN_CHUNK_SIZE_Y+4; ++j)
+      for (i=-4; i < GEN_CHUNK_SIZE_X+4; ++i) {
+         float ht;
+         float weight = (float) stb_linear_remap(stb_perlin_noise3((x+i)/256.0f,(y+j)/256.0f,100,256,256,256), -1.5, 1.5, -4.0f, 5.0f);
+         weight = stb_clamp(weight,0,1);
+         height_lerp[j+4][i+4] = weight;
+         ht = compute_height_field(x+i,y+j, weight);
+         assert(ht >= 8);
+         height_field[j+4][i+4] = ht;
+         height_field_int[j+4][i+4] = (int) height_field[j+4][i+4];
+         ground_top = stb_max(ground_top, height_field_int[j+4][i+4]);
       }
-   }
-   
-   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
-      for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
-         int best=0, best_w=0, w;
-         w = corner_weight[0][0]*(GEN_CHUNK_SIZE_X+i)*(GEN_CHUNK_SIZE_Y-j);
-         if (w >= best_w) {
-            best_w = w;
-            best = corner_tex[0][0];
-         }
-         w = corner_weight[0][1]*(i)*(GEN_CHUNK_SIZE_Y-j);
-         if (w >= best_w) {
-            best_w = w;
-            best = corner_tex[0][1];
-         }
-         w = corner_weight[1][0]*(GEN_CHUNK_SIZE_X-i)*(j);
-         if (w >= best_w) {
-            best_w = w;
-            best = corner_tex[1][0];
-         }
-         w = corner_weight[1][1]*(i)*(j);
-         if (w >= best_w) {
-            best_w = w;
-            best = corner_tex[1][1];
-         }
-         block_type[j][i] = (BT_solid + best);
-      }
-   }
 
    for (z_seg=0; z_seg < NUM_Z_SEGMENTS; ++z_seg) {
       int z0 = z_seg * Z_SEGMENT_SIZE;
       gen_chunk_partial *gcp = &gc->partial[z_seg];
       for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
          for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
-            int ht = height_field_int[j+1][i+1];
+            int bt = block_type[j][i];
+            int ht = height_field_int[j+4][i+4];
+
+            int z_stone = stb_clamp(ht-2-z0, 0, Z_SEGMENT_SIZE);
             int z_limit = stb_clamp(ht-z0, 0, Z_SEGMENT_SIZE);
+
+            if (height_lerp[j+4][i+4] < 0.5)
+               bt = BT_grass;
+            else
+               bt = BT_sand;
+            if (ht > AVG_GROUND+8)
+               bt = BT_stone;
+            //bt = (int) stb_lerp(height_lerp[j][i], BT_sand, BT_marble+0.99f);
             assert(z_limit >= 0 && Z_SEGMENT_SIZE - z_limit >= 0);
-            memset(&gcp->block[j][i][   0   ], block_type[j][i], z_limit);
+
+            if (z_limit > 0) {
+               memset(&gcp->block[j][i][   0   ], BT_stone, z_stone);
+               memset(&gcp->block[j][i][z_stone],  bt     , z_limit-z_stone);
+            }
             memset(&gcp->block[j][i][z_limit],     BT_empty    , Z_SEGMENT_SIZE - z_limit);
+         }
+      }
+   }
+
+   for (j=-4; j < GEN_CHUNK_SIZE_Y+4; j += 8) {
+      for (i=-4; i < GEN_CHUNK_SIZE_X+4; i += 8) {
+         uint32 r = flat_noise32_strong(x+i, y+j, 8989);
+         int xoff = (r % 5) - 2;
+         int yoff = ((r>>8) % 5) - 2;
+         if (i+xoff >= -4 && i+xoff < GEN_CHUNK_SIZE_X+4 &&
+             j+yoff >= -4 && j+yoff < GEN_CHUNK_SIZE_Y+4) {
+            int tx = i+xoff, ty = j+yoff;
+            if (height_lerp[ty+4][tx+4] < 0.5) {
+               int ht = height_field_int[ty+4][tx+4];
+               int tree_height = (r % 6) + 4;
+               int leaf_ht = ht + (tree_height>>1);
+               build_column(gc, tx, ty, ht, ht+tree_height, BT_wood);
+
+               build_column(gc, tx+1, ty, leaf_ht+2, ht+tree_height+1, BT_leaves);
+               build_column(gc, tx, ty+1, leaf_ht+2, ht+tree_height+1, BT_leaves);
+               build_column(gc, tx-1, ty, leaf_ht+2, ht+tree_height+1, BT_leaves);
+               build_column(gc, tx, ty-1, leaf_ht+2, ht+tree_height+1, BT_leaves);
+            }
          }
       }
    }
@@ -363,14 +369,14 @@ gen_chunk *generate_chunk(int x, int y)
             unsigned char *lt = &gcp->lighting[j][i][0];
             for (z=0; z < z_limit; ++z) {
                int light;
-               if (z0+z < height_field_int[j+1][i+1]) {
+               if (z0+z < height_field_int[j+4][i+4]) {
                   light = 0;
                } else {
                   int m,n;
                   light = 0;
                   for (m=-1; m <= 1; ++m) {
                      for (n=-1; n <= 1; ++n) {
-                        int ht = height_field_int[j+1+m][i+1+n];
+                        int ht = height_field_int[j+4+m][i+4+n];
                         int val = z0+z-ht+2;
 
                         if (val < 0) val=0;
@@ -931,12 +937,11 @@ int mesh_worker_handler(void *data)
                fgc.world_x = t.world_x;
                fgc.world_y = t.world_y;
                fgc.gc = generate_chunk(t.world_x, t.world_y);
+               add_ref_count(fgc.gc);
                if (!add_to_queue(&finished_gen, &fgc))
                   release_gen_chunk(fgc.gc);
-               else {
-                  add_ref_count(fgc.gc);
+               else
                   waiter_wake(&manager_monitor);
-               }
                break;
             }
          }
@@ -1071,7 +1076,7 @@ void init_mesh_build_threads(void)
    ref_count_mutex = SDL_CreateMutex();
 
    if (num_proc > 6)
-      num_mesh_workers = num_proc/2;
+      num_mesh_workers = num_proc-3;
    else if (num_proc > 4)
       num_mesh_workers = 4;
    else 
@@ -1082,8 +1087,6 @@ void init_mesh_build_threads(void)
 
    if (num_mesh_workers < 1)
       num_mesh_workers = 1;
-
-   num_mesh_workers = 2;
 
    for (i=0; i < num_mesh_workers; ++i)
       SDL_CreateThread(mesh_worker_handler, "mesh worker", (void *) i);

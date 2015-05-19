@@ -50,6 +50,8 @@ float table4[128][4];
 GLint tablei[2];
 GLuint uniform_loc[STBVOX_UNIFORM_count];
 
+int view_distance=1500;
+
 void setup_uniforms(float pos[3])
 {
    int i,j;
@@ -139,7 +141,7 @@ void setup_uniforms(float pos[3])
 
                // fog color
                table4[3][0] = 0.6f, table4[3][1] = 0.7f, table4[3][2] = 0.9f;
-               table4[3][3] = 1.0f / 1860.0f;
+               table4[3][3] = 1.0f / (view_distance * 0.97f);
                table4[3][3] *= table4[3][3];
 
                data = table4;
@@ -236,7 +238,6 @@ void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer)
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 extern float light_pos[3];
 
-int view_distance=960;
 
 
 

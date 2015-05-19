@@ -10,10 +10,15 @@
 enum
 {
    BT_empty,
-   BT_solid,
-   BT_1,
-   BT_2,
-   BT_3,
+
+   BT_sand,
+   BT_grass,
+   BT_gravel,
+   BT_asphalt,
+   BT_wood,
+   BT_marble,
+   BT_stone,
+   BT_leaves,
 };
 
 typedef struct
@@ -90,5 +95,6 @@ extern int quads_considered, quads_rendered;
 extern int chunk_storage_rendered, chunk_storage_considered, chunk_storage_total;
 extern int view_dist_for_display;
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
+extern unsigned char tex1_for_blocktype[256][6];
 
 #endif

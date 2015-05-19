@@ -62,22 +62,55 @@ texture_info textures[] =
    1,"ground/Dirt_and_gravel_pxr128",
    1,"ground/Fine_gravel_pxr128",
    1.0/2,"ground/Ivy_pxr128",
+
    1,"ground/Lawn_grass_pxr128",
    1,"ground/Pebbles_in_mortar_pxr128",
    1,"ground/Peetmoss_pxr128",
    1,"ground/Red_gravel_pxr128",
    1,"ground/Street_asphalt_pxr128",
+
    1,"floor/Wool_carpet_pxr128",
    1,"brick/Pink-brown_painted_pxr128",
    1,"brick/Building_block_pxr128",
    1,"brick/Standard_red_pxr128",
    1,"siding/Diagonal_cedar_pxr128",
+
    1,"siding/Vertical_redwood_pxr128",
    1,"stone/Gray_marble_pxr128",
    1,"stone/Buffed_marble_pxr128",
    1,"stone/Black_marble_pxr128",
    1,"stone/Blue_marble_pxr128",
+
+   1,"stone/Gray_granite_pxr128",
 };
+
+void set_blocktype_texture(int bt, int tex)
+{
+   int i;
+   for (i=0; i < 6; ++i)
+      tex1_for_blocktype[bt][i] = tex;
+}
+
+void init_mesh_building(void)
+{
+#if 0
+   int i,j;
+   for (i=0; i < 256; ++i)
+      for (j=0; j < 6; ++j)
+         tex1_for_blocktype[i][j] = (uint8) i-1;
+#endif
+
+   set_blocktype_texture(BT_sand, 0);
+   set_blocktype_texture(BT_grass, 5);
+   set_blocktype_texture(BT_gravel, 2);
+   set_blocktype_texture(BT_asphalt, 9);
+   set_blocktype_texture(BT_wood, 15);
+   set_blocktype_texture(BT_marble, 16);
+   set_blocktype_texture(BT_stone, 20);
+   set_blocktype_texture(BT_leaves, 1);
+}
+
+
 
 float texture_scales[256];
 
