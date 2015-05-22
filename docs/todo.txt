@@ -2,7 +2,6 @@ Possible tasks to work on next:
 
    -  check for memory leaks
    -  dynamically set view distance
-      - adjust fog distance to match
    -  limit mesh cache to max size
    -  disk save/load
       - lz4 compression?
@@ -10,6 +9,7 @@ Possible tasks to work on next:
    -  object (non-terrain) rendering
       - what model-file format?
       - animation? skinning?
+      - procedural animation of characters?
    -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
    -  "physics" (e.g. move on ground, needs physics rep)
    -  raycast (needs physics rep)
