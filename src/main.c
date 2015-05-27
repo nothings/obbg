@@ -108,6 +108,8 @@ void init_mesh_building(void)
    set_blocktype_texture(BT_marble, 16);
    set_blocktype_texture(BT_stone, 20);
    set_blocktype_texture(BT_leaves, 1);
+
+   // { int i; for (i=0; i < 20; ++i) set_blocktype_texture(i, 0); }
 }
 
 
@@ -630,6 +632,7 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_D)   active_control_set(7);
          if (k == '1') global_hack = !global_hack;
          if (k == '2') global_hack = -1;
+         if (k == '3') camloc[0] += 65536;
          if (s == SDL_SCANCODE_R) {
             camera_to_worldspace(light_vel, 0,32,0);
             memcpy(light_pos, camloc, sizeof(light_pos));

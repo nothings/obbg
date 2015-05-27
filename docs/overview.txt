@@ -9,6 +9,9 @@ obbg:
   - networking
 
 Done in today's stream:
+   -  fix lighting bug
+   -  change lighting to not be height-field based
+   -  partial work on new tree layout
 
 Previous stream:
    -  fog dist from view dist

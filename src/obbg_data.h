@@ -3,6 +3,7 @@
 
 #include <assert.h>
 
+typedef int Bool;
 #define true   (0==0)
 #define false  (0==1)
 

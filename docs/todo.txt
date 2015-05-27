@@ -1,5 +1,8 @@
 Possible tasks to work on next:
 
+   -  add skylight
+   -  more work on terrain -- zmc pseudo-wang tile approach
+   -  fix depth fighting when far from origin
    -  check for memory leaks
    -  dynamically set view distance
    -  limit mesh cache to max size
@@ -13,13 +16,13 @@ Possible tasks to work on next:
    -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
    -  "physics" (e.g. move on ground, needs physics rep)
    -  raycast (needs physics rep)
-   -  add better lighting
    -  use more block types
    -  improved height-field terrain 
    -  other terrain features
    -  texture improvements
      -  tweak pixar textures to be more grey so can dynamically recolor
      -  find better open textures or pay someone to make them
+   -  add better lighting
    -  optimize mesh building
    -  optimize terrain generation
 

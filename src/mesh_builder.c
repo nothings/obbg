@@ -235,13 +235,25 @@ void free_gen_chunk(gen_chunk_cache *gcc)
 #define MIN_GROUND 32
 #define AVG_GROUND 64
 
+float octave_multiplier[8] =
+{
+   1.01f,
+   1.03f,
+   1.052f,
+   1.021f,
+   1.0057f,
+   1.111f,
+   1.089f,
+   1.157f,
+};
+
 float compute_height_field(int x, int y, float weight)
 {
    float ht = AVG_GROUND;
 #if 1
    int o;
    for (o=0; o < 8; ++o) {
-      float scale = (float) (1 << o);
+      float scale = (float) (1 << o) * octave_multiplier[o];
       float ns = stb_perlin_noise3(x/scale, y/scale, o*2.0f, 256,256,256), heavier;
       float sign = (ns < 0 ? -1.0f : 1.0f);
       ns = (float) fabs(ns);
@@ -270,17 +282,210 @@ void build_column(gen_chunk *gc, int x, int y, int z0, int z1, int bt)
          gc->partial[z >> Z_SEGMENT_SIZE_LOG2].block[y][x][z & 15] = bt;
 }
 
+//  m = minimum spacing between trees
+//  e = edge-generation "radius"
+//  c = corner-generation "radius"
+//
+//  2e >= m
+//
+//  distance between (c,e) and (e,c) must be >= m
+//
+//  (e-c)^2 + (c-e)^2 >= m^2
+//  2(c-e)^2 >= m^2
+//  sqrt(2)*(c-e) >= m
+//  abs(c-e) >= m / sqrt(2) > m / 1.5 = m*2/3
+
+//  m = 6
+//
+//  (c-e) >= 4
+//  c=8, e=4, m=6
+//
+//  c=7,e=3,m=6
+
+typedef struct
+{
+   int x,y;
+} tree_location;
+
+#define MAX_TREES_PER_AREA   6
+typedef struct
+{
+   int num_trees;
+   tree_location trees[MAX_TREES_PER_AREA];
+} tree_area_data;
+
+static int random_5[16] = { -2,-1,0,1,2, -2,1,0,1,2, -2,1,0,1,2, 0 };
+
+#define TREE_CORNER_SIZE   7
+#define TREE_MIN_SPACING   6
+#define TREE_EDGE_SIZE     3
+
+static void add_tree(tree_area_data *tad, int x, int y)
+{
+   tree_location tl = { x,y };
+   tad->trees[tad->num_trees++] = tl;
+}
+
+tree_area_data generate_trees_for_corner(int x, int y)
+{
+   int i,j;
+   tree_area_data tad;
+   uint32 n = flat_noise32_weak(x,y,8938);
+   int bx = x + (n & 7) - 6;
+   int by = y + ((n >> 3) & 7) - 6;
+   tad.num_trees = 0;
+
+   n = flat_noise32_weak(x,y, 319491);
+   for (j=0; j < 2; ++j) {
+      for (i=0; i < 2; ++i) {
+         int tx = bx + i*8;
+         int ty = by + j*8;
+         tx += random_5[n & 15];
+         n >>= 4;
+         ty += random_5[n & 15];
+         n >>= 4;
+         if (tx >= bx - TREE_CORNER_SIZE && tx < bx + TREE_CORNER_SIZE &&
+             ty >= by - TREE_CORNER_SIZE && ty < by + TREE_CORNER_SIZE)
+            add_tree(&tad, tx,ty);
+      }
+   }
+   return tad;
+}
+
+Bool collides(tree_area_data *tad, int x, int y)
+{
+   int i;
+   for (i=0; i < tad->num_trees; ++i) {
+      int sx = x - tad->trees[i].x;
+      int sy = y - tad->trees[i].y;
+      if (abs(sx) < TREE_MIN_SPACING && abs(sy) < TREE_MIN_SPACING)
+         if (sx*sx + sy*sy < TREE_MIN_SPACING * TREE_MIN_SPACING)
+            return true;
+   }
+   return false;
+}
+
+tree_area_data generate_trees_for_horizontal_edge_raw(int ex, int ey, tree_area_data *c1, tree_area_data *c2, uint32 seed)
+{
+   uint32 n = flat_noise32_weak(ex,ey,seed);
+   tree_area_data tad;
+   // TREE_CORNER_SIZE <= x < GEN_CHUNK_SIZE_X - TREE_CORNER_SIZE
+   int x_left, x_right, y_left, y_right, x_mid, y_mid;
+
+   x_left = ex + TREE_CORNER_SIZE + (n & 3); n >>= 2;
+   y_left = ey - 2 + (n & 3); n >>= 2;
+   while (collides(c1, x_left, y_left))
+      x_left += 2;
+   assert(x_left <= ex + TREE_CORNER_SIZE + TREE_MIN_SPACING + 2);
+   //     x_left <= ex + 14
+
+   x_right = ex + GEN_CHUNK_SIZE_X - TREE_CORNER_SIZE + (n & 3) - 4; n >>= 2;
+   y_right = ey - 2 + (n & 3); n >>= 2;
+   while (collides(c2, x_right, y_right))
+      x_right -= 2;
+   assert(x_right >= ex + GEN_CHUNK_SIZE_X - TREE_CORNER_SIZE - TREE_MIN_SPACING - 2);
+
+   if (x_right > x_left + TREE_MIN_SPACING) {
+      tad.num_trees = 0;
+      x_mid = (int) stb_linear_remap((n&255),0,255, x_left, x_right); n >>= 8;
+      y_mid = ey - 2 + (n & 3); n >>= 2;
+      add_tree(&tad, x_mid, y_mid);
+   } else {
+      x_mid = (x_left + x_right) + ((n & 7) - 4); n >>= 3;
+      y_mid = ey - 2 + (n & 3); n >>= 2;
+
+      if (x_mid < x_left + TREE_MIN_SPACING)
+         x_mid = x_left + TREE_MIN_SPACING;
+      if (x_mid > x_right - TREE_MIN_SPACING)
+         x_mid = x_right - TREE_MIN_SPACING;
+
+      tad.num_trees = 0;
+      add_tree(&tad, x_left, y_left);
+      if (x_mid >= x_left + TREE_MIN_SPACING)
+         add_tree(&tad, x_mid, y_mid);
+      add_tree(&tad, x_right, y_right);
+   }
+   return tad;
+}
+
+tree_area_data generate_trees_for_horizontal_edge(int ex, int ey, tree_area_data *c1, tree_area_data *c2)
+{
+   return generate_trees_for_horizontal_edge_raw(ex,ey, c1,c2, 8938);
+}
+
+void swap_tree_coords(tree_area_data *tad)
+{
+   int i;
+   for (i=0; i < tad->num_trees; ++i) {
+      int x = tad->trees[i].x;
+      tad->trees[i].x = tad->trees[i].y;
+      tad->trees[i].y = x;
+   }
+}
+
+tree_area_data generate_trees_for_vertical_edge(int ex, int ey, tree_area_data *c1, tree_area_data *c2)
+{
+   tree_area_data tad;
+   swap_tree_coords(c1);
+   swap_tree_coords(c2);
+   tad = generate_trees_for_horizontal_edge_raw(ey,ex, c1,c2, 9387);
+   swap_tree_coords(c2);
+   swap_tree_coords(c1);
+
+   swap_tree_coords(&tad);
+   return tad;
+}
+
+static int add_trees(tree_location trees[], int num, tree_area_data *tad)
+{
+   int i;
+   for (i=0; i < tad->num_trees; ++i)
+      trees[num++] = tad->trees[i];
+   return num;
+}
+
+// returns number of trees
+int generate_trees_for_chunk(tree_location trees[], int x, int y)
+{
+   int num=0;
+   tree_area_data c00,c01,c10,c11;
+   tree_area_data ee,en,ew,es;
+
+   c00 = generate_trees_for_corner(x                   , y                   );
+   c10 = generate_trees_for_corner(x + GEN_CHUNK_SIZE_X, y                   );
+   c01 = generate_trees_for_corner(x                   , y + GEN_CHUNK_SIZE_Y);
+   c11 = generate_trees_for_corner(x + GEN_CHUNK_SIZE_X, y + GEN_CHUNK_SIZE_Y);
+
+   en = generate_trees_for_horizontal_edge(x, y                   , &c00, &c10);
+   es = generate_trees_for_horizontal_edge(x, y + GEN_CHUNK_SIZE_Y, &c01, &c11);
+   ew = generate_trees_for_vertical_edge  (x,                    y, &c00, &c01);
+   ee = generate_trees_for_vertical_edge  (x + GEN_CHUNK_SIZE_X, y, &c10, &c11);
+
+   num = add_trees(trees, num, &c00);
+   num = add_trees(trees, num, &c10);
+   num = add_trees(trees, num, &c01);
+   num = add_trees(trees, num, &c11);
+   num = add_trees(trees, num, &ee);
+   num = add_trees(trees, num, &en);
+   num = add_trees(trees, num, &ew);
+   num = add_trees(trees, num, &es);
+
+   return num;
+}
+
+#define MAX_TREES_PER_CHUNK ((GEN_CHUNK_SIZE_X / TREE_MIN_SPACING)*(GEN_CHUNK_SIZE_Y / TREE_MIN_SPACING))
+
 gen_chunk *generate_chunk(int x, int y)
 {
    int z_seg;
    int i,j,z;
    int ground_top = 0;
    gen_chunk *gc = malloc(sizeof(*gc));
+   int num_trees;
+   tree_location trees[MAX_TREES_PER_CHUNK];
    float height_lerp[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    float height_field[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    int height_field_int[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
-   int block_type[GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X];
-   int tree[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8] = { { 0 } };
    assert(gc);
 
    memset(gc->non_empty, 0, sizeof(gc->non_empty));
@@ -304,13 +509,13 @@ gen_chunk *generate_chunk(int x, int y)
       gen_chunk_partial *gcp = &gc->partial[z_seg];
       for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
          for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
-            int bt = block_type[j][i];
+            int bt;
             int ht = height_field_int[j+4][i+4];
 
             int z_stone = stb_clamp(ht-2-z0, 0, Z_SEGMENT_SIZE);
             int z_limit = stb_clamp(ht-z0, 0, Z_SEGMENT_SIZE);
 
-            if (height_lerp[j+4][i+4] < 0.5)
+            if (height_lerp[j][i] < 0.5)
                bt = BT_grass;
             else
                bt = BT_sand;
@@ -328,16 +533,40 @@ gen_chunk *generate_chunk(int x, int y)
       }
    }
 
-   for (j=-4; j < GEN_CHUNK_SIZE_Y+4; j += 8) {
-      for (i=-4; i < GEN_CHUNK_SIZE_X+4; i += 8) {
+   num_trees = generate_trees_for_chunk(trees, x, y);
+   for (i=0; i < num_trees; ++i) {
+      int bx = trees[i].x;
+      int by = trees[i].y;
+      int tx = bx - x;
+      int ty = by - y; 
+      if (tx >= -4 && tx < GEN_CHUNK_SIZE_X+4 &&
+          ty >= -4 && ty < GEN_CHUNK_SIZE_Y+4) {
+         if (height_lerp[ty+4][tx+4] < 0.5) {
+            uint32 r = flat_noise32_strong(bx, by, 8989);
+            int ht = height_field_int[ty+4][tx+4];
+            int tree_height = (r % 6) + 4;
+            int leaf_ht = ht + (tree_height>>1);
+            build_column(gc, tx, ty, ht, ht+tree_height, BT_wood);
+
+            build_column(gc, tx+1, ty, leaf_ht+2, ht+tree_height+1, BT_leaves);
+            build_column(gc, tx, ty+1, leaf_ht+2, ht+tree_height+1, BT_leaves);
+            build_column(gc, tx-1, ty, leaf_ht+2, ht+tree_height+1, BT_leaves);
+            build_column(gc, tx, ty-1, leaf_ht+2, ht+tree_height+1, BT_leaves);
+         }
+      }
+   }
+
+   #if 0
+   for (j = -4; j < GEN_CHUNK_SIZE_Y+4; j += 8) {
+      for (i = -4; i < GEN_CHUNK_SIZE_X+4; i += 8) {
          uint32 r = flat_noise32_strong(x+i, y+j, 8989);
          int xoff = (r % 5) - 2;
          int yoff = ((r>>8) % 5) - 2;
          if (i+xoff >= -4 && i+xoff < GEN_CHUNK_SIZE_X+4 &&
              j+yoff >= -4 && j+yoff < GEN_CHUNK_SIZE_Y+4) {
             int tx = i+xoff, ty = j+yoff;
-            if (height_lerp[ty+4][tx+4] < 0.5) {
-               int ht = height_field_int[ty+4][tx+4];
+            if (height_lerp[ty][tx] < 0.5) {
+               int ht = height_field_int[ty][tx];
                int tree_height = (r % 6) + 4;
                int leaf_ht = ht + (tree_height>>1);
                build_column(gc, tx, ty, ht, ht+tree_height, BT_wood);
@@ -350,61 +579,18 @@ gen_chunk *generate_chunk(int x, int y)
          }
       }
    }
+   #endif
 
    // compute lighting for every block by weighted average of neighbors
 
    // loop through every partial chunk separately
 
-   for (z_seg=0; (z_seg < NUM_Z_SEGMENTS); ++z_seg) {
-      gen_chunk_partial *gcp = &gc->partial[z_seg];
-      int z0 = z_seg * Z_SEGMENT_SIZE;
-      int z_limit;
-      z_limit = Z_SEGMENT_SIZE;
-      if (z_limit + z0 > ground_top+1)
-         z_limit = ground_top+1 - z0;
-      if (z_limit < 0)
-         break;
-      for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
-         for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
-            unsigned char *lt = &gcp->lighting[j][i][0];
-            for (z=0; z < z_limit; ++z) {
-               int light;
-               if (z0+z < height_field_int[j+4][i+4]) {
-                  light = 0;
-               } else {
-                  int m,n;
-                  light = 0;
-                  for (m=-1; m <= 1; ++m) {
-                     for (n=-1; n <= 1; ++n) {
-                        int ht = height_field_int[j+4+m][i+4+n];
-                        int val = z0+z-ht+2;
-
-                        if (val < 0) val=0;
-                        if (val > 3) val = 3;
-                        light += val;
-                     }
-                  }
-                  // 27 ?
-                  light += 4;
-                  light = light << 3;
-               }
-
-               *lt++ = light;
-            }
-            for (; z < Z_SEGMENT_SIZE; ++z)
-               *lt++ = 255;
-         }
-      }
-   }
-
-   for (; z_seg < NUM_Z_SEGMENTS; ++z_seg) {
+   for (z_seg=0; z_seg < NUM_Z_SEGMENTS; ++z_seg) {
       gen_chunk_partial *gcp = &gc->partial[z_seg];
       for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
-         for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
-            unsigned char *lt = &gcp->lighting[j][i][0];
+         for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
             for (z=0; z < Z_SEGMENT_SIZE; ++z)
-               *lt++ = 255;
-         }
+               gcp->lighting[j][i][z] = (gcp->block[j][i][z]) ? 0 : 255;
    }
 
    gc->ref_count = 0;
@@ -649,7 +835,7 @@ mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
    int num_proc = SDL_GetCPUCount();
 */
 
-#define MAX_MESH_WORKERS 32
+#define MAX_MESH_WORKERS 24
 
 enum
 {
