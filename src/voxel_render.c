@@ -50,7 +50,7 @@ float table4[128][4];
 GLint tablei[2];
 GLuint uniform_loc[STBVOX_UNIFORM_count];
 
-int view_distance=800;
+int view_distance=1400;
 
 void setup_uniforms(float pos[3])
 {

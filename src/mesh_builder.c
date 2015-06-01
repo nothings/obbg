@@ -233,7 +233,7 @@ void free_gen_chunk(gen_chunk_cache *gcc)
 }
 
 #define MIN_GROUND 32
-#define AVG_GROUND 64
+#define AVG_GROUND 72
 
 float octave_multiplier[8] =
 {
@@ -280,6 +280,21 @@ void build_column(gen_chunk *gc, int x, int y, int z0, int z1, int bt)
    if (x >= 0 && x < GEN_CHUNK_SIZE_X && y >= 0 && y < GEN_CHUNK_SIZE_Y)
       for (z=z0; z < z1; ++z)
          gc->partial[z >> Z_SEGMENT_SIZE_LOG2].block[y][x][z & 15] = bt;
+}
+
+void build_disk(gen_chunk *gc, float x, float y, int z, float radius, int bt)
+{
+   int ix,iy;
+   int x0,y0,x1,y1;
+   x0 = (int) floor(x - radius);
+   y0 = (int) floor(y - radius);
+   x1 = (int) ceil(x + radius);
+   y1 = (int) ceil(y + radius);
+   for (ix=x0; ix <= x1; ++ix)
+      for (iy=y0; iy <= y1; ++iy)
+         if (ix >= 0 && ix < GEN_CHUNK_SIZE_X && iy >= 0 && iy < GEN_CHUNK_SIZE_Y)
+            if ((ix-x)*(ix-x)+(iy-y)*(iy-y) <= radius*radius)
+               gc->partial[z >> Z_SEGMENT_SIZE_LOG2].block[iy][ix][z & 15] = bt;
 }
 
 //  m = minimum spacing between trees
@@ -503,6 +518,17 @@ int generate_trees_for_chunk(tree_location trees[], int x, int y, int limit)
 
 #define MAX_TREES_PER_CHUNK  100
 
+static float tree_shape_function(float pos)
+{
+   if (pos < 0.25) {
+      pos *= 4;
+      return 1.0f-(float)sqrt(1.0f-pos*pos);
+   } else {
+      pos = stb_linear_remap(pos, 0.25f, 1.0f, 0.0f, 1.0f);
+      return 1.0f-pos;
+   }
+}
+
 gen_chunk *generate_chunk(int x, int y)
 {
    int z_seg;
@@ -572,19 +598,62 @@ gen_chunk *generate_chunk(int x, int y)
          if (height_lerp[ty+4][tx+4] < 0.5) {
             uint32 r = flat_noise32_strong(bx, by, 8989);
             int ht = height_field_int[ty+4][tx+4];
-            int tree_height = (r % 6) + 4;
-            int leaf_ht = ht + (tree_height>>1);
-            build_column(gc, tx, ty, ht, ht+tree_height, BT_wood);
+            int tree_height = (r % 4) + 8;
+            int leaf_bottom = ht + (tree_height>>1);
+            int leaf_top = ht + tree_height + (ht + tree_height - leaf_bottom);
+            float px,py, dx,dy;
+            float tree_width = 3.5;
 
+            leaf_top += 3;
+            leaf_bottom += 3;
+
+            r >>= 2;
+            tree_width = stb_linear_remap((r&15), 0, 15, 2.5f, 3.9f); r >>= 4;
+            dx = (float) ((int) (r & 255) - 128); r >>= 8;
+            dy = (float) ((int) (r & 255) - 128); r >>= 8;
+
+            assert(dx >= -128 && dx <= 127);
+            assert(dy >= -128 && dy <= 127);
+
+            dx /= 512.0f;
+            dy /= 512.0f;
+
+            assert(dx >= -0.25f && dx <= 0.25);
+            assert(dy >= -0.25f && dy <= 0.25);
+
+            #if 0
+            dx = 0.15f;
+            dy = 0.15f;
+            #endif
+
+
+            px = (float) tx;
+            py = (float) ty;
+            for (z=leaf_bottom; z <= leaf_top; ++z) {
+               float radius = tree_width * tree_shape_function(stb_linear_remap(z, leaf_bottom, leaf_top, 0.05f, 0.95f));
+               build_disk(gc, px,py, z, radius, BT_leaves);
+               px += dx;
+               py += dy;
+            }
+
+            #if 0
             build_column(gc, tx+1, ty, leaf_ht+2, ht+tree_height+1, BT_leaves);
             build_column(gc, tx, ty+1, leaf_ht+2, ht+tree_height+1, BT_leaves);
             build_column(gc, tx-1, ty, leaf_ht+2, ht+tree_height+1, BT_leaves);
             build_column(gc, tx, ty-1, leaf_ht+2, ht+tree_height+1, BT_leaves);
+            #endif
+
+            build_column(gc, tx, ty, ht, ht+tree_height, BT_wood);
          }
       }
    }
 
-   //build_column(gc, 0,0, height_field_int[4][4], height_field_int[4][4]+1, BT_sand);
+   #if 0
+   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+      for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
+         if (i == 0 || i == GEN_CHUNK_SIZE_X-1 || j == 0 || j == GEN_CHUNK_SIZE_Y-1)
+            build_column(gc, i,j, height_field_int[j+4][i+4], height_field_int[j+4][i+4]+1, BT_sand);
+   #endif
 
    #if 0
    for (j = -4; j < GEN_CHUNK_SIZE_Y+4; j += 8) {
