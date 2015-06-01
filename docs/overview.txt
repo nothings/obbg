@@ -10,6 +10,7 @@ obbg:
 
 Done in today's stream:
    -  Tree layout, no grid artifacts
+   -  Tree tops
 
 Previous stream:
    -  fix lighting bug
