@@ -1,5 +1,6 @@
 #include "u_noise.h"
-#include "caveview.h"
+//#include "caveview.h"
+#include "stb.h"
 #include <string.h>
 #include <math.h> // floor()
 

@@ -13,6 +13,15 @@
 #ifndef CRND_INCLUDE_CRND_H
 #define CRND_INCLUDE_CRND_H
 
+
+
+#if _MSC_VER >= 1800
+	#pragma warning ( disable : 4430 )//for assumed int
+	#if _WIN32
+		#define WIN32 1
+	#endif
+#endif
+
 // definitions from crnlib.h
 // Various library/file format limits.
 typedef enum
