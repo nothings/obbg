@@ -1,9 +1,9 @@
 Possible tasks to work on next:
 
+   -  check for memory leaks
    -  add skylight
    -  more work on terrain -- zmc pseudo-wang tile approach
    -  fix depth fighting when far from origin
-   -  check for memory leaks
    -  dynamically set view distance
    -  limit mesh cache to max size
    -  disk save/load
@@ -28,5 +28,6 @@ Possible tasks to work on next:
 
 Not right now:
 
+   -  check "voxel_world_vheight_spiky.avi" for terrain inspiration
    -  shoot guns
    -  networking

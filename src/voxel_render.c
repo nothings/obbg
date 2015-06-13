@@ -50,7 +50,7 @@ float table4[128][4];
 GLint tablei[2];
 GLuint uniform_loc[STBVOX_UNIFORM_count];
 
-int view_distance=1400;
+int view_distance=1800;
 
 void setup_uniforms(float pos[3])
 {
@@ -141,7 +141,7 @@ void setup_uniforms(float pos[3])
 
                // fog color
                table4[3][0] = 0.6f, table4[3][1] = 0.7f, table4[3][2] = 0.9f;
-               table4[3][3] = 1.0f / (view_distance * 0.97f);
+               table4[3][3] = 1.0f / (view_distance - MESH_CHUNK_SIZE_X);
                table4[3][3] *= table4[3][3];
 
                data = table4;
@@ -430,6 +430,9 @@ void render_voxel_world(float campos[3])
       while (get_next_built_mesh(&bm)) {
          upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
          set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
+         free(bm.face_buffer);
+         free(bm.vertex_build_buffer);
+         free(bm.mc);
       }
    }
 

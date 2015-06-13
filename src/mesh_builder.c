@@ -875,7 +875,6 @@ void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc)
    }
 
    *mc = *new_mc;
-   free(new_mc);
 }
 
 
