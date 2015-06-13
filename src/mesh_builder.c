@@ -165,9 +165,14 @@ mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
 
 void free_mesh_chunk(mesh_chunk *mc)
 {
+   int i;
+
    glDeleteTextures(1, &mc->fbuf_tex);
    glDeleteBuffersARB(1, &mc->vbuf);
    glDeleteBuffersARB(1, &mc->fbuf);
+
+   for (i=0; i < stb_arr_len(mc->allocs); ++i)
+      free(mc->allocs[i]);
 }
 
 gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
@@ -786,6 +791,87 @@ void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg, build_data *bd)
       }
 }
 
+void *arena_alloc(arena_chunk ***chunks, size_t size, size_t arena_chunk_size)
+{
+   void *p;
+   arena_chunk **ac = *chunks;
+   arena_chunk *cur = ac == NULL ? NULL : stb_arr_last(ac);
+   if (stb_arr_len(ac) == 0)
+      goto alloc;
+   if (cur->in_use + size > cur->capacity) {
+      ac=ac;
+     alloc:
+      arena_chunk_size = stb_max(size, arena_chunk_size);
+      cur = malloc(arena_chunk_size + sizeof(arena_chunk)-1);
+      cur->capacity = arena_chunk_size;
+      cur->in_use = 0;
+      stb_arr_push(ac, cur);  
+      *chunks = ac;
+      cur = stb_arr_last(ac);
+   } else {
+      cur = cur;
+   }
+
+   assert(cur->in_use + size <= cur->capacity);
+   p = cur->data + cur->in_use;
+   cur->in_use += size;
+   return p;
+}
+
+// release unused memory from end of last allocation
+void arena_release(arena_chunk **chunks, size_t size)
+{
+   stb_arr_last(chunks)->in_use -= size;
+}
+
+void arena_free_all(arena_chunk **chunks)
+{
+   int i;
+   for (i=0; i < stb_arr_len(chunks); ++i)
+      free(chunks[i]);
+   stb_arr_free(chunks);
+}
+
+phys_chunk_run *build_phys_column(mesh_chunk *mc, gen_chunk *gc, int x, int y)
+{
+   phys_chunk_run *pr = arena_alloc(&mc->allocs, MAX_Z*2, 8192);
+   int z,data_off=0;
+   int run_length = 1;
+   for (z=1; z < 255; ++z) {
+      int prev_type = gc->partial[(z-1)>>4].block[y][x][(z-1)&15] != BT_empty;
+      int type = gc->partial[z>>4].block[y][x][z&15] != BT_empty;
+      if (type != prev_type) {
+         pr[data_off].type = prev_type;
+         pr[data_off].length = run_length;
+         run_length = 1;
+         ++data_off;
+      } else   
+         ++run_length;
+   }
+   pr[data_off].type = (gc->partial[(z-1)>>4].block[y][x][(z-1)&15] != BT_empty);
+   pr[data_off].length = run_length;
+   ++data_off;
+
+   arena_release(mc->allocs, MAX_Z*2 - data_off*2);
+   return pr;
+}
+
+void build_phys_chunk(mesh_chunk *mc, chunk_set *chunks)
+{
+   int j,i,x,y;
+   mc->allocs = NULL;
+   for (j=1; j <= 2; ++j) {
+      for (i=1; i <= 2; ++i) {
+         int x_off = (i-1) * GEN_CHUNK_SIZE_X;
+         int y_off = (j-1) * GEN_CHUNK_SIZE_Y;
+
+         for (y=0; y < GEN_CHUNK_SIZE_Y; ++y)
+            for (x=0; x < GEN_CHUNK_SIZE_X; ++x)
+               mc->pc.column[y_off+y][x_off+x] = build_phys_column(mc, chunks->chunk[j][i], x,y);
+      }
+   }
+}
+
 void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i world_coord, chunk_set *chunks, size_t build_size, build_data *bd)
 {
    int a,b,z;
@@ -799,6 +885,8 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    mc->chunk_y = (world_coord.y >> MESH_CHUNK_SIZE_Y_LOG2);
 
    stbvox_set_input_stride(mm, 18, 66*18);
+
+   build_phys_chunk(mc, chunks);
 
    map = stbvox_get_input_description(mm);
    map->block_tex1_face = tex1_for_blocktype;
@@ -916,24 +1004,7 @@ mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
    return mc;
 }
 
-
-/*
-         SDL_SemPost(mw->request_received);
-      SDL_SemWait(mw->request_received);
-      SDL_LockMutex(chunk_cache_mutex);
-      for (j=0; j < 4; ++j)
-         for (i=0; i < 4; ++i) {
-            deref_fastchunk(mw->chunks[j][i]);
-            mw->chunks[j][i] = NULL;
-         }
-      SDL_UnlockMutex(chunk_cache_mutex);
-      data->request_received = SDL_CreateSemaphore(0);
-      data->chunk_server_done_processing = SDL_CreateSemaphore(0);
-      SDL_CreateThread(mesh_worker_handler, "mesh worker", data);
-   int num_proc = SDL_GetCPUCount();
-*/
-
-#define MAX_MESH_WORKERS 24
+#define MAX_MESH_WORKERS 8
 
 enum
 {

@@ -7,37 +7,6 @@ typedef int Bool;
 #define true   (0==0)
 #define false  (0==1)
 
-// block types
-enum
-{
-   BT_empty,
-
-   BT_sand,
-   BT_grass,
-   BT_gravel,
-   BT_asphalt,
-   BT_wood,
-   BT_marble,
-   BT_stone,
-   BT_leaves,
-};
-
-typedef struct
-{
-   int chunk_x, chunk_y;
-
-   int vbuf_size, fbuf_size;
-
-   float transform[3][3];
-   float bounds[2][3];
-
-   unsigned int vbuf;
-   unsigned int fbuf, fbuf_tex;
-   int num_quads;
-} mesh_chunk;
-
-extern float texture_scales[256];
-
 #define MAX_Z                    255
 
 #define VIEW_DIST_LOG2            11
@@ -55,6 +24,66 @@ extern float texture_scales[256];
 
 #define MESH_CHUNK_X_FOR_WORLD_X(x)   ((x) >> MESH_CHUNK_SIZE_X_LOG2)
 #define MESH_CHUNK_Y_FOR_WORLD_Y(y)   ((y) >> MESH_CHUNK_SIZE_Y_LOG2)
+
+
+// block types
+enum
+{
+   BT_empty,
+
+   BT_sand,
+   BT_grass,
+   BT_gravel,
+   BT_asphalt,
+   BT_wood,
+   BT_marble,
+   BT_stone,
+   BT_leaves,
+};
+
+// physics types
+enum
+{
+   PT_empty,
+   PT_solid,
+};
+
+typedef struct
+{
+   uint8 type;
+   uint8 length;
+} phys_chunk_run;
+
+typedef struct
+{
+   phys_chunk_run *column[MESH_CHUNK_SIZE_Y][MESH_CHUNK_SIZE_X];
+} phys_chunk;
+
+typedef struct
+{
+   size_t capacity;
+   size_t in_use;
+   unsigned char data[1];  
+} arena_chunk;
+
+typedef struct
+{
+   int chunk_x, chunk_y;
+
+   int vbuf_size, fbuf_size;
+
+   float transform[3][3];
+   float bounds[2][3];
+
+   unsigned int vbuf;
+   unsigned int fbuf, fbuf_tex;
+   int num_quads;
+
+   phys_chunk pc;
+   arena_chunk **allocs;
+} mesh_chunk;
+
+extern float texture_scales[256];
 
 extern mesh_chunk      mesh_cache[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
 
