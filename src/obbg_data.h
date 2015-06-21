@@ -2,6 +2,7 @@
 #define INCLUDE_OBBG_DATA_H
 
 #include <assert.h>
+#include "stb.h"
 
 typedef int Bool;
 #define true   (0==0)

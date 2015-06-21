@@ -9,6 +9,12 @@ obbg:
   - networking
 
 Done in today's stream:
+
+Previous stream:
+   (maybe same stream as below)
+     start gathering collision data
+
+Previous stream:
    -  Tree layout, no grid artifacts
    -  Tree tops
 

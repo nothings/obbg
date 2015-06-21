@@ -149,7 +149,6 @@ static mesh_chunk_status *get_chunk_status_alloc(int x, int y)
    return mcs;
 }
 
-#if 0
 mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
 {
    int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
@@ -161,7 +160,6 @@ mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
    else
       return NULL;
 }
-#endif
 
 void free_mesh_chunk(mesh_chunk *mc)
 {
@@ -837,7 +835,7 @@ phys_chunk_run *build_phys_column(mesh_chunk *mc, gen_chunk *gc, int x, int y)
    phys_chunk_run *pr = arena_alloc(&mc->allocs, MAX_Z*2, 8192);
    int z,data_off=0;
    int run_length = 1;
-   for (z=1; z < 255; ++z) {
+   for (z=1; z < MAX_Z; ++z) {
       int prev_type = gc->partial[(z-1)>>4].block[y][x][(z-1)&15] != BT_empty;
       int type = gc->partial[z>>4].block[y][x][z&15] != BT_empty;
       if (type != prev_type) {

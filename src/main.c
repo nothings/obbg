@@ -208,7 +208,7 @@ static void print(char *text, ...)
    pos_y += 10;
 }
 
-float camang[3], camloc[3] = { 0,0,90 };
+float camang[3], camloc[3] = { 0,0,150 };
 float player_zoom = 1.0;
 float rotate_view = 0.0;
 
@@ -295,9 +295,36 @@ void process_tick_raw(float dt)
       cam_vel[2] *= newvel/vel;
    }
 
-   camloc[0] += cam_vel[0] * dt;
-   camloc[1] += cam_vel[1] * dt;
-   camloc[2] += cam_vel[2] * dt;
+   {
+      float x,y,z;
+      float camera_bounds[2][3];
+
+      x = camloc[0] + cam_vel[0] * dt;
+      y = camloc[1] + cam_vel[1] * dt;
+      z = camloc[2] + cam_vel[2] * dt;
+
+      camera_bounds[0][0] = - 0.25f;
+      camera_bounds[0][1] = - 0.25f;
+      camera_bounds[0][2] = - 4.25f;
+      camera_bounds[1][0] = + 0.25f;
+      camera_bounds[1][1] = + 0.25f;
+      camera_bounds[1][2] = + 0.25f;
+
+      if (!physics_move_walkable(&camloc[0], &camloc[1], &camloc[2], &cam_vel[0], &cam_vel[1], &cam_vel[2], dt, camera_bounds))
+         cam_vel[2] -= 20.0f * dt;
+
+      #if 0
+      if (!collision_test_box(x,y,z,camera_bounds)) {
+         camloc[0] = x;
+         camloc[1] = y;
+         camloc[2] = z;
+      } else {
+         cam_vel[0] = 0;
+         cam_vel[1] = 0;
+         cam_vel[2] = 0;
+      }
+      #endif
+   }
 
    light_pos[0] += light_vel[0] * dt;
    light_pos[1] += light_vel[1] * dt;

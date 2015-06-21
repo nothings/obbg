@@ -162,6 +162,10 @@ SOURCE=..\src\obbg_funcs.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\src\physics.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\texture_loader.cpp
 # End Source File
 # Begin Source File
