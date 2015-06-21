@@ -1520,4 +1520,3 @@ void swap_requested_meshes(void)
    } else
       ++starvation_count;
 }
-
