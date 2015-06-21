@@ -403,6 +403,7 @@ void draw_stats(void)
    print("QChunks: %3d in frustum of %3d valid of %3d in range", chunks_in_frustum, chunks_considered, chunk_locations);
    print("Mesh worker threads active: %d", num_threads_active);
    print("View distance: %d blocks", view_dist_for_display);
+   print("x=%5.2f, y=%5.2f, z=%5.2f", camloc[0], camloc[1], camloc[2]);
    print("%s", glGetString(GL_RENDERER));
 
    if (is_synchronous_debug) {

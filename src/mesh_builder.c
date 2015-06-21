@@ -171,6 +171,8 @@ void free_mesh_chunk(mesh_chunk *mc)
 
    for (i=0; i < stb_arr_len(mc->allocs); ++i)
       free(mc->allocs[i]);
+   stb_arr_free(mc->allocs);
+   mc->allocs = NULL;
 }
 
 gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
@@ -854,7 +856,7 @@ phys_chunk_run *build_phys_column(mesh_chunk *mc, gen_chunk *gc, int x, int y)
    return pr;
 }
 
-void build_phys_chunk(mesh_chunk *mc, chunk_set *chunks)
+void build_phys_chunk(mesh_chunk *mc, chunk_set *chunks, int wx, int wy)
 {
    int j,i,x,y;
    mc->allocs = NULL;
@@ -864,8 +866,13 @@ void build_phys_chunk(mesh_chunk *mc, chunk_set *chunks)
          int y_off = (j-1) * GEN_CHUNK_SIZE_Y;
 
          for (y=0; y < GEN_CHUNK_SIZE_Y; ++y)
-            for (x=0; x < GEN_CHUNK_SIZE_X; ++x)
+            for (x=0; x < GEN_CHUNK_SIZE_X; ++x) {
+               #if 0
+               if (wx + x + x_off == -65 && wy + y + y_off == -25)
+                  __asm int 3;
+               #endif
                mc->pc.column[y_off+y][x_off+x] = build_phys_column(mc, chunks->chunk[j][i], x,y);
+            }
       }
    }
 }
@@ -884,7 +891,12 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
 
    stbvox_set_input_stride(mm, 18, 66*18);
 
-   build_phys_chunk(mc, chunks);
+   #if 0
+   if (world_coord.x == -128 && world_coord.y == -64)
+      __asm int 3;
+   #endif
+
+   build_phys_chunk(mc, chunks, world_coord.x, world_coord.y);
 
    map = stbvox_get_input_description(mm);
    map->block_tex1_face = tex1_for_blocktype;
