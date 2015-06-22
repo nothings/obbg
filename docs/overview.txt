@@ -9,6 +9,9 @@ obbg:
   - networking
 
 Done in today's stream:
+  - collision geometry working, but buggy:
+    - incorrect solid block @ -65, -25, 74
+  - simple walking model with collision probes
 
 Previous stream:
    (maybe same stream as below)
