@@ -1,6 +1,5 @@
 Possible tasks to work on next:
 
-   -  some kind of non-first-person collision for checking collision is working right
    -  add skylight
    -  more work on terrain -- zmc pseudo-wang tile approach
    -  fix depth fighting when far from origin
@@ -16,7 +15,6 @@ Possible tasks to work on next:
    -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
       - 1 byte length
       - 1 byte type
-   -  "physics" (e.g. move on ground, needs physics rep)
    -  raycast (needs physics rep)
    -  use more block types
    -  improved height-field terrain 

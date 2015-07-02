@@ -10,6 +10,7 @@ obbg:
 
 Done in today's stream:
   - fixed collision gather bug
+  - 3rd person camera
 
 Previous stream:
   - collision geometry working, but buggy:
