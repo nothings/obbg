@@ -8,11 +8,8 @@ obbg:
   - save/load to disk
   - networking
 
-In progress todo:
-   set_mesh_chunk_for_coord caller  DOESN'T free
-   free_mesh_chunk DOES free
-
 Done in today's stream:
+  - fixed collision gather bug
 
 Previous stream:
   - collision geometry working, but buggy:

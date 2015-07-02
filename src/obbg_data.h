@@ -5,8 +5,8 @@
 #include "stb.h"
 
 typedef int Bool;
-#define true   (0==0)
-#define false  (0==1)
+#define True   1
+#define False  0
 
 #define MAX_Z                    255
 
@@ -26,6 +26,15 @@ typedef int Bool;
 #define MESH_CHUNK_X_FOR_WORLD_X(x)   ((x) >> MESH_CHUNK_SIZE_X_LOG2)
 #define MESH_CHUNK_Y_FOR_WORLD_Y(y)   ((y) >> MESH_CHUNK_SIZE_Y_LOG2)
 
+typedef struct
+{
+   int x,y,z;
+} vec3i;
+
+typedef struct
+{
+   float x,y,z;
+} vec;
 
 // block types
 enum

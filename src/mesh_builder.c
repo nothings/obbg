@@ -353,9 +353,9 @@ Bool collides_raw(tree_location *trees, int n, int x, int y)
       int sy = y - trees[i].y;
       if (abs(sx) < TREE_MIN_SPACING && abs(sy) < TREE_MIN_SPACING)
          if (sx*sx + sy*sy < TREE_MIN_SPACING * TREE_MIN_SPACING)
-            return true;
+            return True;
    }
-   return false;
+   return False;
 }
 
 Bool collides(tree_area_data *tad, int x, int y)
@@ -743,11 +743,6 @@ gen_chunk *get_gen_chunk_for_coord(int x, int y)
 
 typedef struct
 {
-   int x,y,z;
-} vec3i;
-
-typedef struct
-{
    uint8 *vertex_build_buffer;
    uint8 *face_buffer;
    uint8 segment_blocktype[66][66][18];
@@ -1096,12 +1091,12 @@ void init_threadsafe_queue(threadsafe_queue *tq, int count, size_t size)
 
 int add_to_queue(threadsafe_queue *tq, void *item)
 {
-   int retval = false;
+   int retval = False;
    SDL_LockMutex(tq->mutex);
    if ((tq->head+1) % tq->count != tq->tail) {
       memcpy(tq->data + tq->itemsize * tq->head, item, tq->itemsize);
       tq->head = (tq->head+1) % tq->count;
-      retval = true;
+      retval = True;
    }
    SDL_UnlockMutex(tq->mutex);
 
@@ -1110,14 +1105,14 @@ int add_to_queue(threadsafe_queue *tq, void *item)
 
 int get_from_queue(threadsafe_queue *tq, void *item)
 {
-   int retval=false;
+   int retval=False;
    SDL_LockMutex(tq->mutex);
    if (tq->head != tq->tail) {
       memcpy(item, tq->data + tq->itemsize * tq->tail, tq->itemsize);
       ++tq->tail;
       if (tq->tail >= tq->count)
          tq->tail = 0;
-      retval = true;
+      retval = True;
    }
    SDL_UnlockMutex(tq->mutex);
    return retval;
@@ -1125,15 +1120,15 @@ int get_from_queue(threadsafe_queue *tq, void *item)
 
 int get_from_queue_nonblocking(threadsafe_queue *tq, void *item)
 {
-   int retval=false;
+   int retval=False;
    if (SDL_TryLockMutex(tq->mutex) == SDL_MUTEX_TIMEDOUT)
-      return false;
+      return False;
    if (tq->head != tq->tail) {
       memcpy(item, tq->data + tq->itemsize * tq->tail, tq->itemsize);
       ++tq->tail;
       if (tq->tail >= tq->count)
          tq->tail = 0;
-      retval = true;
+      retval = True;
    }
    SDL_UnlockMutex(tq->mutex);
    return retval;
@@ -1169,11 +1164,11 @@ int get_pending_task(task *t)
    SDL_SemWait(pending_task_count);
 
    if (get_from_queue(&pending_meshes, t))
-      return true;
+      return True;
    if (get_from_queue(&pending_gen, t))
-      return true;
+      return True;
    assert(0);
-   return false;
+   return False;
 }
 
 typedef struct
@@ -1203,7 +1198,7 @@ void start_procgen(int x, int y)
    int slot_y = cy & (IN_PROGRESS_CACHE_SIZE-1);
    procgen_in_progress[slot_y][slot_x].x = x;
    procgen_in_progress[slot_y][slot_x].y = y;
-   procgen_in_progress[slot_y][slot_x].in_use = true;
+   procgen_in_progress[slot_y][slot_x].in_use = True;
 }
 
 void end_procgen(int x, int y)
@@ -1214,7 +1209,7 @@ void end_procgen(int x, int y)
    int slot_y = cy & (IN_PROGRESS_CACHE_SIZE-1);
    procgen_in_progress[slot_y][slot_x].x = x;
    procgen_in_progress[slot_y][slot_x].y = y;
-   procgen_in_progress[slot_y][slot_x].in_use = false;
+   procgen_in_progress[slot_y][slot_x].in_use = False;
 }
 
 int can_start_procgen(int x, int y)
@@ -1366,7 +1361,7 @@ int worker_manager(void *data)
                      if (gcc) {
                         mcs->status = CHUNK_STATUS_nonempty_chunk_set;
                         mcs->cs.chunk[k][j] = gcc->chunk;
-                        mcs->chunk_set_valid[k][j] = true;
+                        mcs->chunk_set_valid[k][j] = True;
                         assert(gcc->chunk != 0);
                         add_ref_count(gcc->chunk);
                      } else {
@@ -1464,11 +1459,11 @@ static int starvation_count;
 
 void swap_requested_meshes(void)
 {
-   int locked = false;
+   int locked = False;
 
    if (starvation_count > 2) {
       SDL_LockMutex(requested_mesh_mutex);
-      locked = true;
+      locked = True;
    } else
       locked = (SDL_TryLockMutex(requested_mesh_mutex) == SDL_MUTEX_TIMEDOUT);
    
@@ -1485,7 +1480,7 @@ void swap_requested_meshes(void)
          if (mcs->status == CHUNK_STATUS_processing)
             ; // delete
          else {
-            mcs->in_new_list = true;
+            mcs->in_new_list = True;
             requested_meshes_alternate[n++] = *rm;
          }
       }
@@ -1506,7 +1501,7 @@ void swap_requested_meshes(void)
          if (rm->state == RMS_invalid)
             break;
          mcs = get_chunk_status(rm->x, rm->y);
-         mcs->in_new_list = false;
+         mcs->in_new_list = False;
       }
 
       {
