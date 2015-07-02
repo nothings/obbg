@@ -1,5 +1,6 @@
 Possible tasks to work on next:
 
+   -  some kind of non-first-person collision for checking collision is working right
    -  add skylight
    -  more work on terrain -- zmc pseudo-wang tile approach
    -  fix depth fighting when far from origin

@@ -86,7 +86,7 @@ typedef struct
 
 extern float texture_scales[256];
 
-extern mesh_chunk      mesh_cache[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
+extern mesh_chunk     *mesh_cache[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
 
 
 enum

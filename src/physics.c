@@ -20,11 +20,6 @@ void gather_collision_geometry(collision_geometry *cg, int base_x, int base_y, i
    int j,i;
    memset(cg, 0, sizeof(*cg));
 
-   #if 0
-   if (base_x <= -65 && -65 < base_x+COLLIDE_BLOB_X && base_y <= -25 && -25 < base_y + COLLIDE_BLOB_Y)
-      __asm int 3;
-   #endif
-
    cg->x = base_x;
    cg->y = base_y;
    cg->z = base_z;
@@ -32,7 +27,7 @@ void gather_collision_geometry(collision_geometry *cg, int base_x, int base_y, i
       for (i=cx0; i < cx1; ++i) {
          int x0 = i << MESH_CHUNK_SIZE_X_LOG2;
          int y0 = j << MESH_CHUNK_SIZE_Y_LOG2;
-         mesh_chunk *mc = get_mesh_chunk_for_coord(i,j);
+         mesh_chunk *mc = get_mesh_chunk_for_coord(x0,y0);
          if (mc != NULL) {
             int a,b;
             int rx1 = x0 + MESH_CHUNK_SIZE_X;
@@ -46,13 +41,6 @@ void gather_collision_geometry(collision_geometry *cg, int base_x, int base_y, i
                   phys_chunk_run *pcr = mc->pc.column[b - y0][a - x0];
                   int z=0;
 
-                  // @TODO: pcr for -65,-25 was not the same pointer that
-                  // we saw being created in the mesh chunk creator... what
-                  // happened to it?!??!
-                  #if 0
-                  if (a == -65 && b == -25)
-                     __asm int 3;
-                  #endif
                   while (z < MAX_Z) {
                      int next_z = z + pcr->length;
                      if (base_z <= next_z && z < base_z + COLLIDE_BLOB_Z) {

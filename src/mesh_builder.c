@@ -103,7 +103,7 @@ enum
    CHUNK_STATUS_processing
 };
 
-       mesh_chunk        mesh_cache [MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
+       mesh_chunk       *mesh_cache [MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
 static mesh_chunk_status mesh_status[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
 static gen_chunk_cache    gen_cache [ GEN_CHUNK_CACHE_Y][ GEN_CHUNK_CACHE_X];
 
@@ -153,9 +153,9 @@ mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
 {
    int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
    int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   mesh_chunk *mc = &mesh_cache[cy & (MESH_CHUNK_CACHE_Y-1)][cx & (MESH_CHUNK_CACHE_X-1)];
+   mesh_chunk *mc = mesh_cache[cy & (MESH_CHUNK_CACHE_Y-1)][cx & (MESH_CHUNK_CACHE_X-1)];
 
-   if (mc->chunk_x == cx && mc->chunk_y == cy)
+   if (mc && mc->chunk_x == cx && mc->chunk_y == cy)
       return mc;
    else
       return NULL;
@@ -172,7 +172,7 @@ void free_mesh_chunk(mesh_chunk *mc)
    for (i=0; i < stb_arr_len(mc->allocs); ++i)
       free(mc->allocs[i]);
    stb_arr_free(mc->allocs);
-   mc->allocs = NULL;
+   free(mc);
 }
 
 gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
@@ -193,9 +193,7 @@ void init_chunk_caches(void)
    int i,j;
    for (j=0; j < MESH_CHUNK_CACHE_Y; ++j) {
       for (i=0; i < MESH_CHUNK_CACHE_X; ++i) {
-         assert(mesh_cache[j][i].vbuf == 0);
-         mesh_cache[j][i].vbuf = 0;
-         mesh_cache[j][i].chunk_x = i+1;
+         mesh_cache[j][i] = 0;
       }
    }
 
@@ -867,10 +865,6 @@ void build_phys_chunk(mesh_chunk *mc, chunk_set *chunks, int wx, int wy)
 
          for (y=0; y < GEN_CHUNK_SIZE_Y; ++y)
             for (x=0; x < GEN_CHUNK_SIZE_X; ++x) {
-               #if 0
-               if (wx + x + x_off == -65 && wy + y + y_off == -25)
-                  __asm int 3;
-               #endif
                mc->pc.column[y_off+y][x_off+x] = build_phys_column(mc, chunks->chunk[j][i], x,y);
             }
       }
@@ -890,11 +884,6 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    mc->chunk_y = (world_coord.y >> MESH_CHUNK_SIZE_Y_LOG2);
 
    stbvox_set_input_stride(mm, 18, 66*18);
-
-   #if 0
-   if (world_coord.x == -128 && world_coord.y == -64)
-      __asm int 3;
-   #endif
 
    build_phys_chunk(mc, chunks, world_coord.x, world_coord.y);
 
@@ -967,14 +956,13 @@ void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc)
    int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
    int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
    int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-   mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
-   if (mc->vbuf) {
+   mesh_chunk *mc = mesh_cache[slot_y][slot_x];
+   if (mc && mc->vbuf) {
       free_mesh_chunk(mc);
    }
 
-   *mc = *new_mc;
+   mesh_cache[slot_y][slot_x] = new_mc;
 }
-
 
 static uint8 vertex_build_buffer[16*1024*1024];
 static uint8 face_buffer[4*1024*1024];
@@ -987,11 +975,12 @@ mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
    int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
    int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
    int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-   mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
+   mesh_chunk *mc = mesh_cache[slot_y][slot_x];
 
    if (mc->vbuf) {
       assert(mc->chunk_x != cx || mc->chunk_y != cy);
       free_mesh_chunk(mc);
+      mc = NULL;
    }
 
    {

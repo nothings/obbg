@@ -8,7 +8,13 @@ obbg:
   - save/load to disk
   - networking
 
+In progress todo:
+   set_mesh_chunk_for_coord caller  DOESN'T free
+   free_mesh_chunk DOES free
+
 Done in today's stream:
+
+Previous stream:
   - collision geometry working, but buggy:
     - incorrect solid block @ -65, -25, 74
   - simple walking model with collision probes

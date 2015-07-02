@@ -266,8 +266,8 @@ void request_mesh_generation(int qchunk_x, int qchunk_y)
             int wy = cy * MESH_CHUNK_SIZE_Y;
             int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
             int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-            mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
-            if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
+            mesh_chunk *mc = mesh_cache[slot_y][slot_x];
+            if (mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
                consider_mesh[n].x = wx;
                consider_mesh[n].y = wy;  
                consider_mesh[n].priority = (float) (i*i + j*j);
@@ -356,7 +356,7 @@ void render_voxel_world(float campos[3])
             int cy = qchunk_y + j;
             int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
             int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-            mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
+            mesh_chunk *mc = mesh_cache[slot_y][slot_x];
 
             if (stb_max(abs(i),abs(j)) != distance)
                continue;
@@ -364,7 +364,7 @@ void render_voxel_world(float campos[3])
             if (i*i + j*j > rad*rad)
                continue;
 
-            if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
+            if (mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
                float estimated_bounds[2][3];
                if (num_build_remaining == 0)
                   continue;
@@ -412,7 +412,7 @@ void render_voxel_world(float campos[3])
             int cy = qchunk_y + j;
             int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
             int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-            mesh_chunk *mc = &mesh_cache[slot_y][slot_x];
+            mesh_chunk *mc = mesh_cache[slot_y][slot_x];
             if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
                mc = build_mesh_chunk_for_coord(cx * MESH_CHUNK_CACHE_X, cy * MESH_CHUNK_CACHE_Y);
                --num_build_remaining;
@@ -432,15 +432,15 @@ void render_voxel_world(float campos[3])
          set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
          free(bm.face_buffer);
          free(bm.vertex_build_buffer);
-         free(bm.mc);
+         bm.mc = NULL;
       }
    }
 
    chunk_storage_total = 0;
    for (j=0; j < MESH_CHUNK_CACHE_Y; ++j)
       for (i=0; i < MESH_CHUNK_CACHE_X; ++i)
-         if (mesh_cache[j][i].vbuf)
-            chunk_storage_total += mesh_cache[j][i].num_quads * 20;
+         if (mesh_cache[j][i] != NULL && mesh_cache[j][i]->vbuf)
+            chunk_storage_total += mesh_cache[j][i]->num_quads * 20;
 
    stbglDisableVertexAttribArray(0);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
