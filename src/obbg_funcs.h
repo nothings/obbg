@@ -18,6 +18,6 @@ extern void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_
 extern void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc);
 extern mesh_chunk *get_mesh_chunk_for_coord(int x, int y);
 //extern int collision_test_box(float x, float y, float z, float bounds[2][3]);
-extern int physics_move_walkable(float *px, float *py, float *pz, float *vx, float *vy, float *vz, float dt, float size[2][3]);
+extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3]);
 
 #endif

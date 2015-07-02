@@ -936,7 +936,7 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
       }
    }
 
-   stbvox_set_mesh_coordinates(mm, world_coord.x, world_coord.y, world_coord.z);
+   stbvox_set_mesh_coordinates(mm, world_coord.x, world_coord.y, world_coord.z+1);
    stbvox_get_transform(mm, mc->transform);
 
    stbvox_set_input_range(mm, 0,0,0, 64,64,255);

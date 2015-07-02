@@ -93,17 +93,19 @@ int collision_test_box(collision_geometry *cg, float x, float y, float z, float 
 
 #define Z_EPSILON 0.001f
 
-int physics_move_walkable(float *px, float *py, float *pz, float *pvx, float *pvy, float *pvz, float dt, float size[2][3])
+int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
 {
    int result=0;
    int ix,iy,iz;
-   float x = *px;
-   float y = *py;
-   float z = *pz;
-   float dx = *pvx * dt;
-   float dy = *pvy * dt;
-   float dz = *pvz * dt;
+   float x = pos->x;
+   float y = pos->y;
+   float z = pos->z;
+   float dx = vel->x * dt;
+   float dy = vel->y * dt;
+   float dz = vel->z * dt;
    collision_geometry cg;
+
+   dt = 1.0f/60;
 
    ix = (int) floor(x);
    iy = (int) floor(y);
@@ -112,29 +114,31 @@ int physics_move_walkable(float *px, float *py, float *pz, float *pvx, float *pv
    gather_collision_geometry(&cg, ix - COLLIDE_BLOB_X/2, iy - COLLIDE_BLOB_Y/2, iz - COLLIDE_BLOB_Z/2);
 
    if (!collision_test_box(&cg, x, y, z - 2*Z_EPSILON, size)) {
+      // falling
       if (collision_test_box(&cg, x+dx, y+dy, z+dz, size)) {
          result = 0;
          if (!collision_test_box(&cg, x+dx, y+0, z+dz, size)) {
             x += dx;
-            *pvy = 0;
+            vel->y = 0;
             z += dz;
          } else if (!collision_test_box(&cg, x+0, y+dy, z+dz, size)) {
-            *pvx = 0;
+            vel->x = 0;
             y += dy;
             z += dz;
          } else if (!collision_test_box(&cg, x+0, y+0, z+dz, size)) {
-            *pvx = 0;
-            *pvy = 0;
+            vel->x = 0;
+            vel->y = 0;
             z += dz;
          } else {
             // move bottom to floor of current voxel
             float min_z = z + dz;
+            assert(!collision_test_box(&cg, x,y,z,size));
             z = (float) floor(z + size[0][2]) - size[0][2];
             assert(!collision_test_box(&cg, x,y,z,size));
             while (!collision_test_box(&cg, x,y,z-1,size))
                z -= 1;
             assert(z >= min_z - Z_EPSILON);
-            *pvz = 0;
+            vel->z = 0;
             result = 1;
          }
       } else {
@@ -152,8 +156,8 @@ int physics_move_walkable(float *px, float *py, float *pz, float *pvx, float *pv
             y += dy;
             z += 1;
          } else {
-            *pvx = 0;
-            *pvy = 0;
+            vel->x = 0;
+            vel->y = 0;
          }
       } else {
          x += dx;
@@ -161,9 +165,9 @@ int physics_move_walkable(float *px, float *py, float *pz, float *pvx, float *pv
       }
    }
 
-   *px = x;
-   *py = y;
-   *pz = z;
+   pos->x = x;
+   pos->y = y;
+   pos->z = z;
 
    return result;
 }

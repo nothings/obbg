@@ -114,6 +114,8 @@ void init_mesh_building(void)
 
 
 
+float camera_bounds[2][3];
+
 float texture_scales[256];
 
 void render_init(void)
@@ -121,6 +123,13 @@ void render_init(void)
    // @TODO: support non-DXT path
    char **files = stb_readdir_recursive("data", "*.crn");
    int i;
+
+   camera_bounds[0][0] = - 0.75f;
+   camera_bounds[0][1] = - 0.75f;
+   camera_bounds[0][2] = - 4.25f;
+   camera_bounds[1][0] = + 0.75f;
+   camera_bounds[1][1] = + 0.75f;
+   camera_bounds[1][2] = + 0.25f;
 
    init_chunk_caches();
    init_mesh_building();
@@ -208,32 +217,41 @@ static void print(char *text, ...)
    pos_y += 10;
 }
 
-float camang[3], camloc[3] = { 0,0,150 };
-float player_zoom = 1.0;
-float rotate_view = 0.0;
+typedef struct
+{
+   vec position;
+   vec ang;
+   vec velocity;
+
+   float zoom;
+} player_object;
+
+player_object player = { { 0,0,150 } };
 
 
-void camera_to_worldspace(float world[3], float cam_x, float cam_y, float cam_z)
+float camang[3], camloc[3] = { 0,-10,80 };
+
+
+void playerspace_to_worldspace(float world[3], float cam_x, float cam_y, float cam_z)
 {
    float vec[3] = { cam_x, cam_y, cam_z };
    float t[3];
    float s,c;
-   s = (float) sin(camang[0]*3.141592/180);
-   c = (float) cos(camang[0]*3.141592/180);
+   s = (float) sin(player.ang.x*3.141592/180);
+   c = (float) cos(player.ang.x*3.141592/180);
 
    t[0] = vec[0];
    t[1] = c*vec[1] - s*vec[2];
    t[2] = s*vec[1] + c*vec[2];
 
-   s = (float) sin(camang[2]*3.141592/180);
-   c = (float) cos(camang[2]*3.141592/180);
+   s = (float) sin(player.ang.z*3.141592/180);
+   c = (float) cos(player.ang.z*3.141592/180);
    world[0] = c*t[0] - s*t[1];
    world[1] = s*t[0] + c*t[1];
    world[2] = t[2];
 }
 
 // camera worldspace velocity
-float cam_vel[3];
 float light_pos[3];
 
 int controls;
@@ -260,6 +278,8 @@ float pending_view_z;
 
 float light_vel[3];
 
+
+float square(float x) { return x*x; }
 void process_tick_raw(float dt)
 {
    int i;
@@ -274,44 +294,36 @@ void process_tick_raw(float dt)
 
    // @TODO clamp thrust[0] & thrust[1] vector length to EFFECTIVE_ACCEL
 
-   camera_to_worldspace(world_thrust, thrust[0], thrust[1], 0);
+   playerspace_to_worldspace(world_thrust, thrust[0], thrust[1], 0);
    world_thrust[2] += thrust[2];
 
    for (i=0; i < 3; ++i) {
       float acc = world_thrust[i];
-      cam_vel[i] += acc*dt;
+      (&player.velocity.x)[i] += acc*dt;
    }
 
-   if (cam_vel[0] || cam_vel[1] || cam_vel[2])
+   if (player.velocity.x || player.velocity.y || player.velocity.z)
    {
-      float vel = (float) sqrt(cam_vel[0]*cam_vel[0] + cam_vel[1]*cam_vel[1] + cam_vel[2]*cam_vel[2]);
+      float vel = (float) sqrt(square(player.velocity.x)+square(player.velocity.y)+square(player.velocity.z));
       float newvel = vel;
       float dec = STATIC_FRICTION + DYNAMIC_FRICTION*vel;
       newvel = vel - dec*dt;
       if (newvel < 0)
          newvel = 0;
-      cam_vel[0] *= newvel/vel;
-      cam_vel[1] *= newvel/vel;
-      cam_vel[2] *= newvel/vel;
+      player.velocity.x *= newvel/vel;
+      player.velocity.y *= newvel/vel;
+      player.velocity.z *= newvel/vel;
    }
 
    {
       float x,y,z;
-      float camera_bounds[2][3];
 
-      x = camloc[0] + cam_vel[0] * dt;
-      y = camloc[1] + cam_vel[1] * dt;
-      z = camloc[2] + cam_vel[2] * dt;
+      x = player.position.x + player.velocity.x * dt;
+      y = player.position.y + player.velocity.y * dt;
+      z = player.position.z + player.velocity.z * dt;
 
-      camera_bounds[0][0] = - 0.25f;
-      camera_bounds[0][1] = - 0.25f;
-      camera_bounds[0][2] = - 4.25f;
-      camera_bounds[1][0] = + 0.25f;
-      camera_bounds[1][1] = + 0.25f;
-      camera_bounds[1][2] = + 0.25f;
-
-      if (!physics_move_walkable(&camloc[0], &camloc[1], &camloc[2], &cam_vel[0], &cam_vel[1], &cam_vel[2], dt, camera_bounds))
-         cam_vel[2] -= 20.0f * dt;
+      if (!physics_move_walkable(&player.position, &player.velocity, dt, camera_bounds))
+         player.velocity.z -= 20.0f * dt;
 
       #if 0
       if (!collision_test_box(x,y,z,camera_bounds)) {
@@ -338,10 +350,10 @@ void process_tick_raw(float dt)
 
    pending_view_x -= view_x_vel * dt;
    pending_view_z -= view_z_vel * dt;
-   camang[0] += view_x_vel * dt;
-   camang[2] += view_z_vel * dt;
-   camang[0] = stb_clamp(camang[0], -90, 90);
-   camang[2] = (float) fmod(camang[2], 360);
+   player.ang.x += view_x_vel * dt;
+   player.ang.z += view_z_vel * dt;
+   player.ang.x = stb_clamp(player.ang.x, -90, 90);
+   player.ang.z = (float) fmod(player.ang.z, 360);
 }
 
 void process_tick(float dt)
@@ -403,7 +415,7 @@ void draw_stats(void)
    print("QChunks: %3d in frustum of %3d valid of %3d in range", chunks_in_frustum, chunks_considered, chunk_locations);
    print("Mesh worker threads active: %d", num_threads_active);
    print("View distance: %d blocks", view_dist_for_display);
-   print("x=%5.2f, y=%5.2f, z=%5.2f", camloc[0], camloc[1], camloc[2]);
+   print("x=%5.2f, y=%5.2f, z=%5.2f", player.position.x, player.position.y, player.position.z);
    print("%s", glGetString(GL_RENDERER));
 
    if (is_synchronous_debug) {
@@ -426,9 +438,19 @@ void stbgl_drawRectTCArray(float x0, float y0, float x1, float y1, float s0, flo
 
 void render_objects(void)
 {
+   vec sz;
+   vec pos;
    glColor3f(1,1,1);
    glDisable(GL_TEXTURE_2D);
-   stbgl_drawBox(light_pos[0], light_pos[1], light_pos[2], 3,3,3, 0);
+   stbgl_drawBox(light_pos[0], light_pos[1], light_pos[2], 3,3,3, 1);
+
+   sz.x = camera_bounds[1][0] - camera_bounds[0][0];
+   sz.y = camera_bounds[1][1] - camera_bounds[0][1];
+   sz.z = camera_bounds[1][2] - camera_bounds[0][2];
+   pos.x = player.position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
+   pos.y = player.position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
+   pos.z = player.position.z + (camera_bounds[1][2] + camera_bounds[0][2])/2;
+   stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
 }
 
 
@@ -461,9 +483,9 @@ void draw_main(void)
    glLoadIdentity();
 
    #ifdef REVERSE_DEPTH
-   stbgl_Perspective(player_zoom, 90, 70, 3000, 1.0/16);
+   stbgl_Perspective(player.zoom, 90, 70, 3000, 1.0/16);
    #else
-   stbgl_Perspective(player_zoom, 90, 70, 1.0/16, 3000);
+   stbgl_Perspective(player.zoom, 90, 70, 1.0/16, 3000);
    #endif
 
    // now compute where the camera should be
@@ -471,12 +493,24 @@ void draw_main(void)
    glLoadIdentity();
    stbgl_initCamera_zup_facing_y();
 
+   playerspace_to_worldspace(camloc, 0,-5,0);
+   camloc[0] += player.position.x;
+   camloc[1] += player.position.y;
+   camloc[2] += player.position.z;
+
+   camang[0] = player.ang.x;
+   camang[1] = player.ang.y;
+   camang[2] = player.ang.z;
+#if 1
    glRotatef(-camang[0],1,0,0);
    glRotatef(-camang[2],0,0,1);
    glTranslatef(-camloc[0], -camloc[1], -camloc[2]);
+#endif
 
    start_time = SDL_GetPerformanceCounter();
    render_voxel_world(camloc);
+
+   player.zoom = 1;
 
    render_objects();
 
@@ -660,10 +694,10 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_D)   active_control_set(7);
          if (k == '1') global_hack = !global_hack;
          if (k == '2') global_hack = -1;
-         if (k == '3') camloc[0] += 65536;
+         if (k == '3') player.position.x += 65536;
          if (s == SDL_SCANCODE_R) {
-            camera_to_worldspace(light_vel, 0,32,0);
-            memcpy(light_pos, camloc, sizeof(light_pos));
+            playerspace_to_worldspace(light_vel, 0,32,0);
+            memcpy(light_pos, &player.position, sizeof(light_pos));
          }
 
          #if 0
