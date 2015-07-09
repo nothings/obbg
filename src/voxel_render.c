@@ -432,10 +432,12 @@ void render_voxel_world(float campos[3])
    {
       built_mesh bm;
       while (get_next_built_mesh(&bm)) {
-         if (!bm.mc->has_triangles)
+         if (!bm.mc->has_triangles) {
             // server:
             s_process_mesh_chunk(bm.mc);
-         else {
+            free_mesh_chunk(bm.mc);
+         } else {
+            //s_process_mesh_chunk(bm.mc);
             // client:
             upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
             set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);

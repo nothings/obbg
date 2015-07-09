@@ -1279,6 +1279,7 @@ int mesh_worker_handler(void *data)
                      release_gen_chunk(t.cs.chunk[0][i]);
                }
                out_mesh.mc = mc;
+               out_mesh.mc->has_triangles = True;
                if (!add_to_queue(&built_meshes, &out_mesh)) {
                   free(out_mesh.vertex_build_buffer);
                   free(out_mesh.face_buffer);
@@ -1393,14 +1394,14 @@ int worker_manager(void *data)
                }
             }
             if (valid_chunks == 16) {
-               task t;
                int i,j;
                mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
-               t.cs = mcs->cs;
                for (j=0; j < 4; ++j)
                   for (i=0; i < 4; ++i)
                      assert(mcs->chunk_set_valid[j][i]);
                if (rm->needs_triangles) {
+                  task t;
+                  t.cs = mcs->cs;
                   mcs->status = CHUNK_STATUS_processing;
                   memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
                   memset(&mcs->cs, 0, sizeof(mcs->cs));
@@ -1414,19 +1415,19 @@ int worker_manager(void *data)
                   mesh_chunk *mc = malloc(sizeof(*mc));
                   built_mesh out_mesh;
                   mcs->status = CHUNK_STATUS_processing;
-                  mc->chunk_x = t.world_x >> C_MESH_CHUNK_CACHE_X_LOG2;
-                  mc->chunk_y = t.world_y >> C_MESH_CHUNK_CACHE_Y_LOG2;
+                  mc->chunk_x = rm->x >> C_MESH_CHUNK_CACHE_X_LOG2;
+                  mc->chunk_y = rm->y >> C_MESH_CHUNK_CACHE_Y_LOG2;
 
-
-                  build_phys_chunk(mc, &t.cs, rm->x, rm->y);
+                  build_phys_chunk(mc, &mcs->cs, rm->x, rm->y);
                   out_mesh.vertex_build_buffer = 0;
                   out_mesh.face_buffer  = 0;
                   {
                      int i;
                      for (i=0; i < 16; ++i)
-                        release_gen_chunk(t.cs.chunk[0][i]);
+                        release_gen_chunk(mcs->cs.chunk[0][i]);
                   }
                   out_mesh.mc = mc;
+                  out_mesh.mc->has_triangles = False;
                   if (!add_to_queue(&built_meshes, &out_mesh)) {
                      free(out_mesh.mc);
                   }

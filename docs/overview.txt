@@ -9,6 +9,9 @@ obbg:
   - networking
 
 Done in today's stream:
+  - refactor mesh generation so single-player client & server can share the threaded workers
+
+Previous stream:
   - fixed collision gather bug
   - 3rd person camera
 

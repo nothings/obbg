@@ -47,8 +47,8 @@ void update_server_cache_feedback(void)
    for (j=0; j < S_PHYSICS_CACHE_Y; ++j) {
       for (i=0; i < S_PHYSICS_CACHE_X; ++i) {
          mesh_chunk *phys_cache_mc = &s_phys_cache[j][i];
-         server_cache_feedback[j][i].x = phys_cache_mc->chunk_x - C_MESH_CHUNK_X_FOR_WORLD_X(player_x);
-         server_cache_feedback[j][i].y = phys_cache_mc->chunk_y - C_MESH_CHUNK_Y_FOR_WORLD_Y(player_y);
+         server_cache_feedback[j][i].x = phys_cache_mc->chunk_x;// - C_MESH_CHUNK_X_FOR_WORLD_X(player_x);
+         server_cache_feedback[j][i].y = phys_cache_mc->chunk_y;// - C_MESH_CHUNK_Y_FOR_WORLD_Y(player_y);
       }
    }
 }
@@ -73,8 +73,8 @@ int s_set_player_coord(requested_mesh *rm, int max_req, int px, int py)
          mesh_chunk *phys_cache_mc = &s_phys_cache[ry & (S_PHYSICS_CACHE_Y-1)][rx & (S_PHYSICS_CACHE_X-1)];
          if (phys_cache_mc->chunk_x != rx || phys_cache_mc->chunk_y != ry) {
             if (n < max_req) {
-               rm[n].x = rx;
-               rm[n].y = ry;
+               rm[n].x = rx << MESH_CHUNK_SIZE_X_LOG2;
+               rm[n].y = ry << MESH_CHUNK_SIZE_Y_LOG2;
                rm[n].state = RMS_requested;
                rm[n].needs_triangles = False;
                ++n;
