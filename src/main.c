@@ -134,6 +134,7 @@ void render_init(void)
    init_chunk_caches();
    init_mesh_building();
    init_mesh_build_threads();
+   s_init_physics_cache();
 
    glGenTextures(2, voxel_tex);
 
@@ -405,6 +406,8 @@ static Uint64 start_time, end_time; // render time
 float chunk_server_status[32];
 int chunk_server_pos;
 
+vec3i server_cache_feedback[64][64];
+
 void draw_stats(void)
 {
    int i;
@@ -433,6 +436,12 @@ void draw_stats(void)
    print("View distance: %d blocks", view_dist_for_display);
    print("x=%5.2f, y=%5.2f, z=%5.2f", player.position.x, player.position.y, player.position.z);
    print("%s", glGetString(GL_RENDERER));
+   for (i=0; i < 4; ++i)
+      print("[ %4d,%4d  %4d,%4d  %4d,%4d  %4d,%4d ]",
+                                   server_cache_feedback[i][0].x, server_cache_feedback[i][0].y, 
+                                   server_cache_feedback[i][1].x, server_cache_feedback[i][1].y, 
+                                   server_cache_feedback[i][2].x, server_cache_feedback[i][2].y, 
+                                   server_cache_feedback[i][3].x, server_cache_feedback[i][3].y);
 
    if (is_synchronous_debug) {
       text_color[0] = 1.0;

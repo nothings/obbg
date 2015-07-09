@@ -1,3 +1,8 @@
+//  Mesh builder "process"
+//
+//    Both server & client are customers of this process
+
+
 #define STB_GLEXT_DECLARE "glext_list.h"
 #include "stb_gl.h"
 #include "stb_image.h"
@@ -103,15 +108,16 @@ enum
    CHUNK_STATUS_processing
 };
 
-       mesh_chunk       *c_mesh_cache [C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
-static mesh_chunk_status mesh_status[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
-static gen_chunk_cache    gen_cache [ GEN_CHUNK_CACHE_Y][ GEN_CHUNK_CACHE_X];
+       mesh_chunk      *c_mesh_cache[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
 
-static mesh_chunk_status *get_chunk_status(int x, int y)
+static mesh_chunk_status mesh_status[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X][2];
+static gen_chunk_cache    gen_cache [   GEN_CHUNK_CACHE_Y][   GEN_CHUNK_CACHE_X];
+
+static mesh_chunk_status *get_chunk_status(int x, int y, Bool needs_triangles)
 {
-   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
-   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   mesh_chunk_status *mcs = &mesh_status[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)];
+   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   mesh_chunk_status *mcs = &mesh_status[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)][needs_triangles];
    if (mcs->chunk_x == cx && mcs->chunk_y == cy)
       return mcs;
    return NULL;
@@ -131,11 +137,11 @@ static void abandon_mesh_chunk_status(mesh_chunk_status *mcs)
    memset(&mcs->cs, 0, sizeof(mcs->cs));
 }
 
-static mesh_chunk_status *get_chunk_status_alloc(int x, int y)
+static mesh_chunk_status *get_chunk_status_alloc(int x, int y, Bool needs_triangles)
 {
-   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
-   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   mesh_chunk_status *mcs = &mesh_status[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)];
+   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   mesh_chunk_status *mcs = &mesh_status[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)][needs_triangles];
    if (mcs->chunk_x == cx && mcs->chunk_y == cy)
       return mcs;
 
@@ -151,8 +157,8 @@ static mesh_chunk_status *get_chunk_status_alloc(int x, int y)
 
 mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
 {
-   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
-   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
    mesh_chunk *mc = c_mesh_cache[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)];
 
    if (mc && mc->chunk_x == cx && mc->chunk_y == cy)
@@ -947,9 +953,9 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
 
 void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc)
 {
-   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
    int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
-   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
    int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
    mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
    if (mc && mc->vbuf) {
@@ -966,9 +972,9 @@ static build_data static_build_data;
 
 mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
 {
-   int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
    int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
-   int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
    int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
    mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
 
@@ -1311,15 +1317,17 @@ requested_mesh *get_requested_mesh_alternate(void)
 
 void check_chunk_sets(void)
 {
-   int i,j,m,n;
+   int i,j,k,m,n;
    for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j) {
       for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i) {
-         mesh_chunk_status *mcs = &mesh_status[j][i];
-         if (mcs->status == CHUNK_STATUS_nonempty_chunk_set) {
-            for (n=0; n < 4; ++n)
-               for (m=0; m < 4; ++m)
-                  if (mcs->chunk_set_valid[n][m])
-                     validate(mcs->cs.chunk[n][m]);
+         for (k=False; k <= True; ++k) {
+            mesh_chunk_status *mcs = &mesh_status[j][i][k];
+            if (mcs->status == CHUNK_STATUS_nonempty_chunk_set) {
+               for (n=0; n < 4; ++n)
+                  for (m=0; m < 4; ++m)
+                     if (mcs->chunk_set_valid[n][m])
+                        validate(mcs->cs.chunk[n][m]);
+            }
          }
       }
    }
@@ -1352,7 +1360,7 @@ int worker_manager(void *data)
 
          if (rm->state == RMS_requested) {
             int valid_chunks=0;
-            mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y);
+            mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
             for (k=0; k < 4; ++k) {
                for (j=0; j < 4; ++j) {
                   if (!mcs->chunk_set_valid[k][j]) {
@@ -1387,20 +1395,46 @@ int worker_manager(void *data)
             if (valid_chunks == 16) {
                task t;
                int i,j;
-               mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y);
+               mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
                t.cs = mcs->cs;
                for (j=0; j < 4; ++j)
                   for (i=0; i < 4; ++i)
                      assert(mcs->chunk_set_valid[j][i]);
-               mcs->status = CHUNK_STATUS_processing;
-               memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
-               memset(&mcs->cs, 0, sizeof(mcs->cs));
-               assert(rm->state == RMS_requested);
-               rm->state = RMS_invalid;
-               t.task_type = JOB_build_mesh;
-               t.world_x = rm->x;
-               t.world_y = rm->y;
-               add_mesh_task(&t);
+               if (rm->needs_triangles) {
+                  mcs->status = CHUNK_STATUS_processing;
+                  memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
+                  memset(&mcs->cs, 0, sizeof(mcs->cs));
+                  assert(rm->state == RMS_requested);
+                  rm->state = RMS_invalid;
+                  t.task_type = JOB_build_mesh;
+                  t.world_x = rm->x;
+                  t.world_y = rm->y;
+                  add_mesh_task(&t);
+               } else {
+                  mesh_chunk *mc = malloc(sizeof(*mc));
+                  built_mesh out_mesh;
+                  mcs->status = CHUNK_STATUS_processing;
+                  mc->chunk_x = t.world_x >> C_MESH_CHUNK_CACHE_X_LOG2;
+                  mc->chunk_y = t.world_y >> C_MESH_CHUNK_CACHE_Y_LOG2;
+
+
+                  build_phys_chunk(mc, &t.cs, rm->x, rm->y);
+                  out_mesh.vertex_build_buffer = 0;
+                  out_mesh.face_buffer  = 0;
+                  {
+                     int i;
+                     for (i=0; i < 16; ++i)
+                        release_gen_chunk(t.cs.chunk[0][i]);
+                  }
+                  out_mesh.mc = mc;
+                  if (!add_to_queue(&built_meshes, &out_mesh)) {
+                     free(out_mesh.mc);
+                  }
+                  memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
+                  memset(&mcs->cs, 0, sizeof(mcs->cs));
+                  assert(rm->state == RMS_requested);
+                  rm->state = RMS_invalid;
+               }
             }
          }
       }
@@ -1475,7 +1509,7 @@ void swap_requested_meshes(void)
          mesh_chunk_status *mcs;
          if (rm->state == RMS_invalid)
             break;
-         mcs = get_chunk_status_alloc(rm->x, rm->y);
+         mcs = get_chunk_status_alloc(rm->x, rm->y, rm->needs_triangles);
 
          if (mcs->status == CHUNK_STATUS_processing)
             ; // delete
@@ -1489,7 +1523,7 @@ void swap_requested_meshes(void)
 
       for (i=0; i < MAX_BUILT_MESHES; ++i) {
          requested_mesh *rm = &requested_meshes_alternate[i];
-         mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y);
+         mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
          if (mcs && !mcs->in_new_list) {
             abandon_mesh_chunk_status(mcs);
          }
@@ -1500,7 +1534,7 @@ void swap_requested_meshes(void)
          mesh_chunk_status *mcs;
          if (rm->state == RMS_invalid)
             break;
-         mcs = get_chunk_status(rm->x, rm->y);
+         mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
          mcs->in_new_list = False;
       }
 

@@ -251,9 +251,9 @@ typedef struct
 
 static consider_mesh_t consider_mesh[MAX_CONSIDER_MESHES];
 
-void request_mesh_generation(int qchunk_x, int qchunk_y)
+void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
 {
-   int i,j, n=0;
+   int i,j, n=0, m=0;
    int rad = (view_distance >> MESH_CHUNK_SIZE_X_LOG2) + 1;
    requested_mesh *rm = get_requested_mesh_alternate();
 
@@ -281,10 +281,14 @@ void request_mesh_generation(int qchunk_x, int qchunk_y)
 
    n = stb_min(n, MAX_BUILT_MESHES);
 
-   for (i=0; i < n; ++i) {
-      rm[i].x = consider_mesh[i].x;
-      rm[i].y = consider_mesh[i].y;
-      rm[i].state = RMS_requested;
+   m = s_set_player_coord(rm, MAX_BUILT_MESHES, cam_x, cam_y);
+
+   for (i=0; i < n && m < MAX_BUILT_MESHES; ++i) {
+      rm[m].x = consider_mesh[i].x;
+      rm[m].y = consider_mesh[i].y;
+      rm[m].state = RMS_requested;
+      rm[m].needs_triangles = True;
+      ++m;
    }
    for (; i < MAX_BUILT_MESHES; ++i)
       rm[i].state = RMS_invalid;
@@ -311,10 +315,10 @@ void render_voxel_world(float campos[3])
    cam_x = (int) floor(x);
    cam_y = (int) floor(y);
 
-   qchunk_x = MESH_CHUNK_X_FOR_WORLD_X(cam_x);
-   qchunk_y = MESH_CHUNK_Y_FOR_WORLD_Y(cam_y);
+   qchunk_x = C_MESH_CHUNK_X_FOR_WORLD_X(cam_x);
+   qchunk_y = C_MESH_CHUNK_Y_FOR_WORLD_Y(cam_y);
 
-   request_mesh_generation(qchunk_x, qchunk_y);
+   request_mesh_generation(qchunk_x, qchunk_y, cam_x, cam_y);
 
    glEnable(GL_ALPHA_TEST);
    glAlphaFunc(GL_GREATER, 0.5);
@@ -428,15 +432,17 @@ void render_voxel_world(float campos[3])
    {
       built_mesh bm;
       while (get_next_built_mesh(&bm)) {
-         // server:
-         //   @TODO save as server physics data
-
-         // client:
-         upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
-         set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
-         free(bm.face_buffer);
-         free(bm.vertex_build_buffer);
-         bm.mc = NULL;
+         if (!bm.mc->has_triangles)
+            // server:
+            s_process_mesh_chunk(bm.mc);
+         else {
+            // client:
+            upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
+            set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
+            free(bm.face_buffer);
+            free(bm.vertex_build_buffer);
+            bm.mc = NULL;
+         }
       }
    }
 

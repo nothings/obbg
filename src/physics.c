@@ -13,10 +13,10 @@ typedef struct
 
 void gather_collision_geometry(collision_geometry *cg, int base_x, int base_y, int base_z)
 {
-   int cx0 = MESH_CHUNK_X_FOR_WORLD_X(base_x);
-   int cy0 = MESH_CHUNK_Y_FOR_WORLD_Y(base_y);
-   int cx1 = MESH_CHUNK_X_FOR_WORLD_X(base_x+COLLIDE_BLOB_X-1)+1;
-   int cy1 = MESH_CHUNK_Y_FOR_WORLD_Y(base_y+COLLIDE_BLOB_Y-1)+1;
+   int cx0 = C_MESH_CHUNK_X_FOR_WORLD_X(base_x);
+   int cy0 = C_MESH_CHUNK_Y_FOR_WORLD_Y(base_y);
+   int cx1 = C_MESH_CHUNK_X_FOR_WORLD_X(base_x+COLLIDE_BLOB_X-1)+1;
+   int cy1 = C_MESH_CHUNK_Y_FOR_WORLD_Y(base_y+COLLIDE_BLOB_Y-1)+1;
    int j,i;
    memset(cg, 0, sizeof(*cg));
 
