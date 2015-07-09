@@ -1,34 +1,49 @@
 Possible tasks to work on next:
 
+   Look prettier:
    -  add skylight
    -  more work on terrain -- zmc pseudo-wang tile approach
    -  fix depth fighting when far from origin
    -  dynamically set view distance
-   -  limit mesh cache to max size
-   -  disk save/load
-      - lz4 compression?
-   -  user block create/destroy (needs raycast?)
-   -  object (non-terrain) rendering
-      - what model-file format?
-      - animation? skinning?
-      - procedural animation of characters?
-   -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
-      - 1 byte length
-      - 1 byte type
-   -  raycast (needs physics rep)
-   -  use more block types
    -  improved height-field terrain 
    -  other terrain features
    -  texture improvements
      -  tweak pixar textures to be more grey so can dynamically recolor
      -  find better open textures or pay someone to make them
    -  add better lighting
+   -  use more block types
+
+   Performance:
+   -  limit mesh cache to max size
    -  optimize mesh building
    -  optimize terrain generation
+
+   Voxel features:
+   -  disk save/load
+      - lz4 compression?
+   -  user block create/destroy (needs raycast?)
+   -  networking
+
+   Game features:
+   -  object system
+   -  object (non-terrain) rendering
+      - what model-file format?
+      - animation? skinning?
+      - procedural animation of characters?
+   -  fix walking physics
+      - smooth camera height when stepping up
+      - don't stick to walls when falling one block
+      - push smoothly along walls
+      - core physics model should steer existing momentum to new direction instead of being so Newtonian
+   -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
+      - 1 byte length
+      - 1 byte type
+   -  raycast (needs physics rep)
+   -  shoot guns
+
+   Code quality
    -  check for memory leaks
 
 Not right now:
 
    -  check "voxel_world_vheight_spiky.avi" for terrain inspiration
-   -  shoot guns
-   -  networking

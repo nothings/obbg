@@ -103,15 +103,15 @@ enum
    CHUNK_STATUS_processing
 };
 
-       mesh_chunk       *mesh_cache [MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
-static mesh_chunk_status mesh_status[MESH_CHUNK_CACHE_Y][MESH_CHUNK_CACHE_X];
+       mesh_chunk       *c_mesh_cache [C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
+static mesh_chunk_status mesh_status[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
 static gen_chunk_cache    gen_cache [ GEN_CHUNK_CACHE_Y][ GEN_CHUNK_CACHE_X];
 
 static mesh_chunk_status *get_chunk_status(int x, int y)
 {
    int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
    int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   mesh_chunk_status *mcs = &mesh_status[cy & (MESH_CHUNK_CACHE_Y-1)][cx & (MESH_CHUNK_CACHE_X-1)];
+   mesh_chunk_status *mcs = &mesh_status[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)];
    if (mcs->chunk_x == cx && mcs->chunk_y == cy)
       return mcs;
    return NULL;
@@ -135,7 +135,7 @@ static mesh_chunk_status *get_chunk_status_alloc(int x, int y)
 {
    int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
    int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   mesh_chunk_status *mcs = &mesh_status[cy & (MESH_CHUNK_CACHE_Y-1)][cx & (MESH_CHUNK_CACHE_X-1)];
+   mesh_chunk_status *mcs = &mesh_status[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)];
    if (mcs->chunk_x == cx && mcs->chunk_y == cy)
       return mcs;
 
@@ -153,7 +153,7 @@ mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
 {
    int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
    int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   mesh_chunk *mc = mesh_cache[cy & (MESH_CHUNK_CACHE_Y-1)][cx & (MESH_CHUNK_CACHE_X-1)];
+   mesh_chunk *mc = c_mesh_cache[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)];
 
    if (mc && mc->chunk_x == cx && mc->chunk_y == cy)
       return mc;
@@ -191,9 +191,9 @@ gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
 void init_chunk_caches(void)
 {
    int i,j;
-   for (j=0; j < MESH_CHUNK_CACHE_Y; ++j) {
-      for (i=0; i < MESH_CHUNK_CACHE_X; ++i) {
-         mesh_cache[j][i] = 0;
+   for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j) {
+      for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i) {
+         c_mesh_cache[j][i] = 0;
       }
    }
 
@@ -948,15 +948,15 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
 void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc)
 {
    int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
-   int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
+   int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
    int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-   mesh_chunk *mc = mesh_cache[slot_y][slot_x];
+   int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
+   mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
    if (mc && mc->vbuf) {
       free_mesh_chunk(mc);
    }
 
-   mesh_cache[slot_y][slot_x] = new_mc;
+   c_mesh_cache[slot_y][slot_x] = new_mc;
 }
 
 static uint8 vertex_build_buffer[16*1024*1024];
@@ -967,10 +967,10 @@ static build_data static_build_data;
 mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
 {
    int cx = MESH_CHUNK_X_FOR_WORLD_X(x);
-   int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
+   int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
    int cy = MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-   mesh_chunk *mc = mesh_cache[slot_y][slot_x];
+   int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
+   mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
 
    if (mc->vbuf) {
       assert(mc->chunk_x != cx || mc->chunk_y != cy);
@@ -1252,8 +1252,8 @@ int mesh_worker_handler(void *data)
 
                stbvox_init_mesh_maker(&mm);
 
-               mc->chunk_x = t.world_x >> MESH_CHUNK_CACHE_X_LOG2;
-               mc->chunk_y = t.world_y >> MESH_CHUNK_CACHE_Y_LOG2;
+               mc->chunk_x = t.world_x >> C_MESH_CHUNK_CACHE_X_LOG2;
+               mc->chunk_y = t.world_y >> C_MESH_CHUNK_CACHE_Y_LOG2;
 
                //validate(t.cs.chunk[1][1]);
                //validate(t.cs.chunk[2][1]);
@@ -1312,8 +1312,8 @@ requested_mesh *get_requested_mesh_alternate(void)
 void check_chunk_sets(void)
 {
    int i,j,m,n;
-   for (j=0; j < MESH_CHUNK_CACHE_Y; ++j) {
-      for (i=0; i < MESH_CHUNK_CACHE_X; ++i) {
+   for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j) {
+      for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i) {
          mesh_chunk_status *mcs = &mesh_status[j][i];
          if (mcs->status == CHUNK_STATUS_nonempty_chunk_set) {
             for (n=0; n < 4; ++n)

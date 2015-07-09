@@ -264,9 +264,9 @@ void request_mesh_generation(int qchunk_x, int qchunk_y)
             int cy = qchunk_y + j;
             int wx = cx * MESH_CHUNK_SIZE_X;
             int wy = cy * MESH_CHUNK_SIZE_Y;
-            int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
-            int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-            mesh_chunk *mc = mesh_cache[slot_y][slot_x];
+            int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
+            int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
+            mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
             if (mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
                consider_mesh[n].x = wx;
                consider_mesh[n].y = wy;  
@@ -354,9 +354,9 @@ void render_voxel_world(float campos[3])
          for (i=-distance; i <= distance; ++i) {
             int cx = qchunk_x + i;
             int cy = qchunk_y + j;
-            int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
-            int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-            mesh_chunk *mc = mesh_cache[slot_y][slot_x];
+            int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
+            int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
+            mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
 
             if (stb_max(abs(i),abs(j)) != distance)
                continue;
@@ -376,7 +376,7 @@ void render_voxel_world(float campos[3])
                estimated_bounds[1][2] = (float) (255);
                if (!is_box_in_frustum(estimated_bounds[0], estimated_bounds[1]))
                   continue;
-               mc = build_mesh_chunk_for_coord(cx * MESH_CHUNK_CACHE_X, cy * MESH_CHUNK_CACHE_Y);
+               mc = build_mesh_chunk_for_coord(cx * C_MESH_CHUNK_CACHE_X, cy * C_MESH_CHUNK_CACHE_Y);
                --num_build_remaining;
             }
 
@@ -410,11 +410,11 @@ void render_voxel_world(float campos[3])
          for (i=-rad; i <= rad; ++i) {
             int cx = qchunk_x + i;
             int cy = qchunk_y + j;
-            int slot_x = cx & (MESH_CHUNK_CACHE_X-1);
-            int slot_y = cy & (MESH_CHUNK_CACHE_Y-1);
-            mesh_chunk *mc = mesh_cache[slot_y][slot_x];
+            int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
+            int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
+            mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
             if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
-               mc = build_mesh_chunk_for_coord(cx * MESH_CHUNK_CACHE_X, cy * MESH_CHUNK_CACHE_Y);
+               mc = build_mesh_chunk_for_coord(cx * C_MESH_CHUNK_CACHE_X, cy * C_MESH_CHUNK_CACHE_Y);
                --num_build_remaining;
                if (num_build_remaining == 0)
                   goto done;
@@ -428,6 +428,10 @@ void render_voxel_world(float campos[3])
    {
       built_mesh bm;
       while (get_next_built_mesh(&bm)) {
+         // server:
+         //   @TODO save as server physics data
+
+         // client:
          upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
          set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
          free(bm.face_buffer);
@@ -437,10 +441,10 @@ void render_voxel_world(float campos[3])
    }
 
    chunk_storage_total = 0;
-   for (j=0; j < MESH_CHUNK_CACHE_Y; ++j)
-      for (i=0; i < MESH_CHUNK_CACHE_X; ++i)
-         if (mesh_cache[j][i] != NULL && mesh_cache[j][i]->vbuf)
-            chunk_storage_total += mesh_cache[j][i]->num_quads * 20;
+   for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j)
+      for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i)
+         if (c_mesh_cache[j][i] != NULL && c_mesh_cache[j][i]->vbuf)
+            chunk_storage_total += c_mesh_cache[j][i]->num_quads * 20;
 
    stbglDisableVertexAttribArray(0);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);

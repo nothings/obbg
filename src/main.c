@@ -277,7 +277,7 @@ float pending_view_x;
 float pending_view_z;
 
 float light_vel[3];
-
+Bool flying=True;
 
 float square(float x) { return x*x; }
 void process_tick_raw(float dt)
@@ -322,8 +322,14 @@ void process_tick_raw(float dt)
       y = player.position.y + player.velocity.y * dt;
       z = player.position.z + player.velocity.z * dt;
 
-      if (!physics_move_walkable(&player.position, &player.velocity, dt, camera_bounds))
-         player.velocity.z -= 20.0f * dt;
+      if (!flying) {
+         if (!physics_move_walkable(&player.position, &player.velocity, dt, camera_bounds))
+            player.velocity.z -= 20.0f * dt;
+      } else {
+         player.position.x = x;
+         player.position.y = y;
+         player.position.z = z;
+      }
 
       #if 0
       if (!collision_test_box(x,y,z,camera_bounds)) {
@@ -342,18 +348,28 @@ void process_tick_raw(float dt)
    light_pos[1] += light_vel[1] * dt;
    light_pos[2] += light_vel[2] * dt;
 
-   view_x_vel *= (float) pow(0.75, dt);
-   view_z_vel *= (float) pow(0.75, dt);
+   if (flying) {
+      view_x_vel *= (float) pow(0.75, dt);
+      view_z_vel *= (float) pow(0.75, dt);
 
-   view_x_vel += (pending_view_x - view_x_vel)*dt*60;
-   view_z_vel += (pending_view_z - view_z_vel)*dt*60;
+      view_x_vel += (pending_view_x - view_x_vel)*dt*60;
+      view_z_vel += (pending_view_z - view_z_vel)*dt*60;
 
-   pending_view_x -= view_x_vel * dt;
-   pending_view_z -= view_z_vel * dt;
-   player.ang.x += view_x_vel * dt;
-   player.ang.z += view_z_vel * dt;
-   player.ang.x = stb_clamp(player.ang.x, -90, 90);
-   player.ang.z = (float) fmod(player.ang.z, 360);
+      pending_view_x -= view_x_vel * dt;
+      pending_view_z -= view_z_vel * dt;
+
+      player.ang.x += view_x_vel * dt;
+      player.ang.z += view_z_vel * dt;
+      player.ang.x = stb_clamp(player.ang.x, -90, 90);
+      player.ang.z = (float) fmod(player.ang.z, 360);
+   } else {
+      player.ang.x += pending_view_x * 0.25f;
+      player.ang.z += pending_view_z * 0.50f;
+      pending_view_x = 0;
+      pending_view_z = 0;
+      player.ang.x = stb_clamp(player.ang.x, -90, 90);
+      player.ang.z = (float) fmod(player.ang.z, 360);
+   }
 }
 
 void process_tick(float dt)
@@ -436,6 +452,8 @@ void stbgl_drawRectTCArray(float x0, float y0, float x1, float y1, float s0, flo
    glEnd();
 }
 
+Bool third_person;
+
 void render_objects(void)
 {
    vec sz;
@@ -444,13 +462,15 @@ void render_objects(void)
    glDisable(GL_TEXTURE_2D);
    stbgl_drawBox(light_pos[0], light_pos[1], light_pos[2], 3,3,3, 1);
 
-   sz.x = camera_bounds[1][0] - camera_bounds[0][0];
-   sz.y = camera_bounds[1][1] - camera_bounds[0][1];
-   sz.z = camera_bounds[1][2] - camera_bounds[0][2];
-   pos.x = player.position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
-   pos.y = player.position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
-   pos.z = player.position.z + (camera_bounds[1][2] + camera_bounds[0][2])/2;
-   stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
+   if (third_person) {
+      sz.x = camera_bounds[1][0] - camera_bounds[0][0];
+      sz.y = camera_bounds[1][1] - camera_bounds[0][1];
+      sz.z = camera_bounds[1][2] - camera_bounds[0][2];
+      pos.x = player.position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
+      pos.y = player.position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
+      pos.z = player.position.z + (camera_bounds[1][2] + camera_bounds[0][2])/2;
+      stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
+   }
 }
 
 
@@ -493,10 +513,16 @@ void draw_main(void)
    glLoadIdentity();
    stbgl_initCamera_zup_facing_y();
 
-   playerspace_to_worldspace(camloc, 0,-5,0);
-   camloc[0] += player.position.x;
-   camloc[1] += player.position.y;
-   camloc[2] += player.position.z;
+   if (third_person) {
+      playerspace_to_worldspace(camloc, 0,-5,0);
+      camloc[0] += player.position.x;
+      camloc[1] += player.position.y;
+      camloc[2] += player.position.z;
+   } else {
+      camloc[0] = player.position.x;
+      camloc[1] = player.position.y;
+      camloc[2] = player.position.z;
+   }
 
    camang[0] = player.ang.x;
    camang[1] = player.ang.y;
@@ -692,6 +718,7 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_LCTRL)   active_control_set(5);
          if (s == SDL_SCANCODE_S)   active_control_set(6);
          if (s == SDL_SCANCODE_D)   active_control_set(7);
+         if (s == SDL_SCANCODE_F)   flying = !flying;
          if (k == '1') global_hack = !global_hack;
          if (k == '2') global_hack = -1;
          if (k == '3') player.position.x += 65536;
