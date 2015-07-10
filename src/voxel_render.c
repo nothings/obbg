@@ -435,6 +435,8 @@ void render_voxel_world(float campos[3])
          if (!bm.mc->has_triangles) {
             // server:
             s_process_mesh_chunk(bm.mc);
+            // don't free the physics data below, because the above call copies them
+            bm.mc->allocs = NULL;
             free_mesh_chunk(bm.mc);
          } else {
             //s_process_mesh_chunk(bm.mc);

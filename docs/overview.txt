@@ -9,6 +9,8 @@ obbg:
   - networking
 
 Done in today's stream:
+
+Previous stream:
   - refactor mesh generation so single-player client & server can share the threaded workers
 
 Previous stream:

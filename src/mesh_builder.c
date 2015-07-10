@@ -152,6 +152,14 @@ static mesh_chunk_status *get_chunk_status_alloc(int x, int y, Bool needs_triang
    mcs->chunk_x = cx;
    mcs->chunk_y = cy;
 
+   if (!needs_triangles) {
+      int i;
+      for (i=0; i < 4; ++i) {
+         mcs->chunk_set_valid[0][i] = mcs->chunk_set_valid[3][i] = True;
+         mcs->chunk_set_valid[i][0] = mcs->chunk_set_valid[i][3] = True;
+      }
+   }
+
    return mcs;
 }
 
@@ -167,17 +175,23 @@ mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
       return NULL;
 }
 
+void free_mesh_chunk_physics(mesh_chunk *mc)
+{
+   if (mc->allocs) {
+      int i;
+      for (i=0; i < stb_arr_len(mc->allocs); ++i)
+         free(mc->allocs[i]);
+      stb_arr_free(mc->allocs);
+   }
+}
+
 void free_mesh_chunk(mesh_chunk *mc)
 {
-   int i;
-
    glDeleteTextures(1, &mc->fbuf_tex);
    glDeleteBuffersARB(1, &mc->vbuf);
    glDeleteBuffersARB(1, &mc->fbuf);
 
-   for (i=0; i < stb_arr_len(mc->allocs); ++i)
-      free(mc->allocs[i]);
-   stb_arr_free(mc->allocs);
+   free_mesh_chunk_physics(mc);
    free(mc);
 }
 
@@ -1422,9 +1436,10 @@ int worker_manager(void *data)
                   out_mesh.vertex_build_buffer = 0;
                   out_mesh.face_buffer  = 0;
                   {
-                     int i;
-                     for (i=0; i < 16; ++i)
-                        release_gen_chunk(mcs->cs.chunk[0][i]);
+                     release_gen_chunk(mcs->cs.chunk[1][1]);
+                     release_gen_chunk(mcs->cs.chunk[1][2]);
+                     release_gen_chunk(mcs->cs.chunk[2][1]);
+                     release_gen_chunk(mcs->cs.chunk[2][2]);
                   }
                   out_mesh.mc = mc;
                   out_mesh.mc->has_triangles = False;

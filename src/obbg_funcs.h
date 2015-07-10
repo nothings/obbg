@@ -11,6 +11,7 @@ extern void init_mesh_building(void);
 extern void init_mesh_build_threads(void);
 extern void s_init_physics_cache(void);
 extern void free_mesh_chunk(mesh_chunk *mc);
+extern void free_mesh_chunk_physics(mesh_chunk *mc);
 
 extern int get_next_built_mesh(built_mesh *bm);
 extern requested_mesh *get_requested_mesh_alternate(void);

@@ -100,9 +100,10 @@ void s_process_mesh_chunk(mesh_chunk *mc)
       int phys_cache_x = (mc->chunk_x & (S_PHYSICS_CACHE_X-1));
       int phys_cache_y = (mc->chunk_y & (S_PHYSICS_CACHE_Y-1));
       mesh_chunk *phys_cache_mc = &s_phys_cache[phys_cache_y][phys_cache_x];
-      phys_cache_mc->chunk_x = mc->chunk_x;
-      phys_cache_mc->chunk_y = mc->chunk_y;
-      phys_cache_mc->pc = mc->pc;  // pc = physics chunk
+
+      free_mesh_chunk_physics(phys_cache_mc);
+
+      *phys_cache_mc = *mc;
    }
 
    update_server_cache_feedback();
