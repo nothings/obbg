@@ -12,7 +12,9 @@ extern void init_mesh_build_threads(void);
 extern void s_init_physics_cache(void);
 extern void free_mesh_chunk(mesh_chunk *mc);
 extern void free_mesh_chunk_physics(mesh_chunk *mc);
+extern void world_init(void);
 
+extern void process_tick_raw(float dt);
 extern int get_next_built_mesh(built_mesh *bm);
 extern requested_mesh *get_requested_mesh_alternate(void);
 extern void swap_requested_meshes(void);
@@ -27,5 +29,9 @@ extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
 
 extern void physics_process_mesh_chunk(mesh_chunk *mc);
 extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py);
+
+extern objid allocate_object(void);
+extern objid allocate_player(void);
+extern void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z);
 
 #endif

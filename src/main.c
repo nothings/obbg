@@ -114,7 +114,7 @@ void init_mesh_building(void)
 
 
 
-float camera_bounds[2][3];
+static float camera_bounds[2][3];
 
 float texture_scales[256];
 
@@ -218,160 +218,19 @@ static void print(char *text, ...)
    pos_y += 10;
 }
 
-typedef struct
-{
-   vec position;
-   vec ang;
-   vec velocity;
-
-   float zoom;
-} player_object;
-
-player_object player = { { 0,0,150 } };
+//object player = { { 0,0,150 } };
 
 
 float camang[3], camloc[3] = { 0,-10,80 };
 
-
-void playerspace_to_worldspace(float world[3], float cam_x, float cam_y, float cam_z)
-{
-   float vec[3] = { cam_x, cam_y, cam_z };
-   float t[3];
-   float s,c;
-   s = (float) sin(player.ang.x*3.141592/180);
-   c = (float) cos(player.ang.x*3.141592/180);
-
-   t[0] = vec[0];
-   t[1] = c*vec[1] - s*vec[2];
-   t[2] = s*vec[1] + c*vec[2];
-
-   s = (float) sin(player.ang.z*3.141592/180);
-   c = (float) cos(player.ang.z*3.141592/180);
-   world[0] = c*t[0] - s*t[1];
-   world[1] = s*t[0] + c*t[1];
-   world[2] = t[2];
-}
-
 // camera worldspace velocity
 float light_pos[3];
-
-int controls;
-
-#define MAX_VEL  150.0f      // blocks per second
-#define ACCEL      6.0f
-#define DECEL      3.0f
-
-#define STATIC_FRICTION   DECEL
-#define EFFECTIVE_ACCEL   (ACCEL+DECEL)
-
-// dynamic friction:
-//
-//    if going at MAX_VEL, ACCEL and friction must cancel
-//    EFFECTIVE_ACCEL = DECEL + DYNAMIC_FRIC*MAX_VEL
-#define DYNAMIC_FRICTION  (ACCEL/(float)MAX_VEL)
-
-float view_x_vel = 0;
-float view_z_vel = 0;
-float pending_view_x;
-float pending_view_z;
-float pending_view_x;
-float pending_view_z;
-
 float light_vel[3];
-Bool flying=True;
 
-float square(float x) { return x*x; }
-void process_tick_raw(float dt)
-{
-   int i;
-   float thrust[3] = { 0,0,0 };
-   float world_thrust[3];
+float pending_view_x;
+float pending_view_z;
 
-   // choose direction to apply thrust
-
-   thrust[0] = (controls &  3)== 1 ? EFFECTIVE_ACCEL : (controls &  3)== 2 ? -EFFECTIVE_ACCEL : 0;
-   thrust[1] = (controls & 12)== 4 ? EFFECTIVE_ACCEL : (controls & 12)== 8 ? -EFFECTIVE_ACCEL : 0;
-   thrust[2] = (controls & 48)==16 ? EFFECTIVE_ACCEL : (controls & 48)==32 ? -EFFECTIVE_ACCEL : 0;
-
-   // @TODO clamp thrust[0] & thrust[1] vector length to EFFECTIVE_ACCEL
-
-   playerspace_to_worldspace(world_thrust, thrust[0], thrust[1], 0);
-   world_thrust[2] += thrust[2];
-
-   for (i=0; i < 3; ++i) {
-      float acc = world_thrust[i];
-      (&player.velocity.x)[i] += acc*dt;
-   }
-
-   if (player.velocity.x || player.velocity.y || player.velocity.z)
-   {
-      float vel = (float) sqrt(square(player.velocity.x)+square(player.velocity.y)+square(player.velocity.z));
-      float newvel = vel;
-      float dec = STATIC_FRICTION + DYNAMIC_FRICTION*vel;
-      newvel = vel - dec*dt;
-      if (newvel < 0)
-         newvel = 0;
-      player.velocity.x *= newvel/vel;
-      player.velocity.y *= newvel/vel;
-      player.velocity.z *= newvel/vel;
-   }
-
-   {
-      float x,y,z;
-
-      x = player.position.x + player.velocity.x * dt;
-      y = player.position.y + player.velocity.y * dt;
-      z = player.position.z + player.velocity.z * dt;
-
-      if (!flying) {
-         if (!physics_move_walkable(&player.position, &player.velocity, dt, camera_bounds))
-            player.velocity.z -= 20.0f * dt;
-      } else {
-         player.position.x = x;
-         player.position.y = y;
-         player.position.z = z;
-      }
-
-      #if 0
-      if (!collision_test_box(x,y,z,camera_bounds)) {
-         camloc[0] = x;
-         camloc[1] = y;
-         camloc[2] = z;
-      } else {
-         cam_vel[0] = 0;
-         cam_vel[1] = 0;
-         cam_vel[2] = 0;
-      }
-      #endif
-   }
-
-   light_pos[0] += light_vel[0] * dt;
-   light_pos[1] += light_vel[1] * dt;
-   light_pos[2] += light_vel[2] * dt;
-
-   if (flying) {
-      view_x_vel *= (float) pow(0.75, dt);
-      view_z_vel *= (float) pow(0.75, dt);
-
-      view_x_vel += (pending_view_x - view_x_vel)*dt*60;
-      view_z_vel += (pending_view_z - view_z_vel)*dt*60;
-
-      pending_view_x -= view_x_vel * dt;
-      pending_view_z -= view_z_vel * dt;
-
-      player.ang.x += view_x_vel * dt;
-      player.ang.z += view_z_vel * dt;
-      player.ang.x = stb_clamp(player.ang.x, -90, 90);
-      player.ang.z = (float) fmod(player.ang.z, 360);
-   } else {
-      player.ang.x += pending_view_x * 0.25f;
-      player.ang.z += pending_view_z * 0.50f;
-      pending_view_x = 0;
-      pending_view_z = 0;
-      player.ang.x = stb_clamp(player.ang.x, -90, 90);
-      player.ang.z = (float) fmod(player.ang.z, 360);
-   }
-}
+player_controls client_player_input;
 
 void process_tick(float dt)
 {
@@ -434,7 +293,7 @@ void draw_stats(void)
    print("QChunks: %3d in frustum of %3d valid of %3d in range", chunks_in_frustum, chunks_considered, chunk_locations);
    print("Mesh worker threads active: %d", num_threads_active);
    print("View distance: %d blocks", view_dist_for_display);
-   print("x=%5.2f, y=%5.2f, z=%5.2f", player.position.x, player.position.y, player.position.z);
+   print("x=%5.2f, y=%5.2f, z=%5.2f", obj[player_id].position.x, obj[player_id].position.y, obj[player_id].position.z);
    print("%s", glGetString(GL_RENDERER));
    for (i=0; i < 4; ++i)
       print("[ %4d,%4d  %4d,%4d  %4d,%4d  %4d,%4d ]",
@@ -462,6 +321,7 @@ void stbgl_drawRectTCArray(float x0, float y0, float x1, float y1, float s0, flo
 }
 
 Bool third_person;
+float player_zoom = 1.0f;
 
 void render_objects(void)
 {
@@ -475,9 +335,9 @@ void render_objects(void)
       sz.x = camera_bounds[1][0] - camera_bounds[0][0];
       sz.y = camera_bounds[1][1] - camera_bounds[0][1];
       sz.z = camera_bounds[1][2] - camera_bounds[0][2];
-      pos.x = player.position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
-      pos.y = player.position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
-      pos.z = player.position.z + (camera_bounds[1][2] + camera_bounds[0][2])/2;
+      pos.x = obj[player_id].position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
+      pos.y = obj[player_id].position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
+      pos.z = obj[player_id].position.z + (camera_bounds[1][2] + camera_bounds[0][2])/2;
       stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
    }
 }
@@ -512,9 +372,9 @@ void draw_main(void)
    glLoadIdentity();
 
    #ifdef REVERSE_DEPTH
-   stbgl_Perspective(player.zoom, 90, 70, 3000, 1.0/16);
+   stbgl_Perspective(player_zoom, 90, 70, 3000, 1.0/16);
    #else
-   stbgl_Perspective(player.zoom, 90, 70, 1.0/16, 3000);
+   stbgl_Perspective(player_zoom, 90, 70, 1.0/16, 3000);
    #endif
 
    // now compute where the camera should be
@@ -523,19 +383,19 @@ void draw_main(void)
    stbgl_initCamera_zup_facing_y();
 
    if (third_person) {
-      playerspace_to_worldspace(camloc, 0,-5,0);
-      camloc[0] += player.position.x;
-      camloc[1] += player.position.y;
-      camloc[2] += player.position.z;
+      objspace_to_worldspace(camloc, player_id, 0,-5,0);
+      camloc[0] += obj[player_id].position.x;
+      camloc[1] += obj[player_id].position.y;
+      camloc[2] += obj[player_id].position.z;
    } else {
-      camloc[0] = player.position.x;
-      camloc[1] = player.position.y;
-      camloc[2] = player.position.z;
+      camloc[0] = obj[player_id].position.x;
+      camloc[1] = obj[player_id].position.y;
+      camloc[2] = obj[player_id].position.z;
    }
 
-   camang[0] = player.ang.x;
-   camang[1] = player.ang.y;
-   camang[2] = player.ang.z;
+   camang[0] = obj[player_id].ang.x;
+   camang[1] = obj[player_id].ang.y;
+   camang[2] = obj[player_id].ang.z;
 #if 1
    glRotatef(-camang[0],1,0,0);
    glRotatef(-camang[2],0,0,1);
@@ -545,7 +405,7 @@ void draw_main(void)
    start_time = SDL_GetPerformanceCounter();
    render_voxel_world(camloc);
 
-   player.zoom = 1;
+   player_zoom = 1;
 
    render_objects();
 
@@ -668,16 +528,14 @@ int loopmode(float dt, int real, int in_client)
 
 static int quit;
 
-extern int controls;
-
 void active_control_set(int key)
 {
-   controls |= 1 << key;
+   client_player_input.buttons |= 1 << key;
 }
 
 void active_control_clear(int key)
 {
-   controls &= ~(1 << key);
+   client_player_input.buttons &= ~(1 << key);
 }
 
 extern void update_view(float dx, float dy);
@@ -727,13 +585,13 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_LCTRL)   active_control_set(5);
          if (s == SDL_SCANCODE_S)   active_control_set(6);
          if (s == SDL_SCANCODE_D)   active_control_set(7);
-         if (s == SDL_SCANCODE_F)   flying = !flying;
+         if (s == SDL_SCANCODE_F)   client_player_input.flying = !client_player_input.flying;
          if (k == '1') global_hack = !global_hack;
          if (k == '2') global_hack = -1;
-         if (k == '3') player.position.x += 65536;
+         if (k == '3') obj[player_id].position.x += 65536;
          if (s == SDL_SCANCODE_R) {
-            playerspace_to_worldspace(light_vel, 0,32,0);
-            memcpy(light_pos, &player.position, sizeof(light_pos));
+            objspace_to_worldspace(light_vel, player_id, 0,32,0);
+            memcpy(light_pos, &obj[player_id].position, sizeof(light_pos));
          }
 
          #if 0
@@ -889,7 +747,7 @@ int SDL_main(int argc, char **argv)
 
    render_init();
    //mesh_init();
-   //world_init();
+   world_init();
 
    initialized = 1;
 

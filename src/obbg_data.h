@@ -94,11 +94,38 @@ typedef struct
    arena_chunk **allocs;
 } mesh_chunk;
 
+typedef int32 objid;
+
+typedef struct
+{
+   vec position;
+   vec ang;
+   vec velocity;
+
+   uint8  valid;
+   uint8  padding[3];
+} object;
+
+typedef struct
+{
+   uint16 buttons;
+   float view_x, view_z;
+   Bool flying;
+} player_controls;
+
+extern player_controls client_player_input;
+
+#define MAX_OBJECTS 65536
+#define PLAYER_OBJECT_MAX  1024
+
+extern object obj[MAX_OBJECTS];
+
 extern float texture_scales[256];
 
 extern mesh_chunk     *c_mesh_cache[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
 
-
+extern objid player_id;
+extern objid max_obj_id, max_player_id;
 enum
 {
    RMS_invalid,
