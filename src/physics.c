@@ -212,8 +212,6 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
    float dz = vel->z * dt;
    collision_geometry cg;
 
-   dt = 1.0f/60;
-
    ix = (int) floor(x);
    iy = (int) floor(y);
    iz = (int) floor(z + size[0][2] + (size[1][2] - size[0][2])/2);

@@ -232,13 +232,17 @@ float pending_view_z;
 
 player_controls client_player_input;
 
+float pending_dt;
+
 void process_tick(float dt)
 {
+   dt += pending_dt;
+   //pending_dt = 0;
    while (dt > 1.0f/60) {
       process_tick_raw(1.0f/60);
       dt -= 1.0f/60;
    }
-   process_tick_raw(dt);
+   pending_dt += dt;
 }
 
 void update_view(float dx, float dy)

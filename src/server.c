@@ -3,7 +3,7 @@
 //
 //    - authoratative physics
 //    - generate terrain for physics
-//    - AI
+//    - [[someday: AI]]
 //
 //  Client's responsibility:
 //
