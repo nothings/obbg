@@ -406,7 +406,7 @@ static Uint64 start_time, end_time; // render time
 float chunk_server_status[32];
 int chunk_server_pos;
 
-vec3i server_cache_feedback[64][64];
+extern vec3i physics_cache_feedback[64][64];
 
 void draw_stats(void)
 {
@@ -438,10 +438,10 @@ void draw_stats(void)
    print("%s", glGetString(GL_RENDERER));
    for (i=0; i < 4; ++i)
       print("[ %4d,%4d  %4d,%4d  %4d,%4d  %4d,%4d ]",
-                                   server_cache_feedback[i][0].x, server_cache_feedback[i][0].y, 
-                                   server_cache_feedback[i][1].x, server_cache_feedback[i][1].y, 
-                                   server_cache_feedback[i][2].x, server_cache_feedback[i][2].y, 
-                                   server_cache_feedback[i][3].x, server_cache_feedback[i][3].y);
+                                   physics_cache_feedback[i][0].x, physics_cache_feedback[i][0].y, 
+                                   physics_cache_feedback[i][1].x, physics_cache_feedback[i][1].y, 
+                                   physics_cache_feedback[i][2].x, physics_cache_feedback[i][2].y, 
+                                   physics_cache_feedback[i][3].x, physics_cache_feedback[i][3].y);
 
    if (is_synchronous_debug) {
       text_color[0] = 1.0;

@@ -1,6 +1,109 @@
 #include "obbg_funcs.h"
 #include <math.h>
 
+
+
+#include "obbg_funcs.h"
+
+#define S_PHYSICS_CACHE_X_LOG2  2
+#define S_PHYSICS_CACHE_Y_LOG2  2
+
+#define S_PHYSICS_CACHE_X  (1 << S_PHYSICS_CACHE_X_LOG2)
+#define S_PHYSICS_CACHE_Y  (1 << S_PHYSICS_CACHE_Y_LOG2)
+
+
+static mesh_chunk s_phys_cache[S_PHYSICS_CACHE_Y][S_PHYSICS_CACHE_X];
+static int player_x, player_y;
+vec3i physics_cache_feedback[64][64];
+
+void s_init_physics_cache(void)
+{
+   int i,j;
+   for (j=0; j < S_PHYSICS_CACHE_Y; ++j)
+      for (i=0; i < S_PHYSICS_CACHE_X; ++i)
+         s_phys_cache[j][i].chunk_x = i+1;
+}
+
+void update_physics_cache_feedback(void)
+{
+   int i,j;
+   for (j=0; j < S_PHYSICS_CACHE_Y; ++j) {
+      for (i=0; i < S_PHYSICS_CACHE_X; ++i) {
+         mesh_chunk *phys_cache_mc = &s_phys_cache[j][i];
+         physics_cache_feedback[j][i].x = phys_cache_mc->chunk_x;// - C_MESH_CHUNK_X_FOR_WORLD_X(player_x);
+         physics_cache_feedback[j][i].y = phys_cache_mc->chunk_y;// - C_MESH_CHUNK_Y_FOR_WORLD_Y(player_y);
+      }
+   }
+}
+
+
+int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py)
+{
+   int i,j,n=0;
+
+   int player_cx, player_cy;
+
+   player_x = px;
+   player_y = py;
+
+   player_cx = C_MESH_CHUNK_X_FOR_WORLD_X(player_x);
+   player_cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(player_y);
+
+   for (j=0; j < S_PHYSICS_CACHE_Y; ++j) {
+      for (i=0; i < S_PHYSICS_CACHE_X; ++i) {
+         int rx = player_cx - S_PHYSICS_CACHE_X/2 + i;
+         int ry = player_cy - S_PHYSICS_CACHE_Y/2 + j;
+         mesh_chunk *phys_cache_mc = &s_phys_cache[ry & (S_PHYSICS_CACHE_Y-1)][rx & (S_PHYSICS_CACHE_X-1)];
+         if (phys_cache_mc->chunk_x != rx || phys_cache_mc->chunk_y != ry) {
+            if (n < max_req) {
+               rm[n].x = rx << MESH_CHUNK_SIZE_X_LOG2;
+               rm[n].y = ry << MESH_CHUNK_SIZE_Y_LOG2;
+               rm[n].state = RMS_requested;
+               rm[n].needs_triangles = False;
+               ++n;
+            }
+         }
+      }
+   }
+
+   update_physics_cache_feedback();
+
+   return n;
+}
+
+void physics_process_mesh_chunk(mesh_chunk *mc)
+{
+   int player_cx = C_MESH_CHUNK_X_FOR_WORLD_X(player_x);
+   int player_cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(player_y);
+
+   // if it's within the player bounds, update it
+   if (mc->chunk_x >= player_cx - S_PHYSICS_CACHE_X/2 && mc->chunk_x < player_cx + S_PHYSICS_CACHE_X/2 &&
+       mc->chunk_y >= player_cy - S_PHYSICS_CACHE_Y/2 && mc->chunk_y < player_cy + S_PHYSICS_CACHE_Y/2)
+   {
+      int phys_cache_x = (mc->chunk_x & (S_PHYSICS_CACHE_X-1));
+      int phys_cache_y = (mc->chunk_y & (S_PHYSICS_CACHE_Y-1));
+      mesh_chunk *phys_cache_mc = &s_phys_cache[phys_cache_y][phys_cache_x];
+
+      free_mesh_chunk_physics(phys_cache_mc);
+
+      *phys_cache_mc = *mc;
+   }
+
+   update_physics_cache_feedback();
+}
+
+mesh_chunk *get_physics_chunk_for_coord(int x, int y)
+{
+   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   int rx = cx & (S_PHYSICS_CACHE_X-1);
+   int ry = cy & (S_PHYSICS_CACHE_Y-1);
+   mesh_chunk *mc = &s_phys_cache[ry][rx];
+   if (mc->chunk_x == cx && mc->chunk_y == cy)
+      return mc;
+   return NULL;
+}
+
 #define COLLIDE_BLOB_X   8
 #define COLLIDE_BLOB_Y   8
 #define COLLIDE_BLOB_Z   8
@@ -11,13 +114,14 @@ typedef struct
    unsigned char data[COLLIDE_BLOB_Y][COLLIDE_BLOB_X][COLLIDE_BLOB_Z];
 } collision_geometry;
 
-void gather_collision_geometry(collision_geometry *cg, int base_x, int base_y, int base_z)
+static Bool gather_collision_geometry(collision_geometry *cg, int base_x, int base_y, int base_z)
 {
    int cx0 = C_MESH_CHUNK_X_FOR_WORLD_X(base_x);
    int cy0 = C_MESH_CHUNK_Y_FOR_WORLD_Y(base_y);
    int cx1 = C_MESH_CHUNK_X_FOR_WORLD_X(base_x+COLLIDE_BLOB_X-1)+1;
    int cy1 = C_MESH_CHUNK_Y_FOR_WORLD_Y(base_y+COLLIDE_BLOB_Y-1)+1;
    int j,i;
+   Bool found_bad = False;
    memset(cg, 0, sizeof(*cg));
 
    cg->x = base_x;
@@ -27,8 +131,10 @@ void gather_collision_geometry(collision_geometry *cg, int base_x, int base_y, i
       for (i=cx0; i < cx1; ++i) {
          int x0 = i << MESH_CHUNK_SIZE_X_LOG2;
          int y0 = j << MESH_CHUNK_SIZE_Y_LOG2;
-         mesh_chunk *mc = get_mesh_chunk_for_coord(x0,y0);
-         if (mc != NULL) {
+         mesh_chunk *mc = get_physics_chunk_for_coord(x0,y0);
+         if (mc == NULL) {
+            found_bad = True;
+         } else {
             int a,b;
             int rx1 = x0 + MESH_CHUNK_SIZE_X;
             int ry1 = y0 + MESH_CHUNK_SIZE_Y;
@@ -58,6 +164,7 @@ void gather_collision_geometry(collision_geometry *cg, int base_x, int base_y, i
          }
       }
    }
+   return !found_bad;
 }
 
 //      #1.........|

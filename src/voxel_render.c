@@ -281,7 +281,7 @@ void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
 
    n = stb_min(n, MAX_BUILT_MESHES);
 
-   m = s_set_player_coord(rm, MAX_BUILT_MESHES, cam_x, cam_y);
+   m = physics_set_player_coord(rm, MAX_BUILT_MESHES, cam_x, cam_y);
 
    for (i=0; i < n && m < MAX_BUILT_MESHES; ++i) {
       rm[m].x = consider_mesh[i].x;
@@ -434,7 +434,7 @@ void render_voxel_world(float campos[3])
       while (get_next_built_mesh(&bm)) {
          if (!bm.mc->has_triangles) {
             // server:
-            s_process_mesh_chunk(bm.mc);
+            physics_process_mesh_chunk(bm.mc);
             // don't free the physics data below, because the above call copies them
             bm.mc->allocs = NULL;
             free_mesh_chunk(bm.mc);

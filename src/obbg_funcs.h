@@ -21,10 +21,11 @@ extern mesh_chunk *build_mesh_chunk_for_coord(int x, int y);
 extern void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer);
 extern void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc);
 extern mesh_chunk *get_mesh_chunk_for_coord(int x, int y);
+extern mesh_chunk *get_physics_chunk_for_coord(int x, int y);
 //extern int collision_test_box(float x, float y, float z, float bounds[2][3]);
 extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3]);
 
-extern void s_process_mesh_chunk(mesh_chunk *mc);
-extern int s_set_player_coord(requested_mesh *rm, int max_req, int px, int py);
+extern void physics_process_mesh_chunk(mesh_chunk *mc);
+extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py);
 
 #endif

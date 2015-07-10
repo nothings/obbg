@@ -900,7 +900,8 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
 
    stbvox_set_input_stride(mm, 18, 66*18);
 
-   build_phys_chunk(mc, chunks, world_coord.x, world_coord.y);
+   //build_phys_chunk(mc, chunks, world_coord.x, world_coord.y);
+   mc->allocs = NULL;
 
    map = stbvox_get_input_description(mm);
    map->block_tex1_face = tex1_for_blocktype;
@@ -1269,6 +1270,8 @@ int mesh_worker_handler(void *data)
                mesh_chunk *mc = malloc(sizeof(*mc));
                built_mesh out_mesh;
                vec3i wc = { t.world_x, t.world_y, 0 };
+
+               memset(mc, 0, sizeof(mc));
 
                stbvox_init_mesh_maker(&mm);
 
