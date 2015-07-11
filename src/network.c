@@ -1,6 +1,5 @@
 #include "obbg_funcs.h"
 
-#include <arpa/inet.h>
 #include <SDL_net.h>
 
 #if 0
@@ -16,14 +15,9 @@ typedef struct
 } record_header;
 #endif
 
-// BUG: the code doesn't convert these to network byte order,
-// but they fail to consistently, so it should still be
-// sending & receiving the same port number, so it shouldn't prevent
-// it from working. (4077 becomes 60687, and 4127 becomes 7952)
 #define CLIENT_PORT 4077
 #define SERVER_PORT 4127
 
-static UDPsocket send_socket;
 static UDPsocket receive_socket;
 static UDPpacket *receive_packet;
 static UDPpacket *send_packet;
@@ -42,7 +36,7 @@ Bool net_send(void *buffer, size_t buffer_size)
    send_packet->len = buffer_size;
 
    // loopback to same machine & socket for quick testing
-   send_packet->address.port = is_server ? htons(SERVER_PORT) : htons(CLIENT_PORT);
+   SDLNet_Write16(is_server ? SERVER_PORT : CLIENT_PORT, &send_packet->address.port);
    send_packet->address.host = (127<<0)+(1 << 24);  // 127.0.0.1
 
    res = SDLNet_UDP_Send(receive_socket, -1, send_packet);
@@ -71,7 +65,6 @@ void net_init(void)
    int len;
    char *test = "Hello world!";
    char buffer[513];
-   send_socket = SDLNet_UDP_Open(0);
    receive_socket = SDLNet_UDP_Open(is_server ? SERVER_PORT : CLIENT_PORT);
    receive_packet = SDLNet_AllocPacket(MAX_SAFE_PACKET_SIZE);
    send_packet    = SDLNet_AllocPacket(MAX_SAFE_PACKET_SIZE);
@@ -79,11 +72,12 @@ void net_init(void)
    if (!net_send(test, strlen(test))) {
       ods("Whoops!");
    }
-   SDL_Delay(500);
+   //SDL_Delay(500);
    len = net_receive(buffer, sizeof(buffer)-1);
    if (len >= 0) {
       buffer[len] = 0;
       ods("Received '%s'", buffer);
    }
 }
+
 
