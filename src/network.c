@@ -15,6 +15,10 @@ typedef struct
 } record_header;
 #endif
 
+// BUG: the code doesn't convert these to network byte order,
+// but they do it consistently, so it should still be
+// accessing the same port number, so it shouldn't prevent
+// it from working. (4077 becomes 60687, and 4127 becomes 7952)
 #define CLIENT_PORT 4077
 #define SERVER_PORT 4127
 
