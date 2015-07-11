@@ -1,5 +1,6 @@
 #include "obbg_funcs.h"
 
+#include <arpa/inet.h>
 #include <SDL_net.h>
 
 #if 0
@@ -22,6 +23,7 @@ typedef struct
 #define CLIENT_PORT 4077
 #define SERVER_PORT 4127
 
+static UDPsocket send_socket;
 static UDPsocket receive_socket;
 static UDPpacket *receive_packet;
 static UDPpacket *send_packet;
@@ -40,17 +42,10 @@ Bool net_send(void *buffer, size_t buffer_size)
    send_packet->len = buffer_size;
 
    // loopback to same machine & socket for quick testing
-   send_packet->address.port = is_server ? SERVER_PORT : CLIENT_PORT;
+   send_packet->address.port = is_server ? htons(SERVER_PORT) : htons(CLIENT_PORT);
+   send_packet->address.host = (127<<0)+(1 << 24);  // 127.0.0.1
 
-   // one of these must be right!
-
-   send_packet->address.host = (127<<  0)+(1 << 24);  // 127.0.0.1
    res = SDLNet_UDP_Send(receive_socket, -1, send_packet);
-   // currently this returns 1
-
-   send_packet->address.host = (127<< 24)+(1 <<  0);  // 1.0.0.127?
-   res = SDLNet_UDP_Send(receive_socket, -1, send_packet);
-   // currently this also returns 1
 
    return True;
 }
@@ -76,6 +71,7 @@ void net_init(void)
    int len;
    char *test = "Hello world!";
    char buffer[513];
+   send_socket = SDLNet_UDP_Open(0);
    receive_socket = SDLNet_UDP_Open(is_server ? SERVER_PORT : CLIENT_PORT);
    receive_packet = SDLNet_AllocPacket(MAX_SAFE_PACKET_SIZE);
    send_packet    = SDLNet_AllocPacket(MAX_SAFE_PACKET_SIZE);
