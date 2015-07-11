@@ -65,7 +65,11 @@ int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py)
 
    update_physics_cache_feedback();
 
+   #if 1
    return n;
+   #else
+   return 0;
+   #endif
 }
 
 void physics_process_mesh_chunk(mesh_chunk *mc)

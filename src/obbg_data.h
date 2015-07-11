@@ -142,7 +142,7 @@ enum
 };
 
 
-#define MAX_BUILT_MESHES   256
+#define MAX_BUILT_MESHES   32
 
 typedef struct
 {

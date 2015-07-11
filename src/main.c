@@ -693,6 +693,7 @@ extern float compute_height_field(int x, int y);
 int SDL_main(int argc, char **argv)
 {
    SDL_Init(SDL_INIT_VIDEO);
+   client_player_input.flying = True;
 
    {
       int i,j;

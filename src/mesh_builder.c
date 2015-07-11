@@ -55,8 +55,8 @@ static unsigned char geom_for_blocktype[256];
 #define GEN_CHUNK_SIZE_X         (1 << GEN_CHUNK_SIZE_X_LOG2)
 #define GEN_CHUNK_SIZE_Y         (1 << GEN_CHUNK_SIZE_Y_LOG2)
 
-#define GEN_CHUNK_CACHE_X_LOG2    5
-#define GEN_CHUNK_CACHE_Y_LOG2    5
+#define GEN_CHUNK_CACHE_X_LOG2    4
+#define GEN_CHUNK_CACHE_Y_LOG2    4
 #define GEN_CHUNK_CACHE_X         (1 << GEN_CHUNK_CACHE_X_LOG2)
 #define GEN_CHUNK_CACHE_Y         (1 << GEN_CHUNK_CACHE_Y_LOG2)
 
@@ -576,7 +576,7 @@ gen_chunk *generate_chunk(int x, int y)
          weight = stb_clamp(weight,0,1);
          height_lerp[j+4][i+4] = weight;
          ht = compute_height_field(x+i,y+j, weight);
-         assert(ht >= 8);
+         assert(ht >= 4);
          height_field[j+4][i+4] = ht;
          height_field_int[j+4][i+4] = (int) height_field[j+4][i+4];
          ground_top = stb_max(ground_top, height_field_int[j+4][i+4]);
@@ -1048,7 +1048,7 @@ typedef struct
    int world_y;
 } finished_gen_chunk;
 
-#define MAX_TASKS          1024
+#define MAX_TASKS          64
 #define MAX_GEN_CHUNKS     256
 
 
