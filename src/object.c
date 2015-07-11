@@ -1,3 +1,6 @@
+#define STB_LEAKCHECK_IMPLEMENTATION
+#include "stb_leakcheck_sdl.h"
+
 #include "obbg_data.h"
 
 object obj[MAX_OBJECTS];

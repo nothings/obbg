@@ -172,4 +172,6 @@ extern int view_dist_for_display;
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 extern unsigned char tex1_for_blocktype[256][6];
 
+extern Bool is_server;
+
 #endif

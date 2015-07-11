@@ -20,6 +20,7 @@
 // SDL
 #include "sdl.h"
 #include "SDL_opengl.h"
+#include "SDL_net.h"
 
 // stb_glprog.h
 #define STB_GLPROG_IMPLEMENTATION
@@ -301,12 +302,14 @@ void draw_stats(void)
    print("View distance: %d blocks", view_dist_for_display);
    print("x=%5.2f, y=%5.2f, z=%5.2f", obj[player_id].position.x, obj[player_id].position.y, obj[player_id].position.z);
    print("%s", glGetString(GL_RENDERER));
+   #if 0
    for (i=0; i < 4; ++i)
       print("[ %4d,%4d  %4d,%4d  %4d,%4d  %4d,%4d ]",
                                    physics_cache_feedback[i][0].x, physics_cache_feedback[i][0].y, 
                                    physics_cache_feedback[i][1].x, physics_cache_feedback[i][1].y, 
                                    physics_cache_feedback[i][2].x, physics_cache_feedback[i][2].y, 
                                    physics_cache_feedback[i][3].x, physics_cache_feedback[i][3].y);
+   #endif
 
    if (is_synchronous_debug) {
       text_color[0] = 1.0;
@@ -688,18 +691,22 @@ void enable_synchronous(void)
 
 extern float compute_height_field(int x, int y);
 
+Bool networking;
+
+Bool is_server;
+
 
 //void stbwingraph_main(void)
 int SDL_main(int argc, char **argv)
 {
    SDL_Init(SDL_INIT_VIDEO);
+
+   networking = (SDLNet_Init() == 0);
+
    client_player_input.flying = True;
 
-   {
-      int i,j;
-      for (j=-418; j <= -414; ++j)
-         for (i=834; i <= 838; ++i)
-            ods("(%d,%d): %f\n", i,j, compute_height_field(i,j));
+   if (argc > 1 && !strcmp(argv[1], "--server")) {
+      is_server = 1;
    }
 
    //prepare_threads();
@@ -756,6 +763,8 @@ int SDL_main(int argc, char **argv)
    //mesh_init();
    world_init();
 
+   net_init();
+
    initialized = 1;
 
    while (!quit) {
@@ -765,6 +774,9 @@ int SDL_main(int argc, char **argv)
 
       loopmode(getTimestep(0.0166f/8), 1, 1);
    }
+
+   if (networking)
+      SDLNet_Quit();
 
    return 0;
 }

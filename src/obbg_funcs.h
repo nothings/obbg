@@ -33,5 +33,5 @@ extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int
 extern objid allocate_object(void);
 extern objid allocate_player(void);
 extern void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z);
-
+extern void net_init(void);
 #endif

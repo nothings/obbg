@@ -142,6 +142,7 @@ void stb_leakcheck_dumpmem(void)
 #ifndef INCLUDE_STB_LEAKCHECK_H
 #define INCLUDE_STB_LEAKCHECK_H
 
+#ifdef STB_LEAKCHECK_ENABLE
 #define malloc(sz)    stb_leakcheck_malloc(sz, __FILE__, __LINE__)
 #define free(p)       stb_leakcheck_free(p)
 #define realloc(p,sz) stb_leakcheck_realloc(p,sz, __FILE__, __LINE__)
@@ -152,5 +153,6 @@ extern void * stb_leakcheck_realloc(void *ptr, size_t sz, char *file, int line);
 extern void   stb_leakcheck_free(void *ptr);
 extern char * stb_leakcheck_strdup(char *s, char *file, int line);
 extern void   stb_leakcheck_dumpmem(void);
+#endif
 
 #endif // INCLUDE_STB_LEAKCHECK_H

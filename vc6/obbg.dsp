@@ -154,6 +154,10 @@ SOURCE=..\src\mesh_builder.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\src\network.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\obbg_data.h
 # End Source File
 # Begin Source File
