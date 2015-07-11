@@ -279,7 +279,7 @@ void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
 
    qsort(consider_mesh, n, sizeof(consider_mesh[0]), stb_floatcmp(offsetof(consider_mesh_t, priority)));
 
-   n = stb_min(n, MAX_BUILT_MESHES);
+   n = stb_min(n, MAX_BUILT_MESHES-16);
 
    m = physics_set_player_coord(rm, MAX_BUILT_MESHES, cam_x, cam_y);
 
