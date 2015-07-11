@@ -2,7 +2,7 @@
 
 #include <SDL_net.h>
 
-
+#if 0
 typedef struct
 {
    uint8 seq;
@@ -13,7 +13,7 @@ typedef struct
    uint8 type;
    uint8 count;
 } record_header;
-
+#endif
 
 #define CLIENT_PORT 4077
 #define SERVER_PORT 4127
