@@ -16,8 +16,8 @@ typedef struct
 #endif
 
 // BUG: the code doesn't convert these to network byte order,
-// but they do it consistently, so it should still be
-// accessing the same port number, so it shouldn't prevent
+// but they fail to consistently, so it should still be
+// sending & receiving the same port number, so it shouldn't prevent
 // it from working. (4077 becomes 60687, and 4127 becomes 7952)
 #define CLIENT_PORT 4077
 #define SERVER_PORT 4127
@@ -44,11 +44,13 @@ Bool net_send(void *buffer, size_t buffer_size)
 
    // one of these must be right!
 
-   send_packet->address.host = (127<<24)+(1 << 0);  // 127.0.0.1
+   send_packet->address.host = (127<<  0)+(1 << 24);  // 127.0.0.1
    res = SDLNet_UDP_Send(receive_socket, -1, send_packet);
+   // currently this returns 1
 
-   send_packet->address.host = (127<< 0)+(1 << 24);  // 1.0.0.127?
+   send_packet->address.host = (127<< 24)+(1 <<  0);  // 1.0.0.127?
    res = SDLNet_UDP_Send(receive_socket, -1, send_packet);
+   // currently this also returns 1
 
    return True;
 }
