@@ -1,5 +1,7 @@
 //#define SINGLE_THREADED_MESHBUILD
 
+#include "obbg_funcs.h"
+
 #define STB_GLEXT_DECLARE "glext_list.h"
 #include "stb_gl.h"
 #include "stb_image.h"
@@ -11,8 +13,6 @@
 #include <math.h>
 
 #include "stb_voxel_render.h"
-#include "obbg_data.h"
-#include "obbg_funcs.h"
 
 GLuint main_prog;
 static GLuint vox_tex[2];

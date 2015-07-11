@@ -2,9 +2,6 @@
 #include <math.h>
 
 
-
-#include "obbg_funcs.h"
-
 #define S_PHYSICS_CACHE_X_LOG2  2
 #define S_PHYSICS_CACHE_Y_LOG2  2
 

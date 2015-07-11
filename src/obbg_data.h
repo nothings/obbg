@@ -1,8 +1,14 @@
 #ifndef INCLUDE_OBBG_DATA_H
 #define INCLUDE_OBBG_DATA_H
 
-#include <assert.h>
 #include "stb.h"
+
+#include <stdlib.h>
+#include <malloc.h>
+
+#include "stb_leakcheck_sdl.h"
+
+#include <assert.h>
 
 typedef int Bool;
 #define True   1

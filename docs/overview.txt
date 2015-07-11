@@ -11,6 +11,10 @@ obbg:
 Done in today's stream:
 
 Previous stream:
+  - refactor physics cache
+  - create an object "system"
+
+Previous stream:
   - refactor mesh generation so single-player client & server can share the threaded workers
 
 Previous stream:

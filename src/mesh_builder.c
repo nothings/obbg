@@ -2,6 +2,7 @@
 //
 //    Both server & client are customers of this process
 
+#include "obbg_data.h"
 
 #define STB_GLEXT_DECLARE "glext_list.h"
 #include "stb_gl.h"
@@ -16,7 +17,6 @@
 #include <assert.h>
 
 #include "u_noise.h"
-#include "obbg_data.h"
 #include "obbg_funcs.h"
 
 #define STBVOX_CONFIG_MODE  1
@@ -148,11 +148,12 @@ static mesh_chunk_status *get_chunk_status_alloc(int x, int y, Bool needs_triang
    if (mcs->status == CHUNK_STATUS_nonempty_chunk_set)
       abandon_mesh_chunk_status(mcs);
 
+   memset(mcs, 0, sizeof(*mcs));
    mcs->status = CHUNK_STATUS_empty_chunk_set;
    mcs->chunk_x = cx;
    mcs->chunk_y = cy;
 
-   if (!needs_triangles) {
+   if (0 && !needs_triangles) {
       int i;
       for (i=0; i < 4; ++i) {
          mcs->chunk_set_valid[0][i] = mcs->chunk_set_valid[3][i] = True;
@@ -1419,9 +1420,9 @@ int worker_manager(void *data)
                if (rm->needs_triangles) {
                   task t;
                   t.cs = mcs->cs;
-                  mcs->status = CHUNK_STATUS_processing;
                   memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
                   memset(&mcs->cs, 0, sizeof(mcs->cs));
+                  mcs->status = CHUNK_STATUS_processing;
                   assert(rm->state == RMS_requested);
                   rm->state = RMS_invalid;
                   t.task_type = JOB_build_mesh;
@@ -1431,26 +1432,36 @@ int worker_manager(void *data)
                } else {
                   mesh_chunk *mc = malloc(sizeof(*mc));
                   built_mesh out_mesh;
-                  mcs->status = CHUNK_STATUS_processing;
                   mc->chunk_x = rm->x >> C_MESH_CHUNK_CACHE_X_LOG2;
                   mc->chunk_y = rm->y >> C_MESH_CHUNK_CACHE_Y_LOG2;
 
                   build_phys_chunk(mc, &mcs->cs, rm->x, rm->y);
+
+                  memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
+                  #if 1
+                  for (i=0; i < 16; ++i)
+                     release_gen_chunk(mcs->cs.chunk[0][i]);
+                  #else
+                  release_gen_chunk(mcs->cs.chunk[1][1]);
+                  release_gen_chunk(mcs->cs.chunk[1][2]);
+                  release_gen_chunk(mcs->cs.chunk[2][1]);
+                  release_gen_chunk(mcs->cs.chunk[2][2]);
+                  for (j=0; j < 4; ++j)
+                     for (i=0; i < 4; ++i)
+                        if (i == 0 || j == 0 || i == 3 || j == 3)
+                           assert(mcs->cs.chunk[j][i] == NULL);
+                  #endif
+                  memset(&mcs->cs, 0, sizeof(mcs->cs));
+
+                  mcs->status = CHUNK_STATUS_processing;
+
                   out_mesh.vertex_build_buffer = 0;
                   out_mesh.face_buffer  = 0;
-                  {
-                     release_gen_chunk(mcs->cs.chunk[1][1]);
-                     release_gen_chunk(mcs->cs.chunk[1][2]);
-                     release_gen_chunk(mcs->cs.chunk[2][1]);
-                     release_gen_chunk(mcs->cs.chunk[2][2]);
-                  }
                   out_mesh.mc = mc;
                   out_mesh.mc->has_triangles = False;
                   if (!add_to_queue(&built_meshes, &out_mesh)) {
                      free(out_mesh.mc);
                   }
-                  memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
-                  memset(&mcs->cs, 0, sizeof(mcs->cs));
                   assert(rm->state == RMS_requested);
                   rm->state = RMS_invalid;
                }

@@ -174,6 +174,10 @@ SOURCE=..\src\server.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\src\stb_leakcheck_sdl.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\texture_loader.cpp
 # End Source File
 # Begin Source File

@@ -5,8 +5,12 @@
 #include <windows.h>
 
 // stb.h
+#include "stb_leakcheck_sdl.h"
+
 #define STB_DEFINE
 #include "stb.h"
+
+#include "obbg_funcs.h"
 
 // stb_gl.h
 #define STB_GL_IMPLEMENTATION
@@ -28,8 +32,6 @@
 
 // stb_easy_font.h
 #include "stb_easy_font.h" // doesn't require an IMPLEMENTATION
-
-#include "obbg_funcs.h"
 
 char *game_name = "obbg";
 
@@ -237,7 +239,7 @@ float pending_dt;
 void process_tick(float dt)
 {
    dt += pending_dt;
-   //pending_dt = 0;
+   pending_dt = 0;
    while (dt > 1.0f/60) {
       process_tick_raw(1.0f/60);
       dt -= 1.0f/60;
