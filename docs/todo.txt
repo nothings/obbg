@@ -1,5 +1,8 @@
 Possible tasks to work on next:
 
+   Cleanup:
+   -  let OS pick the client's port
+
    Look prettier:
    -  add skylight
    -  more work on terrain -- zmc pseudo-wang tile approach
