@@ -242,11 +242,38 @@ float pending_dt;
 
 void process_tick(float dt)
 {
-   object o;
    dt += pending_dt;
    pending_dt = 0;
    while (dt > 1.0f/60) {
       #ifdef MULTIPLAYER
+      if (is_server) {
+         server_net_tick();
+         process_tick_raw(1.0f/60);
+      } else {
+         client_view_physics(player_id, &client_player_input, dt);
+         client_net_tick();
+      }
+      #else
+      client_view_physics(player_id, &client_player_input, dt);
+      process_tick_raw(1.0f/60);
+      #endif
+      dt -= 1.0f/60;
+   }
+   pending_dt += dt;
+   #if 0
+   if (is_server) {
+      while (net_receive(&client_player_input, sizeof(client_player_input)) >= 0)
+         ;
+   } else {
+      while (net_receive(&o, sizeof(o)) >= 0) {
+         obj[player_id].position = o.position;
+         obj[player_id].velocity = o.velocity;
+      }
+   }
+   #endif
+}
+
+#if 0
       if (is_server) {
          net_receive(&client_player_input, sizeof(client_player_input));
          obj[player_id].ang = client_player_input.ang;
@@ -263,23 +290,7 @@ void process_tick(float dt)
             obj[player_id].velocity = o.velocity;
          }
       }
-      #else
-      client_view_physics(player_id, &client_player_input, dt);
-      process_tick_raw(1.0f/60);
-      #endif
-      dt -= 1.0f/60;
-   }
-   pending_dt += dt;
-   if (is_server) {
-      while (net_receive(&client_player_input, sizeof(client_player_input)) >= 0)
-         ;
-   } else {
-      while (net_receive(&o, sizeof(o)) >= 0) {
-         obj[player_id].position = o.position;
-         obj[player_id].velocity = o.velocity;
-      }
-   }
-}
+#endif
 
 void update_view(float dx, float dy)
 {
@@ -367,20 +378,23 @@ float player_zoom = 1.0f;
 
 void render_objects(void)
 {
+   int i;
    vec sz;
    vec pos;
    glColor3f(1,1,1);
    glDisable(GL_TEXTURE_2D);
    stbgl_drawBox(light_pos[0], light_pos[1], light_pos[2], 3,3,3, 1);
 
-   if (third_person) {
-      sz.x = camera_bounds[1][0] - camera_bounds[0][0];
-      sz.y = camera_bounds[1][1] - camera_bounds[0][1];
-      sz.z = camera_bounds[1][2] - camera_bounds[0][2];
-      pos.x = obj[player_id].position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
-      pos.y = obj[player_id].position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
-      pos.z = obj[player_id].position.z + (camera_bounds[1][2] + camera_bounds[0][2])/2;
-      stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
+   for (i=1; i < max_player_id; ++i) {
+      if (obj[i].valid && (i != player_id || third_person)) {
+         sz.x = camera_bounds[1][0] - camera_bounds[0][0];
+         sz.y = camera_bounds[1][1] - camera_bounds[0][1];
+         sz.z = camera_bounds[1][2] - camera_bounds[0][2];
+         pos.x = obj[i].position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
+         pos.y = obj[i].position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
+         pos.z = obj[i].position.z + (camera_bounds[1][2] + camera_bounds[0][2])/2;
+         stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
+      }
    }
 }
 
@@ -730,12 +744,16 @@ Bool networking;
 //void stbwingraph_main(void)
 int SDL_main(int argc, char **argv)
 {
+   int port = 4077;
    SDL_Init(SDL_INIT_VIDEO);
 
    client_player_input.flying = True;
 
    if (argc > 1 && !strcmp(argv[1], "--server")) {
       is_server = True;
+   }
+   if (argc > 2 && !strcmp(argv[1], "--port")) {
+      port = atoi(argv[2]);
    }
 
    //prepare_threads();
@@ -755,8 +773,14 @@ int SDL_main(int argc, char **argv)
 
    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
+   #if 0
    screen_x = 1920;
    screen_y = 1080;
+   #else
+   screen_x = 1280;
+   screen_y = 720;
+   #endif
+
    if (is_server) {
       screen_x = 320;
       screen_y = 200;
@@ -792,7 +816,7 @@ int SDL_main(int argc, char **argv)
 
    SDL_GL_SetSwapInterval(1);
 
-   networking = net_init();
+   networking = net_init(port);
 
    render_init();
    //mesh_init();

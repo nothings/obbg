@@ -115,8 +115,7 @@ typedef struct
    vec ang;
    vec velocity;
 
-   uint8  valid;
-   uint8  padding[3];
+   uint32 valid;
 } object;
 
 typedef struct
@@ -181,5 +180,5 @@ extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 extern unsigned char tex1_for_blocktype[256][6];
 
 extern Bool is_server;
-
+extern player_controls p_input[PLAYER_OBJECT_MAX];
 #endif

@@ -34,8 +34,16 @@ extern objid allocate_object(void);
 extern objid allocate_player(void);
 extern void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z);
 
-extern Bool net_init(void);
-extern Bool net_send(void *buffer, size_t buffer_size);
-extern int  net_receive(void *buffer, size_t buffer_size);
+typedef struct
+{
+   uint32 host;
+   uint16 port;
+} address;
+
+extern Bool net_init(int port);
+extern Bool net_send(void *buffer, size_t buffer_size, address *addr);
+extern int  net_receive(void *buffer, size_t buffer_size, address *addr);
 extern void client_view_physics(objid oid, player_controls *con, float dt);
+extern void client_net_tick(void);
+extern void server_net_tick(void);
 #endif

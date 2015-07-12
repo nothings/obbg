@@ -5,6 +5,7 @@
 
 object obj[MAX_OBJECTS];
 // player_object obj[PLAYER_OBJECT_MAX];
+player_controls p_input[PLAYER_OBJECT_MAX];
 
 objid max_obj_id, max_player_id;
 

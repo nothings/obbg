@@ -28,11 +28,11 @@ objid player_id;
 
 void world_init(void)
 {
-   player_id = allocate_player();
+   //player_id = allocate_player();
 
    obj[player_id].position.x = 0;
    obj[player_id].position.y = 0;
-   obj[player_id].position.z = 150;
+   obj[player_id].position.z = 180;
 }
 
 float square(float x) { return x*x; }
@@ -161,7 +161,7 @@ void process_tick_raw(float dt)
 
    for (i=1; i < max_player_id; ++i)
       if (obj[i].valid)
-         player_physics((objid) i, &client_player_input, dt);
+         player_physics((objid) i, &p_input[i], dt);
 
    light_pos[0] += light_vel[0] * dt;
    light_pos[1] += light_vel[1] * dt;
