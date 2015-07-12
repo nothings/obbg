@@ -11,6 +11,11 @@ obbg:
 Done in today's stream:
 
 Previous stream:
+  - debugged potential memory leak
+     - really just using too much memory for 32-bit
+  - start hooking up SDL_net  
+
+Previous stream:
   - refactor physics cache
   - create an object "system"
 

@@ -701,12 +701,10 @@ int SDL_main(int argc, char **argv)
 {
    SDL_Init(SDL_INIT_VIDEO);
 
-   networking = (SDLNet_Init() == 0);
-
    client_player_input.flying = True;
 
    if (argc > 1 && !strcmp(argv[1], "--server")) {
-      is_server = 1;
+      is_server = True;
    }
 
    //prepare_threads();
@@ -759,11 +757,11 @@ int SDL_main(int argc, char **argv)
 
    SDL_GL_SetSwapInterval(1);
 
+   networking = net_init();
+
    render_init();
    //mesh_init();
    world_init();
-
-   net_init();
 
    initialized = 1;
 

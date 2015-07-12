@@ -50,7 +50,11 @@ float table4[128][4];
 GLint tablei[2];
 GLuint uniform_loc[STBVOX_UNIFORM_count];
 
+#if VIEW_DIST_LOG2 < 11
+int view_distance=200;
+#else
 int view_distance=1800;
+#endif
 
 void setup_uniforms(float pos[3])
 {

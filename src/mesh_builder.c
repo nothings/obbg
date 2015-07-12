@@ -1498,6 +1498,10 @@ void init_mesh_build_threads(void)
    if (num_mesh_workers > MAX_MESH_WORKERS)
       num_mesh_workers = MAX_MESH_WORKERS;
 
+   #ifdef MINIMIZE_MEMORY
+   num_mesh_workers = 1;
+   #endif
+
    if (num_mesh_workers < 1)
       num_mesh_workers = 1;
 

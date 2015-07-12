@@ -1,6 +1,8 @@
 #ifndef INCLUDE_OBBG_DATA_H
 #define INCLUDE_OBBG_DATA_H
 
+#define MINIMIZE_MEMORY
+
 #include "stb.h"
 
 #include <stdlib.h>
@@ -16,7 +18,12 @@ typedef int Bool;
 
 #define MAX_Z                    255
 
+#ifdef MINIMIZE_MEMORY
+#define VIEW_DIST_LOG2            9
+#else
 #define VIEW_DIST_LOG2            11
+#endif
+
 #define C_CACHE_RADIUS_LOG2        (VIEW_DIST_LOG2+1)
 
 #define MESH_CHUNK_SIZE_X_LOG2    6
