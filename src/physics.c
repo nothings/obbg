@@ -46,18 +46,20 @@ int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py)
    player_cx = C_MESH_CHUNK_X_FOR_WORLD_X(player_x);
    player_cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(player_y);
 
-   for (j=0; j < S_PHYSICS_CACHE_Y; ++j) {
-      for (i=0; i < S_PHYSICS_CACHE_X; ++i) {
-         int rx = player_cx - S_PHYSICS_CACHE_X/2 + i;
-         int ry = player_cy - S_PHYSICS_CACHE_Y/2 + j;
-         mesh_chunk *phys_cache_mc = &s_phys_cache[ry & (S_PHYSICS_CACHE_Y-1)][rx & (S_PHYSICS_CACHE_X-1)];
-         if (phys_cache_mc->chunk_x != rx || phys_cache_mc->chunk_y != ry) {
-            if (n < max_req) {
-               rm[n].x = rx << MESH_CHUNK_SIZE_X_LOG2;
-               rm[n].y = ry << MESH_CHUNK_SIZE_Y_LOG2;
-               rm[n].state = RMS_requested;
-               rm[n].needs_triangles = False;
-               ++n;
+   if (rm != NULL) {
+      for (j=0; j < S_PHYSICS_CACHE_Y; ++j) {
+         for (i=0; i < S_PHYSICS_CACHE_X; ++i) {
+            int rx = player_cx - S_PHYSICS_CACHE_X/2 + i;
+            int ry = player_cy - S_PHYSICS_CACHE_Y/2 + j;
+            mesh_chunk *phys_cache_mc = &s_phys_cache[ry & (S_PHYSICS_CACHE_Y-1)][rx & (S_PHYSICS_CACHE_X-1)];
+            if (phys_cache_mc->chunk_x != rx || phys_cache_mc->chunk_y != ry) {
+               if (n < max_req) {
+                  rm[n].x = rx << MESH_CHUNK_SIZE_X_LOG2;
+                  rm[n].y = ry << MESH_CHUNK_SIZE_Y_LOG2;
+                  rm[n].state = RMS_requested;
+                  rm[n].needs_triangles = False;
+                  ++n;
+               }
             }
          }
       }
@@ -65,11 +67,7 @@ int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py)
 
    update_physics_cache_feedback();
 
-   #if 1
    return n;
-   #else
-   return 0;
-   #endif
 }
 
 void physics_process_mesh_chunk(mesh_chunk *mc)

@@ -159,8 +159,6 @@ void process_tick_raw(float dt)
 {
    int i;
 
-   client_view_physics(player_id, &client_player_input, dt);
-
    for (i=1; i < max_player_id; ++i)
       if (obj[i].valid)
          player_physics((objid) i, &client_player_input, dt);

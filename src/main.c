@@ -36,6 +36,8 @@
 
 char *game_name = "obbg";
 
+Bool is_server;
+
 
 #define REVERSE_DEPTH
 
@@ -236,16 +238,47 @@ float pending_view_z;
 player_controls client_player_input;
 
 float pending_dt;
+#define MULTIPLAYER
 
 void process_tick(float dt)
 {
+   object o;
    dt += pending_dt;
    pending_dt = 0;
    while (dt > 1.0f/60) {
+      #ifdef MULTIPLAYER
+      if (is_server) {
+         net_receive(&client_player_input, sizeof(client_player_input));
+         obj[player_id].ang = client_player_input.ang;
+         //physics_set_player_coord(NULL, 0, (int) obj[player_id].position.x, (int) obj[player_id].position_y);
+         process_tick_raw(1.0f/60);
+         net_send(&obj[player_id], sizeof(obj[player_id]));
+      } else {
+         client_player_input.ang = obj[player_id].ang;
+         net_send(&client_player_input, sizeof(client_player_input));
+         client_view_physics(player_id, &client_player_input, dt);
+         o = obj[player_id];
+         if (net_receive(&o, sizeof(o))) {
+            obj[player_id].position = o.position;
+            obj[player_id].velocity = o.velocity;
+         }
+      }
+      #else
+      client_view_physics(player_id, &client_player_input, dt);
       process_tick_raw(1.0f/60);
+      #endif
       dt -= 1.0f/60;
    }
    pending_dt += dt;
+   if (is_server) {
+      while (net_receive(&client_player_input, sizeof(client_player_input)) >= 0)
+         ;
+   } else {
+      while (net_receive(&o, sizeof(o)) >= 0) {
+         obj[player_id].position = o.position;
+         obj[player_id].velocity = o.velocity;
+      }
+   }
 }
 
 void update_view(float dx, float dy)
@@ -302,7 +335,7 @@ void draw_stats(void)
    print("View distance: %d blocks", view_dist_for_display);
    print("x=%5.2f, y=%5.2f, z=%5.2f", obj[player_id].position.x, obj[player_id].position.y, obj[player_id].position.z);
    print("%s", glGetString(GL_RENDERER));
-   #if 0
+   #if 1
    for (i=0; i < 4; ++i)
       print("[ %4d,%4d  %4d,%4d  %4d,%4d  %4d,%4d ]",
                                    physics_cache_feedback[i][0].x, physics_cache_feedback[i][0].y, 
@@ -693,8 +726,6 @@ extern float compute_height_field(int x, int y);
 
 Bool networking;
 
-Bool is_server;
-
 
 //void stbwingraph_main(void)
 int SDL_main(int argc, char **argv)
@@ -726,6 +757,10 @@ int SDL_main(int argc, char **argv)
 
    screen_x = 1920;
    screen_y = 1080;
+   if (is_server) {
+      screen_x = 320;
+      screen_y = 200;
+   }
 
    window = SDL_CreateWindow("obbg", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                    screen_x, screen_y,

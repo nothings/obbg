@@ -108,16 +108,19 @@ enum
    CHUNK_STATUS_processing
 };
 
+#define MESH_STATUS_X   64
+#define MESH_STATUS_Y   64
+
        mesh_chunk      *c_mesh_cache[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
 
-static mesh_chunk_status mesh_status[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X][2];
+static mesh_chunk_status mesh_status[MESH_STATUS_Y][MESH_STATUS_X][2];
 static gen_chunk_cache    gen_cache [   GEN_CHUNK_CACHE_Y][   GEN_CHUNK_CACHE_X];
 
 static mesh_chunk_status *get_chunk_status(int x, int y, Bool needs_triangles)
 {
    int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
    int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   mesh_chunk_status *mcs = &mesh_status[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)][needs_triangles];
+   mesh_chunk_status *mcs = &mesh_status[cy & (MESH_STATUS_Y-1)][cx & (MESH_STATUS_X-1)][needs_triangles];
    if (mcs->chunk_x == cx && mcs->chunk_y == cy)
       return mcs;
    return NULL;
@@ -141,7 +144,7 @@ static mesh_chunk_status *get_chunk_status_alloc(int x, int y, Bool needs_triang
 {
    int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
    int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   mesh_chunk_status *mcs = &mesh_status[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)][needs_triangles];
+   mesh_chunk_status *mcs = &mesh_status[cy & (MESH_STATUS_Y-1)][cx & (MESH_STATUS_X-1)][needs_triangles];
    if (mcs->chunk_x == cx && mcs->chunk_y == cy)
       return mcs;
 
@@ -1020,7 +1023,8 @@ mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
    return mc;
 }
 
-#define MAX_MESH_WORKERS 8
+//#define MAX_MESH_WORKERS 8
+#define MAX_MESH_WORKERS 3
 
 enum
 {
@@ -1276,8 +1280,8 @@ int mesh_worker_handler(void *data)
 
                stbvox_init_mesh_maker(&mm);
 
-               mc->chunk_x = t.world_x >> C_MESH_CHUNK_CACHE_X_LOG2;
-               mc->chunk_y = t.world_y >> C_MESH_CHUNK_CACHE_Y_LOG2;
+               mc->chunk_x = t.world_x >> MESH_CHUNK_SIZE_X_LOG2;
+               mc->chunk_y = t.world_y >> MESH_CHUNK_SIZE_Y_LOG2;
 
                //validate(t.cs.chunk[1][1]);
                //validate(t.cs.chunk[2][1]);
@@ -1432,8 +1436,8 @@ int worker_manager(void *data)
                } else {
                   mesh_chunk *mc = malloc(sizeof(*mc));
                   built_mesh out_mesh;
-                  mc->chunk_x = rm->x >> C_MESH_CHUNK_CACHE_X_LOG2;
-                  mc->chunk_y = rm->y >> C_MESH_CHUNK_CACHE_Y_LOG2;
+                  mc->chunk_x = rm->x >> MESH_CHUNK_SIZE_X_LOG2;
+                  mc->chunk_y = rm->y >> MESH_CHUNK_SIZE_Y_LOG2;
 
                   build_phys_chunk(mc, &mcs->cs, rm->x, rm->y);
 
@@ -1499,7 +1503,7 @@ void init_mesh_build_threads(void)
       num_mesh_workers = MAX_MESH_WORKERS;
 
    #ifdef MINIMIZE_MEMORY
-   num_mesh_workers = 1;
+   //num_mesh_workers = 1;
    #endif
 
    if (num_mesh_workers < 1)

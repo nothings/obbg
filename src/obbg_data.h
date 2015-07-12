@@ -124,6 +124,7 @@ typedef struct
    uint16 buttons;
    float view_x, view_z;
    Bool flying;
+   vec   ang;
 } player_controls;
 
 extern player_controls client_player_input;

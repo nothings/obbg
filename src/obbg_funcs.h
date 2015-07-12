@@ -33,5 +33,9 @@ extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int
 extern objid allocate_object(void);
 extern objid allocate_player(void);
 extern void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z);
+
 extern Bool net_init(void);
+extern Bool net_send(void *buffer, size_t buffer_size);
+extern int  net_receive(void *buffer, size_t buffer_size);
+extern void client_view_physics(objid oid, player_controls *con, float dt);
 #endif
