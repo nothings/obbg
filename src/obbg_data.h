@@ -124,7 +124,8 @@ typedef struct
    uint16 view_x, view_z;
 } player_net_controls; // 6 bytes    (6 * 10 + 28 = 88 bytes/packet, * 30/sec = 2640 bytes/sec)
 
-#define NUM_INPUTS_PER_PACKET  10
+
+#define NUM_INPUTS_PER_PACKET     6  // 100 ms buffer with 30hz packets = each 60hz input in 3 packets
 #define INPUT_PACKETS_PER_SECOND  30
 
 typedef struct

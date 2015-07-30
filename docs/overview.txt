@@ -9,6 +9,10 @@ obbg:
   - networking
 
 Done in today's stream:
+  - send multiple client inputs in one packet
+  - let OS pick the client's port
+  - much research into how to do client/server right
+  - pseudo-code design of networking
 
 Previous stream:
   - primitive networking

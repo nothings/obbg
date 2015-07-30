@@ -1,3 +1,86 @@
+// Four approaches to server-side physics when doing
+// client-side prediction and receiving only player-input
+// from clients:
+//
+//   - 1. buffer client input for some length of time, then
+//        execute a global tick for entire system at once
+//
+//   - 2. simulate globally-timed state; late client input rewinds
+//        time, simulates that client forward (against *cached*
+//        states), emits state to client as it goes forward,
+//        avoids changing anything else so all other clients
+//        only need updating about this client's state
+//
+//   - 3. simulate globally-timed state; late client input rewinds
+//        time, simulates all clients forward again, may need
+//        to update already-sent state with newer, more correct
+//        values
+//
+//   - 4. simulate opportunistically as soon as you get client
+//        input; all physics state is unchanging while client
+//        is simulating
+//
+// "late client input" is just for expository purposes; effectively,
+// all client input is late by a variable amount (varying depending
+// on lag/dropped packets).
+
+/*
+
+ Stuff marked + or * must _all_ be implemented before the new
+ system will even feebly work. Marked with + means it can be dummied.
+
+   server main loop at 60hz:
+ *    1. accumulate timestamped inputs from clients over network
+ *    2. simulate 1 tick using corresponding input from client  (how to determine correspondence?)
+ *    3. for each client:
+      3a.   check accuracy of client-predicted position
+      3b.      add highest-priority client state to non-reliable list
+      4.    put relevent voxel changes in reliable list
+               - also map downloading as player moves around
+ *    5.    for each entity:
+ +    6.       compute min update time (1 over max update rate)
+      7.       if time-since-last is higher than min update time
+      8.          compute priority based on:
+                     - deviation from dead-reckoning (requires knowing last time client saw state)
+                     - time-since-last
+                     - distance
+                     - view direction (minimal contribution since player can instantly change view direction)
+                        - if player is zoomed in, need to demphasize distance if in view direction
+                     - relevance (e.g. player-is-attached-to)
+                     - importance (absolute player-independent)
+      9.          if priority is sufficiently high, or we are on every 3rd packet,
+ *   10.             add state to pending non-reliable list w/priority
+     11.       add reliable-state-changes for this entity to reliable list
+     12.    sort non-reliable list
+ *   13.    build UDP packets containing:
+     14.       as much reliable state as reliable-stream-layer requires
+ *   15.       as much non-reliable data as will fit in rest of packet
+     16.       packet-size determined by unused bandwidth relative to max consumed bandwidth
+ *   17.    send packet(s)--may be 0 if nothing is updating
+   // intent of above algorithms:
+   //    - reliable data takes precedence over non-reliable data as needed
+   //        - (especially as it gets resent, because it gets staler)
+   //    - if no high-frequency data needs sending, packets are quantized to 20hz
+   //        (60hz updating is hopefully totally unnecessary, but this allows
+   //         for the possibility, which is the kind of flexibility OBBG is intended to have)
+
+   client main loop:
+ *    0. for as many 60hz ticks since last frame:
+ *    1.   collect player input
+ +    2.   collect server updates into 100ms buffer
+ *    3.   store player input into network output buffer
+ +    4.   if odd tick, send network output buffer
+      5.   store player input into replay buffer
+      6.   if player-state correction packet:
+      7.     rewind to time of correction, replay player input from time
+ *    8.   interpolate positions from buffered server states
+      9.   extrapolate positions/state where dead reckoning
+ *   10.   simulate player physics
+     10. render
+*/
+
+
+
 #include "obbg_funcs.h"
 #include <math.h>
 

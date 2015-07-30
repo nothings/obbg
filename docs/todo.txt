@@ -1,15 +1,14 @@
 Possible tasks to work on next:
 
-   Cleanup:
-   -  let OS pick the client's port
-
    Networking:
    -  client transmits last N inputs
    -  client replays last K inputs relative to server update data
+   -  server buffers M inputs from client
    -  server sends sparser updates
    -  client interpolates between recent server updates
       - and extrapolates if necessary?!?
    -  replace SDL_Net with a lighter-weight #define socket wrapper
+      - http://gafferongames.com/networking-for-game-programmers/sending-and-receiving-packets/
 
    Look prettier:
    -  add skylight
