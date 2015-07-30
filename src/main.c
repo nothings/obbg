@@ -744,7 +744,7 @@ Bool networking;
 //void stbwingraph_main(void)
 int SDL_main(int argc, char **argv)
 {
-   int port = 4077;
+   int port = 0;
    SDL_Init(SDL_INIT_VIDEO);
 
    client_player_input.flying = True;
