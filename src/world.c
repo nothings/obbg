@@ -42,15 +42,15 @@ void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y,
    float vec[3] = { cam_x, cam_y, cam_z };
    float t[3];
    float s,c;
-   s = (float) sin(obj[oid].ang.x*3.141592/180);
-   c = (float) cos(obj[oid].ang.x*3.141592/180);
+   s = (float) sin(obj[oid].ang.x*M_PI/180);
+   c = (float) cos(obj[oid].ang.x*M_PI/180);
 
    t[0] = vec[0];
    t[1] = c*vec[1] - s*vec[2];
    t[2] = s*vec[1] + c*vec[2];
 
-   s = (float) sin(obj[oid].ang.z*3.141592/180);
-   c = (float) cos(obj[oid].ang.z*3.141592/180);
+   s = (float) sin(obj[oid].ang.z*M_PI/180);
+   c = (float) cos(obj[oid].ang.z*M_PI/180);
    world[0] = c*t[0] - s*t[1];
    world[1] = s*t[0] + c*t[1];
    world[2] = t[2];

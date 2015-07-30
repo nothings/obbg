@@ -121,9 +121,24 @@ typedef struct
 typedef struct
 {
    uint16 buttons;
-   float view_x, view_z;
-   Bool flying;
-   vec   ang;
+   uint16 view_x, view_z;
+} player_net_controls; // 6 bytes    (6 * 10 + 28 = 88 bytes/packet, * 30/sec = 2640 bytes/sec)
+
+#define NUM_INPUTS_PER_PACKET  10
+#define INPUT_PACKETS_PER_SECOND  30
+
+typedef struct
+{
+   uint8 type;
+   uint8 sequence;
+   player_net_controls last_inputs[NUM_INPUTS_PER_PACKET];
+} net_client_input;
+
+typedef struct
+{
+   uint16 buttons;
+   Bool flying;   // this becomes a button or a command
+   vec   ang;     // this should be redundant to view_x,view_z
 } player_controls;
 
 extern player_controls client_player_input;

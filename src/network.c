@@ -1,4 +1,5 @@
 #include "obbg_funcs.h"
+#include <math.h>
 
 #include <SDL_net.h>
 
@@ -114,10 +115,23 @@ int find_connection(address *addr)
    return -1;
 }
 
+float angle_from_network(uint16 iang)
+{
+   return iang / 65536.0f * 360;
+}
+
+uint16 angle_to_network(float ang)
+{
+   int iang = (int) (ang/360 * 65536);
+   if (iang >= 65536) iang = 65535;
+   return iang;
+}
+
 void server_net_tick(void)
 {
    int i;
-   player_controls input;
+   net_client_input input;
+
    address addr;
    while (net_receive(&input, sizeof(input), &addr) >= 0) {
       int n = find_connection(&addr);
@@ -126,8 +140,9 @@ void server_net_tick(void)
          if (n < 0)
             continue;
       }
-      p_input[connection[n].pid] = input;
-      obj[connection[n].pid].ang = input.ang;
+      p_input[connection[n].pid].buttons = input.last_inputs[0].buttons;
+      obj[connection[n].pid].ang.x = angle_from_network(input.last_inputs[0].view_x) - 90;
+      obj[connection[n].pid].ang.z = angle_from_network(input.last_inputs[0].view_z);
    }
 
    for (i=1; i < max_player_id; ++i) {
@@ -139,15 +154,34 @@ void server_net_tick(void)
    }
 }
 
+static net_client_input input;
 void client_net_tick(void)
 {
    int i;
    vec ang;
    address receive_addr;
-   client_player_input.ang = obj[player_id].ang;
-   net_send(&client_player_input, sizeof(client_player_input), &server_address);
 
    ang = obj[player_id].ang;
+
+   ang.x += 90;
+   ang.x = (float) fmod(ang.x, 360);
+   if (ang.x < 0) ang.x += 360;
+   ang.z = (float) fmod(ang.z, 360);
+   if (ang.z < 0) ang.z += 360;
+
+   input.sequence += 1;
+   input.type = 0;
+   memmove(&input.last_inputs[1], &input.last_inputs[0], sizeof(input.last_inputs) - sizeof(input.last_inputs[0]));
+
+   input.last_inputs[0].buttons = client_player_input.buttons;
+   input.last_inputs[0].view_x = angle_to_network(ang.x);
+   input.last_inputs[0].view_z = angle_to_network(ang.z);
+
+   ang.x -= 90;   
+   obj[player_id].ang = ang;
+
+   net_send(&input, sizeof(input), &server_address);
+
    while (net_receive(obj, sizeof(obj[0])*8, &receive_addr) >= 0) {
       // @TODO: veryify receive_addr == server_address
       obj[player_id].ang = ang;
