@@ -1,4 +1,4 @@
-// Four approaches to server-side physics when doing
+// Four approaches to server-side "physics" when doing
 // client-side prediction and receiving only player-input
 // from clients:
 //
