@@ -1,6 +1,8 @@
 // Four approaches to server-side "physics" when doing
 // client-side prediction and receiving only player-input
-// from clients:
+// from clients (note that this is totally independent
+// of client-side prediction or interpolation, and related
+// to but different from lag compensation for shooting guns):
 //
 //   - 1. buffer client input for some length of time, then
 //        execute a global tick for entire system at once
