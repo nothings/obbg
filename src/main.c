@@ -247,8 +247,9 @@ void process_tick(float dt)
    while (dt > 1.0f/60) {
       #ifdef MULTIPLAYER
       if (is_server) {
-         server_net_tick();
+         server_net_tick_pre_physics();
          process_tick_raw(1.0f/60);
+         server_net_tick_post_physics();
       } else {
          client_view_physics(player_id, &client_player_input, dt);
          client_net_tick();

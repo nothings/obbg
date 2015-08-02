@@ -16,6 +16,14 @@ typedef int Bool;
 #define True   1
 #define False  0
 
+#ifdef _MSC_VER
+   typedef __int64 int64;
+   typedef unsigned __int64 uint64;
+#else
+   typedef long long int64;
+   typedef unsigned long long uint64;
+#endif
+
 #define MAX_Z                    255
 
 #ifdef MINIMIZE_MEMORY
@@ -116,6 +124,7 @@ typedef struct
    vec velocity;
 
    uint32 valid;
+   uint32 sent_fields; // used only as part of the server version history
 } object;
 
 typedef struct
@@ -133,8 +142,13 @@ typedef struct
 
 extern player_controls client_player_input;
 
-#define MAX_OBJECTS 65536
-#define PLAYER_OBJECT_MAX  1024
+#ifdef IS_64_BIT  // this doesn't exist yet and should be a different symbol
+#define MAX_OBJECTS        32768
+#define PLAYER_OBJECT_MAX   1024
+#else
+#define MAX_OBJECTS         8192
+#define PLAYER_OBJECT_MAX    256
+#endif
 
 extern object obj[MAX_OBJECTS];
 

@@ -45,5 +45,7 @@ extern Bool net_send(void *buffer, size_t buffer_size, address *addr);
 extern int  net_receive(void *buffer, size_t buffer_size, address *addr);
 extern void client_view_physics(objid oid, player_controls *con, float dt);
 extern void client_net_tick(void);
-extern void server_net_tick(void);
+extern void server_net_tick_pre_physics(void);
+extern void server_net_tick_post_physics(void);
+
 #endif

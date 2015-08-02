@@ -105,7 +105,7 @@ mesh_chunk *get_physics_chunk_for_coord(int x, int y)
 
 #define COLLIDE_BLOB_X   8
 #define COLLIDE_BLOB_Y   8
-#define COLLIDE_BLOB_Z   8
+#define COLLIDE_BLOB_Z   12
 
 typedef struct
 {
@@ -239,7 +239,7 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
             assert(!collision_test_box(&cg, x,y,z,size));
             z = (float) floor(z + size[0][2]) - size[0][2];
             assert(!collision_test_box(&cg, x,y,z,size));
-            while (!collision_test_box(&cg, x,y,z-1,size))
+            while (!collision_test_box(&cg, x,y,z-1,size) && z-1 >= min_z)
                z -= 1;
             assert(z >= min_z - Z_EPSILON);
             vel->z = 0;

@@ -145,24 +145,12 @@
 
 #include <SDL_net.h>
 
-#if 0
-typedef struct
-{
-   uint8 seq;
-} packet_header;
-
-typedef struct
-{
-   uint8 type;
-   uint8 count;
-} record_header;
-#endif
-
 static UDPsocket receive_socket;
 static UDPpacket *receive_packet;
 static UDPpacket *send_packet;
 
-#define MAX_SAFE_PACKET_SIZE  512
+#define MAX_PACKET_SIZE  512
+
 
 typedef struct
 {
@@ -216,8 +204,8 @@ Bool net_init(Bool server, int server_port)
       return False;
 
    receive_socket = SDLNet_UDP_Open(server ? server_port : 0);
-   receive_packet = SDLNet_AllocPacket(MAX_SAFE_PACKET_SIZE);
-   send_packet    = SDLNet_AllocPacket(MAX_SAFE_PACKET_SIZE);
+   receive_packet = SDLNet_AllocPacket(MAX_PACKET_SIZE);
+   send_packet    = SDLNet_AllocPacket(MAX_PACKET_SIZE);
 
    server_address.host = (127<<24) + 1;
    server_address.port = server_port;
@@ -260,12 +248,43 @@ int find_connection(address *addr)
 #define NUM_INPUTS_PER_PACKET     6  // 100 ms buffer with 30hz packets = each 60hz input in 3 packets
 #define INPUT_PACKETS_PER_SECOND  30
 
+#define MAX_SERVER_STATE_HISTORY       8
+#define MAX_CLIENT_INPUT_HISTORY      12
+#define MAX_CLIENT_FRAME_NUMBER_LOG2   7 
+#define MAX_CLIENT_FRAME_NUMBER       (1 << MAX_CLIENT_FRAME_NUMBER_LOG2)
+
+#define CLIENT_FRAME_NUMBER_MASK      (MAX_CLIENT_FRAME_NUMBER-1)
+#define CLIENT_FRAME_HALFWAY_POINT    (MAX_CLIENT_FRAME_NUMBER/2)
+
+// buffer is stored so input[0] is always at server_timestamp
 typedef struct
 {
-   uint8 type;
+   player_net_controls input[MAX_CLIENT_INPUT_HISTORY];
+   uint64 client_input_offset;
+   int saw_frame_past_halfway;
+} player_input_history;
+
+player_input_history phistory[PLAYER_OBJECT_MAX];
+
+typedef struct
+{
    uint8 sequence;
+   uint8 frame;
    player_net_controls last_inputs[NUM_INPUTS_PER_PACKET];
 } net_client_input;
+
+typedef struct
+{
+   uint8 sequence;
+} player_output_history;
+
+player_output_history outhistory[PLAYER_OBJECT_MAX];
+
+typedef struct
+{
+   object (*obj)[MAX_SERVER_STATE_HISTORY];
+   uint64 timestamp[MAX_SERVER_STATE_HISTORY];
+} versioned_object_system;
 
 float angle_from_network(uint16 iang)
 {
@@ -279,7 +298,44 @@ uint16 angle_to_network(float ang)
    return iang;
 }
 
-void server_net_tick(void)
+uint64 server_timestamp = 1U<<24;
+
+//      p_input[connection[n].pid].buttons = input.last_inputs[0].buttons;
+//      obj[connection[n].pid].ang.x = angle_from_network(input.last_inputs[0].view_x) - 90;
+//      obj[connection[n].pid].ang.z = angle_from_network(input.last_inputs[0].view_z);
+void process_player_input(objid pid, net_client_input *input)
+{
+   int i;
+   uint64 input_timestamp;
+
+   if (input->frame < CLIENT_FRAME_HALFWAY_POINT && phistory[pid].saw_frame_past_halfway) {
+      player_input_history *p = &phistory[pid];
+      p->client_input_offset += MAX_CLIENT_FRAME_NUMBER;
+
+      // if the input frame is no longer in the valid window, recompute an client offset clock;
+      // @TODO: avoid doing this too frequently
+      if (p->client_input_offset + input->frame < server_timestamp || p->client_input_offset + input->frame >= server_timestamp + MAX_CLIENT_INPUT_HISTORY) {
+         p->client_input_offset = server_timestamp + MAX_CLIENT_INPUT_HISTORY/2 - input->frame;
+      }
+
+      phistory[pid].saw_frame_past_halfway = False;
+   }
+
+   if (input->frame > CLIENT_FRAME_HALFWAY_POINT)
+      phistory[pid].saw_frame_past_halfway = True;
+
+   input_timestamp = phistory[pid].client_input_offset + input->frame;
+   for (i=0; i < NUM_INPUTS_PER_PACKET; ++i) {
+      if (input_timestamp >= server_timestamp && input_timestamp < server_timestamp + MAX_CLIENT_INPUT_HISTORY) {
+         phistory[pid].input[input_timestamp - server_timestamp] = input->last_inputs[i];
+      }
+      --input_timestamp;
+   }
+}
+
+// 1. consumes all packets from players
+// 2. consumes 1 input from each player input queue
+void server_net_tick_pre_physics(void)
 {
    int i;
    net_client_input input;
@@ -292,28 +348,187 @@ void server_net_tick(void)
          if (n < 0)
             continue;
       }
-      p_input[connection[n].pid].buttons = input.last_inputs[0].buttons;
-      obj[connection[n].pid].ang.x = angle_from_network(input.last_inputs[0].view_x) - 90;
-      obj[connection[n].pid].ang.z = angle_from_network(input.last_inputs[0].view_z);
+
+      process_player_input(connection[n].pid, &input);
    }
 
    for (i=1; i < max_player_id; ++i) {
       if (obj[i].valid) {
+         obj[i].ang.x = angle_from_network(phistory[i].input[0].view_x);
+         obj[i].ang.z = angle_from_network(phistory[i].input[0].view_z);
+         p_input[i].buttons = phistory[i].input[0].buttons;
+
+         ods("buttons: %04x\n", p_input[i].buttons);
+         
+         memmove(&phistory[i].input[0], &phistory[i].input[1], MAX_CLIENT_INPUT_HISTORY-1);
+         phistory[i].input[MAX_CLIENT_INPUT_HISTORY-1].buttons = 0;
+      }
+   }
+}
+
+typedef struct
+{
+   uint16 objid;
+} net_objid;
+
+typedef struct
+{
+   uint8 seq;
+   uint8 timestamp;
+} packet_header;
+
+typedef struct
+{
+   uint8 type;
+   uint8 count;
+} record_header;
+
+enum
+{
+   RECORD_TYPE_invalid,
+   RECORD_TYPE_player_objid,
+   RECORD_TYPE_object_state,
+};
+
+typedef struct
+{
+   float p[3],v[3],o[2];
+} object_state;
+
+void write_to_packet(char *buffer, int *off, void *data, int data_size, int limit)
+{
+   if (*off + data_size <= limit) {
+      memcpy(buffer + *off, data, data_size);
+   }
+   *off += data_size;
+}
+
+/*
+ +    6.       compute min update time (1 over max update rate)
+ *   10.             add state to pending non-reliable list w/priority
+*/
+int build_packet_for_player(objid pid, char *buffer, int buffer_size)
+{
+   int i;
+   Bool empty = True;
+   int offset=0, save_offset, object_state_count=0;
+   packet_header ph;
+   record_header rh;
+   net_objid no;
+
+   ph.seq = outhistory[pid].sequence;
+   ph.timestamp = (uint8) (server_timestamp & 0xff);
+   write_to_packet(buffer, &offset, &ph, sizeof(ph), buffer_size);
+
+   rh.type = RECORD_TYPE_player_objid;
+   rh.count = 1;
+   no.objid = pid;
+   write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
+   write_to_packet(buffer, &offset, &no, sizeof(no), buffer_size);
+   empty = False;
+
+   save_offset = offset;
+   rh.type = RECORD_TYPE_object_state;
+   rh.count = 0;
+   write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
+
+   // send player states
+   for (i=1; i < max_player_id; ++i) {
+      if (obj[i].valid) {
+         object_state os;
+         if (offset + (int) sizeof(os) + (int) sizeof(no) <= buffer_size) {
+            no.objid = i;
+            write_to_packet(buffer, &offset, &no, sizeof(no), buffer_size);
+            os.p[0] = obj[i].position.x;
+            os.p[1] = obj[i].position.y;
+            os.p[2] = obj[i].position.z;
+            os.v[0] = obj[i].velocity.x;
+            os.v[1] = obj[i].velocity.y;
+            os.v[2] = obj[i].velocity.z;
+            os.o[0] = obj[i].ang.x;
+            os.o[1] = obj[i].ang.z;
+            write_to_packet(buffer, &offset, &os, sizeof(os), buffer_size);
+            ++object_state_count;
+         }
+      }
+   }
+
+   // send non-player states
+   for (i=PLAYER_OBJECT_MAX; i < max_obj_id; ++i) {
+      if (obj[i].valid) {
+         object_state os;
+         if (offset + (int) sizeof(os) + (int) sizeof(no) <= buffer_size) {
+            no.objid = i;
+            write_to_packet(buffer, &offset, &no, sizeof(no), buffer_size);
+            os.p[0] = obj[i].position.x;
+            os.p[1] = obj[i].position.y;
+            os.p[2] = obj[i].position.z;
+            os.v[0] = obj[i].velocity.x;
+            os.v[1] = obj[i].velocity.y;
+            os.v[2] = obj[i].velocity.z;
+            os.o[0] = obj[i].ang.x;
+            os.o[1] = obj[i].ang.z;
+            write_to_packet(buffer, &offset, &os, sizeof(os), buffer_size);
+            ++object_state_count;
+            empty = False;
+         }
+      }
+   }
+
+   assert(object_state_count < 256);
+   rh.type = RECORD_TYPE_object_state;
+   rh.count = (uint8) object_state_count;
+   write_to_packet(buffer, &save_offset, &rh, sizeof(rh), buffer_size);
+
+   if (empty) {
+      return 0;
+   } else {
+      ++outhistory[pid].sequence;
+      return offset;
+   }
+}
+
+void server_net_tick_post_physics(void)
+{
+   int i;
+   char packet_data[MAX_PACKET_SIZE];
+   ++server_timestamp;
+   for (i=1; i < max_player_id; ++i) {
+      if (obj[i].valid) {
+         int size;
          int conn = connection_for_pid[i];
          obj[0].valid = i;
-         net_send(obj, sizeof(obj[0])*8, &connection[conn].addr);
+
+         size = build_packet_for_player(i, packet_data, sizeof(packet_data));
+         if (size != 0) 
+            net_send(packet_data, size, &connection[conn].addr);
       }
    }
 }
 
 static net_client_input input;
-void client_net_tick(void)
-{
-   int i;
-   vec ang;
-   address receive_addr;
 
-   ang = obj[player_id].ang;
+/*
+ *    0.  collect player input
+ *    1.  send player input to server
+ *    2.  receive server update packet
+ *    3.  parse server update packet
+ *
+ *
+ *    0. for as many 60hz ticks since last frame:
+ *    1.   collect player input
+ +    2.   collect server updates into 100ms buffer
+ *    3.   store player input into network output buffer
+ +    4.   if odd tick, send network output buffer
+ *    8.   interpolate positions from buffered server states
+ *   10.   simulate player physics
+ */
+
+player_net_controls client_build_input(objid player_id)
+{
+   player_net_controls pnc;
+
+   vec ang = obj[player_id].ang;
 
    ang.x += 90;
    ang.x = (float) fmod(ang.x, 360);
@@ -321,25 +536,115 @@ void client_net_tick(void)
    ang.z = (float) fmod(ang.z, 360);
    if (ang.z < 0) ang.z += 360;
 
-   input.sequence += 1;
-   input.type = 0;
-   memmove(&input.last_inputs[1], &input.last_inputs[0], sizeof(input.last_inputs) - sizeof(input.last_inputs[0]));
-
-   input.last_inputs[0].buttons = client_player_input.buttons;
-   input.last_inputs[0].view_x = angle_to_network(ang.x);
-   input.last_inputs[0].view_z = angle_to_network(ang.z);
+   pnc.buttons = client_player_input.buttons;
+   pnc.view_x = angle_to_network(ang.x);
+   pnc.view_z = angle_to_network(ang.z);
 
    ang.x -= 90;   
    obj[player_id].ang = ang;
 
-   net_send(&input, sizeof(input), &server_address);
-
-   while (net_receive(obj, sizeof(obj[0])*8, &receive_addr) >= 0) {
-      // @TODO: veryify receive_addr == server_address
-      obj[player_id].ang = ang;
-      player_id = obj[0].valid;
-   }
-   for (i=1; i < 8; ++i)
-      if (obj[i].valid && i >= max_player_id)
-         max_player_id = i+1;
+   return pnc;
 }
+
+void client_net_tick(void)
+{
+   char packet[MAX_PACKET_SIZE];
+   vec ang = { 0,0,0 };
+   Bool override_ang = False;
+   address receive_addr;
+   int packet_size;
+
+   if (1 || player_id != 0) {
+      ang = obj[player_id].ang;
+      override_ang = True;
+
+      input.frame += 1;
+      input.frame = (uint8) (input.frame & CLIENT_FRAME_NUMBER_MASK);
+      memmove(&input.last_inputs[1], &input.last_inputs[0], sizeof(input.last_inputs) - sizeof(input.last_inputs[0]));
+
+      input.last_inputs[0] = client_build_input(player_id);
+
+      if (input.frame & 1) {
+         input.sequence += 1;
+         net_send(&input, sizeof(input), &server_address);
+      }
+   }
+
+   packet_size = net_receive(packet, sizeof(packet), &receive_addr);
+   while (packet_size >= 0) {
+      // @TODO: veryify receive_addr == server_address
+      int offset=0;
+      packet_header *ph = (packet_header *) (packet+offset);
+      // process ph->seq
+      // process ph->timestamp
+      offset += sizeof(*ph);
+      while(offset + (int) sizeof(record_header) < packet_size) {
+         record_header *rh = (record_header *) (packet+offset);
+         offset += sizeof(*rh);
+         switch (rh->type) {
+            case RECORD_TYPE_player_objid: {
+               net_objid *no;
+               if (offset + (int) sizeof(*no) > packet_size)
+                  goto corrupt;
+               no = (net_objid *) (packet+offset);
+               offset += sizeof(*no);
+               player_id = no->objid;
+               break;
+            }
+            case RECORD_TYPE_object_state: {
+               int i;
+               if (offset + (int) (sizeof(object_state)+sizeof(net_objid))*rh->count > packet_size)
+                  goto corrupt;
+               for (i=0; i < rh->count; ++i) {
+                  objid o;
+                  object_state *os;
+                  net_objid *no = (net_objid *) (packet+offset);
+                  offset += sizeof(*no);
+                  os = (object_state *) (packet+offset);
+                  offset += sizeof(*os);
+                  o = no->objid;
+                  if (o >= PLAYER_OBJECT_MAX) {
+                     if (o >= max_obj_id)
+                        max_obj_id = o+1;
+                  } else {
+                     if (o >= max_player_id)
+                        max_player_id = o+1;
+                  }
+                  obj[o].position.x = os->p[0];
+                  obj[o].position.y = os->p[1];
+                  obj[o].position.z = os->p[2];
+                  obj[o].velocity.x = os->v[0];
+                  obj[o].velocity.y = os->v[1];
+                  obj[o].velocity.z = os->v[2];
+                  obj[0].ang.x = os->o[0];
+                  obj[0].ang.z = os->o[1];
+               }
+               break;
+            }               
+            default:
+               goto corrupt;
+         }
+      }
+     corrupt:
+      packet_size = net_receive(packet, sizeof(packet), &receive_addr);
+   }
+
+   if (override_ang)
+      obj[player_id].ang = ang;
+}
+
+// 64 bytes per object
+// * 32768 objects
+// *  1024 players
+// *    16 versions
+
+// 2^(6+15+10+4) = 2^35  32 GB
+
+// 64 bytes per object
+//    8192 objects
+//    1024 players
+//       8 versions
+//
+// 2^(6+13+10+3) = 2^32 = 4GB
+
+
