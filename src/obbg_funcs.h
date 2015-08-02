@@ -40,7 +40,7 @@ typedef struct
    uint16 port;
 } address;
 
-extern Bool net_init(int port);
+extern Bool net_init(Bool server, int port);
 extern Bool net_send(void *buffer, size_t buffer_size, address *addr);
 extern int  net_receive(void *buffer, size_t buffer_size, address *addr);
 extern void client_view_physics(objid oid, player_controls *con, float dt);

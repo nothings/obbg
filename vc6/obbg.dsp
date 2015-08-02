@@ -144,6 +144,18 @@ SOURCE=..\docs\overview.txt
 SOURCE=..\docs\todo.txt
 # End Source File
 # End Group
+# Begin Group "headers"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=..\src\obbg_data.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\src\obbg_funcs.h
+# End Source File
+# End Group
 # Begin Source File
 
 SOURCE=..\src\main.c
@@ -155,14 +167,6 @@ SOURCE=..\src\mesh_builder.c
 # Begin Source File
 
 SOURCE=..\src\network.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\src\obbg_data.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\src\obbg_funcs.h
 # End Source File
 # Begin Source File
 

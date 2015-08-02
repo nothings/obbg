@@ -9,6 +9,10 @@ obbg:
   - networking
 
 Done in today's stream:
+  - minor clean-up of port# handling
+  - add more client/server design docs
+
+Previous stream:
   - send multiple client inputs in one packet
   - let OS pick the client's port
   - much research into how to do client/server right

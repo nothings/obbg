@@ -740,11 +740,12 @@ extern float compute_height_field(int x, int y);
 
 Bool networking;
 
+#define SERVER_PORT 4127
 
 //void stbwingraph_main(void)
 int SDL_main(int argc, char **argv)
 {
-   int port = 0;
+   int server_port = SERVER_PORT;
    SDL_Init(SDL_INIT_VIDEO);
 
    client_player_input.flying = True;
@@ -753,7 +754,7 @@ int SDL_main(int argc, char **argv)
       is_server = True;
    }
    if (argc > 2 && !strcmp(argv[1], "--port")) {
-      port = atoi(argv[2]);
+      server_port = atoi(argv[2]);
    }
 
    //prepare_threads();
@@ -816,7 +817,7 @@ int SDL_main(int argc, char **argv)
 
    SDL_GL_SetSwapInterval(1);
 
-   networking = net_init(port);
+   networking = net_init(is_server, server_port);
 
    render_init();
    //mesh_init();

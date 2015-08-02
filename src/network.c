@@ -1,8 +1,29 @@
-// Four approaches to server-side "physics" when doing
-// client-side prediction and receiving only player-input
-// from clients (note that this is totally independent
-// of client-side prediction or interpolation, and related
-// to but different from lag compensation for shooting guns):
+// Networking uses client/server with client-side prediction.
+//
+// Client involves "clever" algorithm I first read about
+// in description of Unreal's player physics and which you
+// can find described in a million places on the net:
+//
+//   - Client simulates effect of moving player through world
+//     in response to player input, renders player as being
+//     there, but also sends input to server *and* records it
+//     for later; server sends back *authorative* client position
+//     and client replays user input (resimulating player physics)
+//     from last authorative position to recover new ("predicted")
+//     position for player.
+//
+// There is also clever stuff to do to handle the client player
+// shooting at another player ("lag compenstation").
+//
+// What nobody talks much about is how the server-side is
+// dealing with this, especially since there's variable
+// latency from the client (e.g. even with stable latency,
+// if a packet from client is dropped, then user input from
+// that packet is delayed).
+//
+// So here are four possible approaches to server-side "physics"
+// for the above scenario (doing client-side prediction and
+// receiving only player-input from clients).
 //
 //   - 1. buffer client input for some length of time, then
 //        execute a global tick for entire system at once
@@ -25,9 +46,38 @@
 // "late client input" is just for expository purposes; effectively,
 // all client input is late by a variable amount (varying depending
 // on lag/dropped packets).
+//
+// We can describe the above in terms of a scenario where player
+// A & B try to move to the same location (even though physics is
+// supposed to prevent the players from being in the same location)
+// and according to their relative clocks player A gets there first,
+// but due to variable latency the server receives the packet for
+// player B first. (Note I'm not talking in detail about what 'clocks'
+// means here, I just need a characterization like that to make sense
+// of the some of the above scenarios):
+//
+//     1. player A ends up in the place and player B doesn't (as long as the
+//        buffering is sufficient to cover the late packet from A)
+//
+//     2. player A and player B end up in the same place
+//
+//     3. player A ends up in the place, and player B doesn't, but a
+//        packet might go out first that claims player B got there
+//
+//     4. player B ends up in the place ("first come first served")
+//
+// Note that in case 1, if a player input packet is delayed by more
+// than the client buffering time, that player input is *dropped
+// entirely*, which is going to cause the player to jump around from
+// their point of view. Since network dropouts can be bursty, this
+// means you could easily lose a bunch of input, say a second's worth,
+// which could mean a pretty big jump. However, the alternative (e.g. #4)
+// would result in all the players seeing A's 1 second of activity all
+// at once in a burst, so we're going to guess that it's better for A
+// to suffer A's net drop, instead of everyone else, so we're going to
+// implement method 1.
 
 /*
-
  Stuff marked + or * must _all_ be implemented before the new
  system will even feebly work. Marked with + means it can be dummied.
 
@@ -79,6 +129,13 @@
       9.   extrapolate positions/state where dead reckoning
  *   10.   simulate player physics
      10. render
+
+
+   single-player main loop:
+     0. for as many 60hz ticks since last frame
+     1.   collect player input
+     2.   simulate 1 tick
+     3. render
 */
 
 
@@ -100,8 +157,6 @@ typedef struct
    uint8 count;
 } record_header;
 #endif
-
-#define SERVER_PORT 4127
 
 static UDPsocket receive_socket;
 static UDPpacket *receive_packet;
@@ -155,17 +210,17 @@ int net_receive(void *buffer, size_t buffer_size, address *addr)
 
 address server_address;
 
-Bool net_init(int port)
+Bool net_init(Bool server, int server_port)
 {
    if (SDLNet_Init() != 0)
       return False;
 
-   receive_socket = SDLNet_UDP_Open(is_server ? SERVER_PORT : port);
+   receive_socket = SDLNet_UDP_Open(server ? server_port : 0);
    receive_packet = SDLNet_AllocPacket(MAX_SAFE_PACKET_SIZE);
    send_packet    = SDLNet_AllocPacket(MAX_SAFE_PACKET_SIZE);
 
    server_address.host = (127<<24) + 1;
-   server_address.port = SERVER_PORT;
+   server_address.port = server_port;
    return True;
 }
 
@@ -180,8 +235,10 @@ int create_connection(address *addr)
    for (i=0; i < MAX_CONNECTIONS; ++i)
       if (connection[i].addr.port == 0) {
          objid pid;
-         connection[i].addr = *addr;
          connection[i].pid = pid = allocate_player();
+         if (pid == 0)
+            return -1;
+         connection[i].addr = *addr;
          connection_for_pid[connection[i].pid] = i;
          obj[pid].position.x = (float) (rand() & 31);
          obj[pid].position.y = (float) (rand() & 31);
@@ -199,6 +256,16 @@ int find_connection(address *addr)
          return i;
    return -1;
 }
+
+#define NUM_INPUTS_PER_PACKET     6  // 100 ms buffer with 30hz packets = each 60hz input in 3 packets
+#define INPUT_PACKETS_PER_SECOND  30
+
+typedef struct
+{
+   uint8 type;
+   uint8 sequence;
+   player_net_controls last_inputs[NUM_INPUTS_PER_PACKET];
+} net_client_input;
 
 float angle_from_network(uint16 iang)
 {
