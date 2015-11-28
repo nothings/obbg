@@ -9,7 +9,7 @@ what's up next.
 
 ![obbg screen shot](http://nothings.org/remote/obbg_3.jpg "obbg screen shot")
 
-![Development stream archive](https://www.youtube.com/playlist?list=PLMkT-w6m06QvQaGJKw7vRuPlnYJWczvPj)
+[Development stream archive](https://www.youtube.com/playlist?list=PLMkT-w6m06QvQaGJKw7vRuPlnYJWczvPj)
 
 # License
 
