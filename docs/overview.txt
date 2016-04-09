@@ -9,6 +9,11 @@ obbg:
   - networking
 
 Done in today's stream:
+
+Previous stream:
+  - forgot to document it
+
+Previous stream:
   - minor clean-up of port# handling
   - add more client/server design docs
 

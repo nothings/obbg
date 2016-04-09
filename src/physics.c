@@ -218,7 +218,7 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
    gather_collision_geometry(&cg, ix - COLLIDE_BLOB_X/2, iy - COLLIDE_BLOB_Y/2, iz - COLLIDE_BLOB_Z/2);
 
    if (!collision_test_box(&cg, x, y, z - 2*Z_EPSILON, size)) {
-      // falling
+      // not in contact w/ the ground
       if (collision_test_box(&cg, x+dx, y+dy, z+dz, size)) {
          result = 0;
          if (!collision_test_box(&cg, x+dx, y+0, z+dz, size)) {
@@ -235,15 +235,29 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
             z += dz;
          } else {
             // move bottom to floor of current voxel
-            float min_z = z + dz;
-            assert(!collision_test_box(&cg, x,y,z,size));
-            z = (float) floor(z + size[0][2]) - size[0][2];
-            assert(!collision_test_box(&cg, x,y,z,size));
-            while (!collision_test_box(&cg, x,y,z-1,size) && z-1 >= min_z)
-               z -= 1;
-            assert(z >= min_z - Z_EPSILON);
-            vel->z = 0;
-            result = 1;
+            if (dz > 0) {
+               float max_z = z + dz - Z_EPSILON;
+               assert(!collision_test_box(&cg, x,y,z,size));
+               z = (float) ceil(z + size[1][2]) - size[1][2] - Z_EPSILON;
+               assert(z <= max_z + Z_EPSILON);
+               assert(!collision_test_box(&cg, x,y,z,size));
+               while (!collision_test_box(&cg, x,y,z+1,size) && z+1 <= max_z)
+                  z += 1;
+               assert(z <= max_z + Z_EPSILON);
+               vel->z = 0;
+               result = 1;
+            } else {
+               float min_z = z + dz;
+               assert(!collision_test_box(&cg, x,y,z,size));
+               z = (float) floor(z + size[0][2]) - size[0][2];
+               assert(z >= min_z - Z_EPSILON);
+               assert(!collision_test_box(&cg, x,y,z,size));
+               while (!collision_test_box(&cg, x,y,z-1,size) && z-1 >= min_z)
+                  z -= 1;
+               assert(z >= min_z - Z_EPSILON);
+               vel->z = 0;
+               result = 1;
+            }
          }
       } else {
          result = 0;
@@ -252,6 +266,7 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
          z += dz;
       }
    } else {
+      // in contact w/ the ground
       result = 1;
       if (collision_test_box(&cg, x+dx,y+dy,z, size)) {
          // step up?

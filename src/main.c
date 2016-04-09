@@ -749,7 +749,7 @@ int SDL_main(int argc, char **argv)
    int server_port = SERVER_PORT;
    SDL_Init(SDL_INIT_VIDEO);
 
-   client_player_input.flying = True;
+   //client_player_input.flying = True;
 
    if (argc > 1 && !strcmp(argv[1], "--server")) {
       is_server = True;

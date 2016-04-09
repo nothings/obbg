@@ -80,12 +80,17 @@ void client_view_physics(objid oid, player_controls *con, float dt)
       o->ang.x = stb_clamp(o->ang.x, -90, 90);
       o->ang.z = (float) fmod(o->ang.z, 360);
    } else {
+      #if 1
+      o->ang.x = pending_view_x*0.25f;
+      o->ang.z = pending_view_z*0.50f;
+      #else
       o->ang.x += pending_view_x * 0.25f;
       o->ang.z += pending_view_z * 0.50f;
       pending_view_x = 0;
       pending_view_z = 0;
       o->ang.x = stb_clamp(o->ang.x, -90, 90);
       o->ang.z = (float) fmod(o->ang.z, 360);
+      #endif
    }
 }
 
@@ -107,6 +112,9 @@ void player_physics(objid oid, player_controls *con, float dt)
    objspace_to_worldspace(world_thrust, oid, thrust[0], thrust[1], 0);
    world_thrust[2] += thrust[2];
 
+   if (!con->flying)
+      world_thrust[2] = 0;
+
    for (i=0; i < 3; ++i) {
       float acc = world_thrust[i];
       (&o->velocity.x)[i] += acc*dt;
@@ -120,6 +128,9 @@ void player_physics(objid oid, player_controls *con, float dt)
       newvel = vel - dec*dt;
       if (newvel < 0)
          newvel = 0;
+      assert(newvel <= vel);
+      assert(newvel/vel >= 0);
+      assert(newvel/vel <= 1);
       o->velocity.x *= newvel/vel;
       o->velocity.y *= newvel/vel;
       o->velocity.z *= newvel/vel;

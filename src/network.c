@@ -231,6 +231,15 @@ int create_connection(address *addr)
          obj[pid].position.x = (float) (rand() & 31);
          obj[pid].position.y = (float) (rand() & 31);
          obj[pid].position.z = 100;
+
+         obj[pid].ang.x = 0;
+         obj[pid].ang.y = 0;
+         obj[pid].ang.z = 0;
+
+         obj[pid].velocity.x = 0;
+         obj[pid].velocity.y = 0;
+         obj[pid].velocity.z = 0;
+
          return i;
       }
    return -1;
@@ -300,11 +309,17 @@ uint16 angle_to_network(float ang)
 
 uint64 server_timestamp = 1U<<24;
 
+#define NO_PLAYER_INPUT_BUFFERING
+
 //      p_input[connection[n].pid].buttons = input.last_inputs[0].buttons;
 //      obj[connection[n].pid].ang.x = angle_from_network(input.last_inputs[0].view_x) - 90;
 //      obj[connection[n].pid].ang.z = angle_from_network(input.last_inputs[0].view_z);
 void process_player_input(objid pid, net_client_input *input)
 {
+   #ifdef NO_PLAYER_INPUT_BUFFERING
+   phistory[pid].input[0] = input->last_inputs[0];
+   #else
+   
    int i;
    uint64 input_timestamp;
 
@@ -331,6 +346,7 @@ void process_player_input(objid pid, net_client_input *input)
       }
       --input_timestamp;
    }
+   #endif
 }
 
 // 1. consumes all packets from players
@@ -354,14 +370,16 @@ void server_net_tick_pre_physics(void)
 
    for (i=1; i < max_player_id; ++i) {
       if (obj[i].valid) {
-         obj[i].ang.x = angle_from_network(phistory[i].input[0].view_x);
+         obj[i].ang.x = angle_from_network(phistory[i].input[0].view_x) - 90;
          obj[i].ang.z = angle_from_network(phistory[i].input[0].view_z);
          p_input[i].buttons = phistory[i].input[0].buttons;
 
          ods("buttons: %04x\n", p_input[i].buttons);
-         
+
+         #ifndef NO_PLAYER_INPUT_BUFFERING         
          memmove(&phistory[i].input[0], &phistory[i].input[1], MAX_CLIENT_INPUT_HISTORY-1);
          phistory[i].input[MAX_CLIENT_INPUT_HISTORY-1].buttons = 0;
+         #endif
       }
    }
 }
@@ -537,7 +555,7 @@ player_net_controls client_build_input(objid player_id)
    if (ang.z < 0) ang.z += 360;
 
    pnc.buttons = client_player_input.buttons;
-   pnc.view_x = angle_to_network(ang.x);
+   pnc.view_x = angle_to_network(ang.x); 
    pnc.view_z = angle_to_network(ang.z);
 
    ang.x -= 90;   
@@ -616,8 +634,8 @@ void client_net_tick(void)
                   obj[o].velocity.x = os->v[0];
                   obj[o].velocity.y = os->v[1];
                   obj[o].velocity.z = os->v[2];
-                  obj[0].ang.x = os->o[0];
-                  obj[0].ang.z = os->o[1];
+                  obj[o].ang.x = os->o[0];
+                  obj[o].ang.z = os->o[1];
                }
                break;
             }               
@@ -633,11 +651,10 @@ void client_net_tick(void)
       obj[player_id].ang = ang;
 }
 
-// 64 bytes per object
+//   1024 connections
 // * 32768 objects
-// *  1024 players
-// *    16 versions
-
+// * 64 bytes per object
+// * 16 versions
 // 2^(6+15+10+4) = 2^35  32 GB
 
 // 64 bytes per object
@@ -646,5 +663,21 @@ void client_net_tick(void)
 //       8 versions
 //
 // 2^(6+13+10+3) = 2^32 = 4GB
+
+
+// * 1024 connections
+// * 32768 objects not-lag compensated       1024 objects lag compensated
+// * 64 bytes per object                       64 bytes per object
+// *     1                                 *   16
+
+//   1024 connections                       1024 connections
+// * 1024 objects not-lag compensated       1024 objects lag compensated
+// *   64 bytes per object                    16 bytes per object
+// *    1                                      8 versions
+
+// 2^10 * 2^10 * 2^4 * 2^3 = 2^27 => 128 MB
+
+
+
 
 
