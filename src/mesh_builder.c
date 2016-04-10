@@ -10,8 +10,8 @@
 #include "stb_glprog.h"
 
 #include "stb.h"
-#include "sdl.h"
-#include "sdl_thread.h"
+#include "SDL.h"
+#include "SDL_thread.h"
 
 #include <math.h>
 #include <assert.h>
@@ -251,8 +251,8 @@ void free_mesh_chunk_physics(mesh_chunk *mc)
 void free_mesh_chunk(mesh_chunk *mc)
 {
    glDeleteTextures(1, &mc->fbuf_tex);
-   glDeleteBuffersARB(1, &mc->vbuf);
-   glDeleteBuffersARB(1, &mc->fbuf);
+   xglDeleteBuffersARB(1, &mc->vbuf);
+   xglDeleteBuffersARB(1, &mc->fbuf);
 
    free_mesh_chunk_physics(mc);
    free(mc);
@@ -307,7 +307,11 @@ void release_gen_chunk(gen_chunk *gc)
 void add_ref_count(gen_chunk *gc)
 {
    SDL_LockMutex(ref_count_mutex);
-   if (gc == NULL) __asm int 3;
+#ifdef __GNUC__
+   if (gc == NULL) __asm__("int3");
+#else
+   if (gc == NULL) __asm(int 3);
+#endif
    ++gc->ref_count;
    SDL_UnlockMutex(ref_count_mutex);
 }

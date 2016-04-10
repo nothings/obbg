@@ -7,8 +7,7 @@
 #ifdef STB_LEAKCHECK_IMPLEMENTATION
 #undef STB_LEAKCHECK_IMPLEMENTATION // don't implenment more than once
 
-#include "sdl_thread.h"
-
+#include "SDL_thread.h"
 #include <assert.h>
 #include <string.h>
 

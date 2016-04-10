@@ -242,6 +242,10 @@ static __declspec(dllimport) stbgl__voidfunc wglGetProcAddress(char *);
 #endif
 #endif
 #define STBGL__GET_FUNC(x)   wglGetProcAddress(x)
+#elif defined(__linux)
+#ifndef STBGL__GET_FUNC
+#define STBGL__GET_FUNC(x)   glXGetProcAddress(x)
+#endif
 #else
 #error "need to define how this platform gets extensions"
 #endif

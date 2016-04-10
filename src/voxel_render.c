@@ -8,8 +8,8 @@
 #include "stb_glprog.h"
 
 #include "stb.h"
-#include "sdl.h"
-#include "sdl_thread.h"
+#include "SDL.h"
+#include "SDL_thread.h"
 #include <math.h>
 
 #include "stb_voxel_render.h"
@@ -19,7 +19,7 @@ static GLuint vox_tex[2];
 
 void init_voxel_render(int voxel_tex[2])
 {
-   char *binds[] = { "attr_vertex", "attr_face", NULL };
+   char const *binds[] = { "attr_vertex", "attr_face", NULL };
    char *vertex;
    char *fragment;
 
@@ -28,8 +28,8 @@ void init_voxel_render(int voxel_tex[2])
 
    {
       char error_buffer[1024];
-      char *main_vertex[] = { vertex, NULL };
-      char *main_fragment[] = { fragment, NULL };
+      char const *main_vertex[] = { vertex, NULL };
+      char const *main_fragment[] = { fragment, NULL };
       int which_failed;
       main_prog = stbgl_create_program(main_vertex, main_fragment, binds, error_buffer, sizeof(error_buffer), &which_failed);
       if (main_prog == 0) {
@@ -236,19 +236,19 @@ static int is_box_in_frustum(float *bmin, float *bmax)
 
 void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer)
 {
-   glGenBuffersARB(1, &mc->vbuf);
-   glBindBufferARB(GL_ARRAY_BUFFER_ARB, mc->vbuf);
-   glBufferDataARB(GL_ARRAY_BUFFER_ARB, mc->num_quads*4*sizeof(uint32), vertex_build_buffer, GL_STATIC_DRAW_ARB);
-   glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+   xglGenBuffersARB(1, &mc->vbuf);
+   xglBindBufferARB(GL_ARRAY_BUFFER_ARB, mc->vbuf);
+   xglBufferDataARB(GL_ARRAY_BUFFER_ARB, mc->num_quads*4*sizeof(uint32), vertex_build_buffer, GL_STATIC_DRAW_ARB);
+   xglBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
 
-   glGenBuffersARB(1, &mc->fbuf);
-   glBindBufferARB(GL_TEXTURE_BUFFER_ARB, mc->fbuf);
-   glBufferDataARB(GL_TEXTURE_BUFFER_ARB, mc->num_quads*sizeof(uint32), face_buffer , GL_STATIC_DRAW_ARB);
-   glBindBufferARB(GL_TEXTURE_BUFFER_ARB, 0);
+   xglGenBuffersARB(1, &mc->fbuf);
+   xglBindBufferARB(GL_TEXTURE_BUFFER_ARB, mc->fbuf);
+   xglBufferDataARB(GL_TEXTURE_BUFFER_ARB, mc->num_quads*sizeof(uint32), face_buffer , GL_STATIC_DRAW_ARB);
+   xglBindBufferARB(GL_TEXTURE_BUFFER_ARB, 0);
 
    glGenTextures(1, &mc->fbuf_tex);
    glBindTexture(GL_TEXTURE_BUFFER_ARB, mc->fbuf_tex);
-   glTexBufferARB(GL_TEXTURE_BUFFER_ARB, GL_RGBA8UI, mc->fbuf);
+   xglTexBufferARB(GL_TEXTURE_BUFFER_ARB, GL_RGBA8UI, mc->fbuf);
    glBindTexture(GL_TEXTURE_BUFFER_ARB, 0);
 }
 
@@ -414,8 +414,8 @@ void render_voxel_world(float campos[3])
                if (is_box_in_frustum(mc->bounds[0], mc->bounds[1])) {
                   // @TODO if in range, frustum cull
                   stbglUniform3fv(stbgl_find_uniform(main_prog, "transform"), 3, mc->transform[0]);
-                  glBindBufferARB(GL_ARRAY_BUFFER_ARB, mc->vbuf);
-                  glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, 4, (void*) 0);
+                  xglBindBufferARB(GL_ARRAY_BUFFER_ARB, mc->vbuf);
+                  xglVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, 4, (void*) 0);
                   glBindTexture(GL_TEXTURE_BUFFER_ARB, mc->fbuf_tex);
 
                   glDrawArrays(GL_QUADS, 0, mc->num_quads*4);
@@ -477,7 +477,7 @@ void render_voxel_world(float campos[3])
             chunk_storage_total += c_mesh_cache[j][i]->num_quads * 20;
 
    stbglDisableVertexAttribArray(0);
-   glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+   xglBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
    glActiveTextureARB(GL_TEXTURE0_ARB);
 
    stbglUseProgram(0);

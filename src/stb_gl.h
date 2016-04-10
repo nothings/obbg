@@ -46,9 +46,12 @@
 #endif //_WIN32
 
 #include <stddef.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
 
-#include <gl/gl.h>
-#include <gl/glu.h>
+#ifdef __linux
+#include <GL/glx.h>
+#endif
 
 #ifndef M_PI
 #define M_PI  3.14159265358979323846f
@@ -1049,7 +1052,7 @@ int stbgl_TexImage2D_Extra(int texid, int w, int h, void *data, int chan, char *
 #endif
 
 #if defined(STB_GLEXT_DECLARE) && !defined(STB_GLEXT_DEFINE)
-   #define GLE(a,b) extern PFNGL##b##PROC gl##a;
+   #define GLE(a,b) extern PFNGL##b##PROC xgl##a;
 
    #ifdef __cplusplus
    extern "C" {
@@ -1079,15 +1082,20 @@ int stbgl_TexImage2D_Extra(int texid, int w, int h, void *data, int chan, char *
    #define STBGL__GET_FUNC(x)   wglGetProcAddress(x)
    #endif
 
+   #ifdef __linux
+   #define STBGL__GET_FUNC(x)   (void*)glXGetProcAddress((const GLubyte*)x)
+   #endif
+
    #ifdef GLE
    #undef GLE
    #endif
 
-   #define GLE(a,b)  PFNGL##b##PROC gl##a;
+   #define GLE(a,b)  PFNGL##b##PROC xgl##a;
    #include STB_GLEXT_DEFINE
 
    #undef GLE
-   #define GLE(a,b) gl##a = (PFNGL##b##PROC) STBGL__GET_FUNC("gl" #a );
+   #define GLE(a,b) xgl##a = (PFNGL##b##PROC) STBGL__GET_FUNC("gl" #a );
+
 
    void stbgl_initExtensions(void)
    {

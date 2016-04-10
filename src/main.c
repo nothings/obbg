@@ -2,7 +2,10 @@
 //#define GL_DEBUG
 
 #include <assert.h>
+
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 // stb.h
 #include "stb_leakcheck_sdl.h"
@@ -18,7 +21,7 @@
 #include "stb_gl.h"
 
 // SDL
-#include "sdl.h"
+#include "SDL.h"
 #include "SDL_opengl.h"
 #include "SDL_net.h"
 
@@ -189,7 +192,7 @@ void render_init(void)
    glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
    for (i=0; i < 11; ++i) {
-      glTexImage3DEXT(GL_TEXTURE_2D_ARRAY_EXT, i,
+      xglTexImage3DEXT(GL_TEXTURE_2D_ARRAY_EXT, i,
                          GL_COMPRESSED_RGB_S3TC_DXT1_EXT,
                          1024>>i,1024>>i,128,0,
                          GL_RGBA,GL_UNSIGNED_BYTE,NULL);
@@ -225,7 +228,7 @@ void render_init(void)
    init_voxel_render(voxel_tex);
 
    {
-      char *frag[] = { dumb_fragment_shader, NULL };
+      char const *frag[] = { dumb_fragment_shader, NULL };
       char error[1024];
       GLuint fragment;
       fragment = stbgl_compile_shader(STBGL_FRAGMENT_SHADER, frag, -1, error, sizeof(error));
@@ -1011,6 +1014,10 @@ void enable_synchronous(void)
 extern float compute_height_field(int x, int y);
 
 Bool networking;
+
+#ifndef SDL_main
+#define SDL_main main
+#endif
 
 #define SERVER_PORT 4127
 
