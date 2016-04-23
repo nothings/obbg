@@ -243,7 +243,7 @@ int find_connection(address *addr)
 
 #define MAX_SERVER_STATE_HISTORY       8
 #define MAX_CLIENT_INPUT_HISTORY      12
-#define MAX_CLIENT_FRAME_NUMBER_LOG2   7 
+#define MAX_CLIENT_FRAME_NUMBER_LOG2   8
 #define MAX_CLIENT_FRAME_NUMBER       (1 << MAX_CLIENT_FRAME_NUMBER_LOG2)
 
 #define CLIENT_FRAME_NUMBER_MASK      (MAX_CLIENT_FRAME_NUMBER-1)
@@ -407,9 +407,18 @@ void server_net_tick_pre_physics(void)
       if (obj[i].valid) {
          decode_net_controls_into_state(&obj[i], &p_input[i], &phistory[i].input[0]);
 
-         ods("buttons: %04x\n", p_input[i].buttons);
+         //ods("buttons: %04x\n", p_input[i].buttons);
 
          phistory[i].last_client_input_frame_applied = phistory[i].input[0].client_frame;
+         ods("Using input frame %d (%d %d %d %d %d %d %d)\n", phistory[i].input[0].client_frame,
+                                                              phistory[i].input[1].client_frame, 
+                                                              phistory[i].input[2].client_frame, 
+                                                              phistory[i].input[3].client_frame, 
+                                                              phistory[i].input[4].client_frame, 
+                                                              phistory[i].input[5].client_frame, 
+                                                              phistory[i].input[6].client_frame, 
+                                                              phistory[i].input[7].client_frame);
+
          #ifndef NO_PLAYER_INPUT_BUFFERING         
          memmove(&phistory[i].input[0], &phistory[i].input[1], sizeof(phistory[i].input[0]) * (MAX_CLIENT_INPUT_HISTORY-1));
          memmove(&phistory[i].valid[0], &phistory[i].valid[1], sizeof(phistory[i].valid[0]) * (MAX_CLIENT_INPUT_HISTORY-1));
@@ -779,7 +788,8 @@ void client_net_tick(void)
                            if (input_history[j].client_frame == last_frame)
                               break; // then replay inputs before j
                         }
-                        ods("Replay %d player inputs\n", j);
+                        ods("Player currently at %d, server at %d (replay %d)\n", input_history[0].client_frame, last_frame, j == 24 ? -1 : j);
+                        //ods("Replay %d player inputs\n", j);
                         if (j < MAX_CLIENT_RECORD_HISTORY) {
                            for(--j; j >= 0; --j) {
                               player_controls pc;
