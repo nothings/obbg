@@ -29,6 +29,7 @@ extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
 
 extern void physics_process_mesh_chunk(mesh_chunk *mc);
 extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py);
+extern void player_physics(objid oid, player_controls *con, float dt);
 
 extern objid allocate_object(void);
 extern objid allocate_player(void);

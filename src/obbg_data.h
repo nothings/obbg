@@ -131,6 +131,8 @@ typedef struct
 {
    uint16 buttons;
    uint16 view_x, view_z;
+   uint8  client_frame;
+   uint8  reserved;
 } player_net_controls; // 6 bytes    (6 * 10 + 28 = 88 bytes/packet, * 30/sec = 2640 bytes/sec)
 
 typedef struct

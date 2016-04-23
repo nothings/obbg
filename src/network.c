@@ -258,6 +258,7 @@ typedef struct
    int saw_frame_past_halfway;
    uint8 last_frame;
    uint8 last_seq;
+   uint8 last_client_input_frame_applied;
 } player_input_history;
 
 player_input_history phistory[PLAYER_OBJECT_MAX];
@@ -274,6 +275,8 @@ typedef struct
    uint8 sequence;
 } player_output_history;
 
+#define MAX_CLIENT_RECORD_HISTORY  (2*MAX_CLIENT_INPUT_HISTORY)
+player_net_controls input_history[MAX_CLIENT_RECORD_HISTORY];
 player_output_history outhistory[PLAYER_OBJECT_MAX];
 
 typedef struct
@@ -364,6 +367,13 @@ objid create_player(void)
    return pid;
 }
 
+void decode_net_controls_into_state(object *o, player_controls *pi, player_net_controls *pnc)
+{
+   o->ang.x = angle_from_network(pnc->view_x) - 90;
+   o->ang.z = angle_from_network(pnc->view_z);
+   pi->buttons = pnc->buttons;
+}
+
 // 1. consumes all packets from players
 // 2. consumes 1 input from each player input queue
 void server_net_tick_pre_physics(void)
@@ -381,25 +391,25 @@ void server_net_tick_pre_physics(void)
             continue;
       }
 
+      #if 0
       {
          char packet_data[MAX_PACKET_SIZE];
          int size = build_ping_for_player(connection[n].pid, packet_data, sizeof(packet_data));
          if (size != 0) 
             net_send(packet_data, size, &connection[n].addr);
       }
-
+      #endif
 
       process_player_input(connection[n].pid, &input);
    }
 
    for (i=1; i < max_player_id; ++i) {
       if (obj[i].valid) {
-         obj[i].ang.x = angle_from_network(phistory[i].input[0].view_x) - 90;
-         obj[i].ang.z = angle_from_network(phistory[i].input[0].view_z);
-         p_input[i].buttons = phistory[i].input[0].buttons;
+         decode_net_controls_into_state(&obj[i], &p_input[i], &phistory[i].input[0]);
 
          ods("buttons: %04x\n", p_input[i].buttons);
 
+         phistory[i].last_client_input_frame_applied = phistory[i].input[0].client_frame;
          #ifndef NO_PLAYER_INPUT_BUFFERING         
          memmove(&phistory[i].input[0], &phistory[i].input[1], sizeof(phistory[i].input[0]) * (MAX_CLIENT_INPUT_HISTORY-1));
          memmove(&phistory[i].valid[0], &phistory[i].valid[1], sizeof(phistory[i].valid[0]) * (MAX_CLIENT_INPUT_HISTORY-1));
@@ -498,6 +508,7 @@ int build_packet_for_player(objid pid, char *buffer, int buffer_size)
    packet_header ph;
    record_header rh;
    net_objid no;
+   connection_info ci;
 
    ph.seq = outhistory[pid].sequence;
    ph.timestamp = (uint8) (server_timestamp & 0xff);
@@ -509,6 +520,14 @@ int build_packet_for_player(objid pid, char *buffer, int buffer_size)
    write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
    write_to_packet(buffer, &offset, &no, sizeof(no), buffer_size);
    empty = False;
+
+   rh.type = RECORD_TYPE_connection_info;
+   rh.count = 1;
+   ci.buffered_packets = count_buffered_packets_for_player(pid);
+   ci.client_frame = phistory[pid].last_client_input_frame_applied;
+   ci.client_seq = phistory[pid].last_seq;
+   write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
+   write_to_packet(buffer, &offset, &ci, sizeof(ci), buffer_size);
 
    save_offset = offset;
    rh.type = RECORD_TYPE_object_state;
@@ -670,7 +689,18 @@ void client_net_tick(void)
       input.frame = (uint8) (input.frame & CLIENT_FRAME_NUMBER_MASK);
       memmove(&input.last_inputs[1], &input.last_inputs[0], sizeof(input.last_inputs) - sizeof(input.last_inputs[0]));
 
+      memmove(&input_history[1], &input_history[0], sizeof(input_history) - sizeof(input_history[0]));
+
       input.last_inputs[0] = client_build_input(player_id);
+      input.last_inputs[0].client_frame = (uint8) (input.frame & 255);
+
+      input_history[0] = input.last_inputs[0];
+
+      {
+         player_controls pc;
+         decode_net_controls_into_state(&obj[player_id], &pc, &input.last_inputs[0]);
+         player_physics(player_id, &pc, 1.0f/60);
+      }
 
       if (input.frame & 1) {
          input.sequence += 1;
@@ -742,6 +772,23 @@ void client_net_tick(void)
                   obj[o].ang.x = os->o[0];
                   obj[o].ang.z = os->o[1];
                   obj[o].valid = True;
+                  if (o == player_id) {
+                     if (last_frame != -1) {
+                        int j;
+                        for (j=0; j < MAX_CLIENT_RECORD_HISTORY; ++j) {
+                           if (input_history[j].client_frame == last_frame)
+                              break; // then replay inputs before j
+                        }
+                        ods("Replay %d player inputs\n", j);
+                        if (j < MAX_CLIENT_RECORD_HISTORY) {
+                           for(--j; j >= 0; --j) {
+                              player_controls pc;
+                              decode_net_controls_into_state(&obj[player_id], &pc, &input_history[j]);
+                              player_physics(player_id, &pc, 1.0f/60);
+                           }
+                        }
+                     }
+                  }
                }
                break;
             }               
