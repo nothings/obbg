@@ -256,6 +256,8 @@ typedef struct
    Bool valid[MAX_CLIENT_INPUT_HISTORY];
    uint64 client_input_offset;
    int saw_frame_past_halfway;
+   uint8 last_frame;
+   uint8 last_seq;
 } player_input_history;
 
 player_input_history phistory[PLAYER_OBJECT_MAX];
@@ -308,6 +310,9 @@ void process_player_input(objid pid, net_client_input *input)
    
    int i;
    uint64 input_timestamp;
+
+   phistory[pid].last_frame = input->frame;
+   phistory[pid].last_seq = input->sequence;
 
    if (input->frame < CLIENT_FRAME_HALFWAY_POINT && phistory[pid].saw_frame_past_halfway) {
       player_input_history *p = &phistory[pid];
@@ -422,6 +427,8 @@ enum
 
 typedef struct
 {
+   uint8 client_seq;
+   uint8 client_frame;
    uint8 buffered_packets;
 } connection_info;
 
@@ -474,6 +481,8 @@ int build_packet_for_player(objid pid, char *buffer, int buffer_size)
    rh.type = RECORD_TYPE_connection_info;
    rh.count = 1;
    ci.buffered_packets = count_buffered_packets_for_player(pid);
+   ci.client_frame = phistory[pid].last_frame;
+   ci.client_seq = phistory[pid].last_seq;
    write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
    write_to_packet(buffer, &offset, &ci, sizeof(ci), buffer_size);
 
@@ -558,6 +567,28 @@ void server_net_tick_post_physics(void)
 
 static net_client_input input;
 
+#define MAX_PACKET_LOG 64
+static net_client_input packet_log[MAX_PACKET_LOG];
+static Uint32 packet_timestamp[MAX_PACKET_LOG];
+static int cur_log_slot;
+
+static void log_input(net_client_input *nci)
+{
+   packet_log[cur_log_slot] = *nci;
+   packet_timestamp[cur_log_slot] = SDL_GetTicks();
+   cur_log_slot = (cur_log_slot + 1) & (MAX_PACKET_LOG-1);
+}
+
+static Uint32 get_timestamp_for_seq(int seq)
+{
+   int i;
+   for (i=0; i < MAX_PACKET_LOG; ++i)
+      if (packet_log[i].sequence == seq)
+         return packet_timestamp[i];
+   return 0;
+}
+
+
 /*
  *    0.  collect player input
  *    1.  send player input to server
@@ -596,6 +627,7 @@ player_net_controls client_build_input(objid player_id)
    return pnc;
 }
 
+static int ping;
 void client_net_tick(void)
 {
    char packet[MAX_PACKET_SIZE];
@@ -603,6 +635,8 @@ void client_net_tick(void)
    Bool override_ang = False;
    address receive_addr;
    int packet_size, pending_input=-1, num_object_updates=0;
+   int last_frame = -1, last_seq = -1;
+
 
    if (1 || player_id != 0) {
       ang = obj[player_id].ang;
@@ -617,6 +651,7 @@ void client_net_tick(void)
       if (input.frame & 1) {
          input.sequence += 1;
          net_send(&input, sizeof(input), &server_address);
+         log_input(&input);
       }
    }
 
@@ -648,6 +683,9 @@ void client_net_tick(void)
                ci = (connection_info *) (packet+offset);
                offset += sizeof(*ci);
                pending_input = ci->buffered_packets;
+               last_frame = ci->client_frame;
+               last_seq = ci->client_seq;
+               ping = SDL_GetTicks() - get_timestamp_for_seq(last_seq);
                break;
             }
             case RECORD_TYPE_object_state: {
@@ -687,7 +725,8 @@ void client_net_tick(void)
          }
       }
      corrupt:
-      ods("PID: %d; pending input %d; obj updates %d\n", player_id, pending_input, num_object_updates);
+      ods("PID: %d; ping: %d (pending input %d); obj updates %d\n",
+             player_id, ping, pending_input, num_object_updates);
       packet_size = net_receive(packet, sizeof(packet), &receive_addr);
    }
 
