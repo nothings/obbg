@@ -123,6 +123,14 @@ static float camera_bounds[2][3];
 
 float texture_scales[256];
 
+void game_init(void)
+{
+   init_chunk_caches();
+   init_mesh_building();
+   init_mesh_build_threads();
+   s_init_physics_cache();
+}
+
 void render_init(void)
 {
    // @TODO: support non-DXT path
@@ -135,11 +143,6 @@ void render_init(void)
    camera_bounds[1][0] = + 0.75f;
    camera_bounds[1][1] = + 0.75f;
    camera_bounds[1][2] = + 0.25f;
-
-   init_chunk_caches();
-   init_mesh_building();
-   init_mesh_build_threads();
-   s_init_physics_cache();
 
    glGenTextures(2, voxel_tex);
 
@@ -578,7 +581,9 @@ int loopmode(float dt, int real, int in_client)
    }
 
    process_tick(dt);
-   draw();
+
+   if (1 || !is_server)
+      draw();
 
    return 0;
 }
@@ -788,39 +793,44 @@ int SDL_main(int argc, char **argv)
       screen_y = 200;
    }
 
-   window = SDL_CreateWindow("obbg", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                   screen_x, screen_y,
-                                   SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
-                             );
-   if (!window) error("Couldn't create window");
+   if (1 || !is_server) {
+      window = SDL_CreateWindow("obbg", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                                      screen_x, screen_y,
+                                      SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
+                                );
+      if (!window) error("Couldn't create window");
 
-   context = SDL_GL_CreateContext(window);
-   if (!context) error("Couldn't create context");
+      context = SDL_GL_CreateContext(window);
+      if (!context) error("Couldn't create context");
 
-   SDL_GL_MakeCurrent(window, context); // is this true by default?
+      SDL_GL_MakeCurrent(window, context); // is this true by default?
 
-   SDL_SetRelativeMouseMode(SDL_TRUE);
-   #if defined(_MSC_VER) && _MSC_VER < 1300
-   // work around broken behavior in VC6 debugging
-   if (IsDebuggerPresent())
-      SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, "1");
-   #endif
+      SDL_SetRelativeMouseMode(SDL_TRUE);
+      #if defined(_MSC_VER) && _MSC_VER < 1300
+      // work around broken behavior in VC6 debugging
+      if (IsDebuggerPresent())
+         SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, "1");
+      #endif
 
-   stbgl_initExtensions();
+      stbgl_initExtensions();
 
-   #ifdef GL_DEBUG
-   if (glDebugMessageCallbackARB) {
-      glDebugMessageCallbackARB(gl_debug, NULL);
+      #ifdef GL_DEBUG
+      if (glDebugMessageCallbackARB) {
+         glDebugMessageCallbackARB(gl_debug, NULL);
 
-      enable_synchronous();
+         enable_synchronous();
+      }
+      #endif
+
+      SDL_GL_SetSwapInterval(1);
    }
-   #endif
-
-   SDL_GL_SetSwapInterval(1);
 
    networking = net_init(is_server, server_port);
 
-   render_init();
+   game_init();
+   if (1 || !is_server)
+      render_init();
+
    //mesh_init();
    world_init();
 

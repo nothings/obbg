@@ -1,15 +1,17 @@
 Possible tasks to work on next:
 
    Networking:
-   *  client transmits last N inputs
-   -  client replays last K inputs relative to server update data
-   *  server buffers M inputs from client
-   -  server sends sparser updates
    -  client-side prediction
+      -  client replays last K inputs relative to server update data
+   -  test network lag, dropouts
+   -  server sends sparser updates
+   -  server tracks multiple physics regions, one per player
    -  client interpolates between recent server updates
       - and extrapolates if necessary?!?
    -  replace SDL_Net with a lighter-weight #define socket wrapper
       - http://gafferongames.com/networking-for-game-programmers/sending-and-receiving-packets/
+   *  client transmits last N inputs
+   *  server buffers M inputs from client
 
    Look prettier:
    -  add skylight
@@ -42,9 +44,9 @@ Possible tasks to work on next:
       - animation? skinning?
       - procedural animation of characters?
    -  fix walking physics
+      - push smoothly along walls
       - smooth camera height when stepping up
       - don't stick to walls when falling one block
-      - push smoothly along walls
       - core physics model should steer existing momentum to new direction instead of being so Newtonian
    -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
       - 1 byte length

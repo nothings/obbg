@@ -341,6 +341,8 @@ void process_player_input(objid pid, net_client_input *input)
    #endif
 }
 
+int build_ping_for_player(objid pid, char *buffer, int buffer_size);
+
 objid create_player(void)
 {
    objid pid = allocate_player();
@@ -378,6 +380,14 @@ void server_net_tick_pre_physics(void)
          if (n < 0)
             continue;
       }
+
+      {
+         char packet_data[MAX_PACKET_SIZE];
+         int size = build_ping_for_player(connection[n].pid, packet_data, sizeof(packet_data));
+         if (size != 0) 
+            net_send(packet_data, size, &connection[n].addr);
+      }
+
 
       process_player_input(connection[n].pid, &input);
    }
@@ -453,6 +463,29 @@ int count_buffered_packets_for_player(int pid)
    return n;
 }
 
+int build_ping_for_player(objid pid, char *buffer, int buffer_size)
+{
+   int offset=0;
+   packet_header ph;
+   record_header rh;
+   connection_info ci;
+
+   ph.seq = outhistory[pid].sequence;
+   ph.timestamp = (uint8) (server_timestamp & 0xff);
+   write_to_packet(buffer, &offset, &ph, sizeof(ph), buffer_size);
+
+   rh.type = RECORD_TYPE_connection_info;
+   rh.count = 1;
+   ci.buffered_packets = count_buffered_packets_for_player(pid);
+   ci.client_frame = phistory[pid].last_frame;
+   ci.client_seq = phistory[pid].last_seq;
+   write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
+   write_to_packet(buffer, &offset, &ci, sizeof(ci), buffer_size);
+
+   ++outhistory[pid].sequence;
+   return offset;
+}
+
 /*
  +    6.       compute min update time (1 over max update rate)
  *   10.             add state to pending non-reliable list w/priority
@@ -465,7 +498,6 @@ int build_packet_for_player(objid pid, char *buffer, int buffer_size)
    packet_header ph;
    record_header rh;
    net_objid no;
-   connection_info ci;
 
    ph.seq = outhistory[pid].sequence;
    ph.timestamp = (uint8) (server_timestamp & 0xff);
@@ -477,14 +509,6 @@ int build_packet_for_player(objid pid, char *buffer, int buffer_size)
    write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
    write_to_packet(buffer, &offset, &no, sizeof(no), buffer_size);
    empty = False;
-
-   rh.type = RECORD_TYPE_connection_info;
-   rh.count = 1;
-   ci.buffered_packets = count_buffered_packets_for_player(pid);
-   ci.client_frame = phistory[pid].last_frame;
-   ci.client_seq = phistory[pid].last_seq;
-   write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
-   write_to_packet(buffer, &offset, &ci, sizeof(ci), buffer_size);
 
    save_offset = offset;
    rh.type = RECORD_TYPE_object_state;
@@ -686,13 +710,14 @@ void client_net_tick(void)
                last_frame = ci->client_frame;
                last_seq = ci->client_seq;
                ping = SDL_GetTicks() - get_timestamp_for_seq(last_seq);
+               ods("PID: %d; ping: %d (pending input %d)\n", player_id, ping, pending_input);
                break;
             }
             case RECORD_TYPE_object_state: {
                int i;
                if (offset + (int) (sizeof(object_state)+sizeof(net_objid))*rh->count > packet_size)
                   goto corrupt;
-               num_object_updates = rh->count;
+               ods("PID: %d; obj updates %d\n", player_id, rh->count);
                for (i=0; i < rh->count; ++i) {
                   objid o;
                   object_state *os;
@@ -725,8 +750,6 @@ void client_net_tick(void)
          }
       }
      corrupt:
-      ods("PID: %d; ping: %d (pending input %d); obj updates %d\n",
-             player_id, ping, pending_input, num_object_updates);
       packet_size = net_receive(packet, sizeof(packet), &receive_addr);
    }
 

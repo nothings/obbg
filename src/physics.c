@@ -198,6 +198,7 @@ int collision_test_box(collision_geometry *cg, float x, float y, float z, float 
 }
 
 #define Z_EPSILON 0.001f
+#define STEP_UP_VELOCITY -0.75
 
 int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
 {
@@ -233,6 +234,21 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
             vel->x = 0;
             vel->y = 0;
             z += dz;
+         } else if (vel->z > STEP_UP_VELOCITY && !collision_test_box(&cg, x+dx, y+dy, (float) ceil(z), size) && collision_test_box(&cg, x+dx, y+dy, (float) ceil(z)-1, size)) {
+            vel->z = 0;
+            x += dx;
+            y += dy;
+            z = (float) ceil(z);
+         } else if (vel->z > STEP_UP_VELOCITY && !collision_test_box(&cg, x+dx, y   , (float) ceil(z), size) && collision_test_box(&cg, x+dx, y   , (float) ceil(z)-1, size)) {
+            vel->z = 0;
+            x += dx;
+            vel->y = 0;
+            z = (float) ceil(z);
+         } else if (vel->z > STEP_UP_VELOCITY && !collision_test_box(&cg, x   , y+dy, (float) ceil(z), size) && collision_test_box(&cg, x   , y+dy, (float) ceil(z)-1, size)) {
+            vel->z = 0;
+            vel->x = 0;
+            y += dy;
+            z = (float) ceil(z);
          } else {
             // move bottom to floor of current voxel
             if (dz > 0) {
@@ -266,17 +282,35 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
          z += dz;
       }
    } else {
-      // in contact w/ the ground
+      // previous position is currently in contact w/ the ground
       result = 1;
+
       if (collision_test_box(&cg, x+dx,y+dy,z, size)) {
          // step up?
          if (!collision_test_box(&cg, x+dx,y+dy,z+1, size)) {
+            // step up!
             x += dx;
             y += dy;
             z += 1;
          } else {
-            vel->x = 0;
-            vel->y = 0;
+            if (!collision_test_box(&cg, x+dx, y+0, z, size)) {
+               x += dx;
+               vel->y = 0;
+            } else if (!collision_test_box(&cg, x+0, y+dy, z, size)) {
+               vel->x = 0;
+               y += dy;
+            } else if (!collision_test_box(&cg, x+dx, y+0, z+1, size)) {
+               x += dx;
+               vel->y = 0;
+               z += 1;
+            } else if (!collision_test_box(&cg, x+0, y+dy, z+1, size)) {
+               vel->x = 0;
+               y += dy;
+               z += 1;
+            } else {
+               vel->x = 0;
+               vel->y = 0;
+            }
          }
       } else {
          x += dx;
