@@ -9,6 +9,11 @@ obbg:
   - networking
 
 Done in today's stream:
+  - 
+
+Previous stream:
+  - fix jumping up bug
+  - fix tilting up moves backwards
 
 Previous stream:
   - forgot to document it

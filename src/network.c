@@ -217,29 +217,14 @@ Bool net_init(Bool server, int server_port)
 connection_t connection[MAX_CONNECTIONS];
 int connection_for_pid[PLAYER_OBJECT_MAX];
 
-int create_connection(address *addr)
+int create_connection(address *addr, objid pid)
 {
    int i;
    for (i=0; i < MAX_CONNECTIONS; ++i)
       if (connection[i].addr.port == 0) {
-         objid pid;
-         connection[i].pid = pid = allocate_player();
-         if (pid == 0)
-            return -1;
+         connection[i].pid = pid;
          connection[i].addr = *addr;
          connection_for_pid[connection[i].pid] = i;
-         obj[pid].position.x = (float) (rand() & 31);
-         obj[pid].position.y = (float) (rand() & 31);
-         obj[pid].position.z = 100;
-
-         obj[pid].ang.x = 0;
-         obj[pid].ang.y = 0;
-         obj[pid].ang.z = 0;
-
-         obj[pid].velocity.x = 0;
-         obj[pid].velocity.y = 0;
-         obj[pid].velocity.z = 0;
-
          return i;
       }
    return -1;
@@ -255,7 +240,6 @@ int find_connection(address *addr)
 }
 
 #define NUM_INPUTS_PER_PACKET     6  // 100 ms buffer with 30hz packets = each 60hz input in 3 packets
-#define INPUT_PACKETS_PER_SECOND  30
 
 #define MAX_SERVER_STATE_HISTORY       8
 #define MAX_CLIENT_INPUT_HISTORY      12
@@ -269,6 +253,7 @@ int find_connection(address *addr)
 typedef struct
 {
    player_net_controls input[MAX_CLIENT_INPUT_HISTORY];
+   Bool valid[MAX_CLIENT_INPUT_HISTORY];
    uint64 client_input_offset;
    int saw_frame_past_halfway;
 } player_input_history;
@@ -309,7 +294,7 @@ uint16 angle_to_network(float ang)
 
 uint64 server_timestamp = 1U<<24;
 
-#define NO_PLAYER_INPUT_BUFFERING
+//#define NO_PLAYER_INPUT_BUFFERING
 
 //      p_input[connection[n].pid].buttons = input.last_inputs[0].buttons;
 //      obj[connection[n].pid].ang.x = angle_from_network(input.last_inputs[0].view_x) - 90;
@@ -318,6 +303,7 @@ void process_player_input(objid pid, net_client_input *input)
 {
    #ifdef NO_PLAYER_INPUT_BUFFERING
    phistory[pid].input[0] = input->last_inputs[0];
+   phistory[pid].valid[0] = True;
    #else
    
    int i;
@@ -343,10 +329,32 @@ void process_player_input(objid pid, net_client_input *input)
    for (i=0; i < NUM_INPUTS_PER_PACKET; ++i) {
       if (input_timestamp >= server_timestamp && input_timestamp < server_timestamp + MAX_CLIENT_INPUT_HISTORY) {
          phistory[pid].input[input_timestamp - server_timestamp] = input->last_inputs[i];
+         phistory[pid].valid[input_timestamp - server_timestamp] = True;
       }
       --input_timestamp;
    }
    #endif
+}
+
+objid create_player(void)
+{
+   objid pid = allocate_player();
+   if (pid == 0)
+      return -1;
+
+   obj[pid].position.x = (float) (rand() & 31);
+   obj[pid].position.y = (float) (rand() & 31);
+   obj[pid].position.z = 200;
+
+   obj[pid].ang.x = 0;
+   obj[pid].ang.y = 0;
+   obj[pid].ang.z = 0;
+
+   obj[pid].velocity.x = 0;
+   obj[pid].velocity.y = 0;
+   obj[pid].velocity.z = 0;
+
+   return pid;
 }
 
 // 1. consumes all packets from players
@@ -360,7 +368,8 @@ void server_net_tick_pre_physics(void)
    while (net_receive(&input, sizeof(input), &addr) >= 0) {
       int n = find_connection(&addr);
       if (n < 0) {
-         n = create_connection(&addr);
+         objid pid = create_player();
+         n = create_connection(&addr, pid);
          if (n < 0)
             continue;
       }
@@ -377,8 +386,10 @@ void server_net_tick_pre_physics(void)
          ods("buttons: %04x\n", p_input[i].buttons);
 
          #ifndef NO_PLAYER_INPUT_BUFFERING         
-         memmove(&phistory[i].input[0], &phistory[i].input[1], MAX_CLIENT_INPUT_HISTORY-1);
+         memmove(&phistory[i].input[0], &phistory[i].input[1], sizeof(phistory[i].input[0]) * (MAX_CLIENT_INPUT_HISTORY-1));
+         memmove(&phistory[i].valid[0], &phistory[i].valid[1], sizeof(phistory[i].valid[0]) * (MAX_CLIENT_INPUT_HISTORY-1));
          phistory[i].input[MAX_CLIENT_INPUT_HISTORY-1].buttons = 0;
+         phistory[i].valid[MAX_CLIENT_INPUT_HISTORY-1] = False;
          #endif
       }
    }
@@ -406,7 +417,13 @@ enum
    RECORD_TYPE_invalid,
    RECORD_TYPE_player_objid,
    RECORD_TYPE_object_state,
+   RECORD_TYPE_connection_info
 };
+
+typedef struct
+{
+   uint8 buffered_packets;
+} connection_info;
 
 typedef struct
 {
@@ -421,6 +438,14 @@ void write_to_packet(char *buffer, int *off, void *data, int data_size, int limi
    *off += data_size;
 }
 
+int count_buffered_packets_for_player(int pid)
+{
+   int i, n = 0;
+   for (i=0; i < MAX_CLIENT_INPUT_HISTORY; ++i)
+      n += phistory[pid].valid[i];
+   return n;
+}
+
 /*
  +    6.       compute min update time (1 over max update rate)
  *   10.             add state to pending non-reliable list w/priority
@@ -433,6 +458,7 @@ int build_packet_for_player(objid pid, char *buffer, int buffer_size)
    packet_header ph;
    record_header rh;
    net_objid no;
+   connection_info ci;
 
    ph.seq = outhistory[pid].sequence;
    ph.timestamp = (uint8) (server_timestamp & 0xff);
@@ -444,6 +470,12 @@ int build_packet_for_player(objid pid, char *buffer, int buffer_size)
    write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
    write_to_packet(buffer, &offset, &no, sizeof(no), buffer_size);
    empty = False;
+
+   rh.type = RECORD_TYPE_connection_info;
+   rh.count = 1;
+   ci.buffered_packets = count_buffered_packets_for_player(pid);
+   write_to_packet(buffer, &offset, &rh, sizeof(rh), buffer_size);
+   write_to_packet(buffer, &offset, &ci, sizeof(ci), buffer_size);
 
    save_offset = offset;
    rh.type = RECORD_TYPE_object_state;
@@ -570,7 +602,7 @@ void client_net_tick(void)
    vec ang = { 0,0,0 };
    Bool override_ang = False;
    address receive_addr;
-   int packet_size;
+   int packet_size, pending_input=-1, num_object_updates=0;
 
    if (1 || player_id != 0) {
       ang = obj[player_id].ang;
@@ -609,10 +641,20 @@ void client_net_tick(void)
                player_id = no->objid;
                break;
             }
+            case RECORD_TYPE_connection_info: {
+               connection_info *ci;
+               if (offset + (int) sizeof(*ci) > packet_size)
+                  goto corrupt;
+               ci = (connection_info *) (packet+offset);
+               offset += sizeof(*ci);
+               pending_input = ci->buffered_packets;
+               break;
+            }
             case RECORD_TYPE_object_state: {
                int i;
                if (offset + (int) (sizeof(object_state)+sizeof(net_objid))*rh->count > packet_size)
                   goto corrupt;
+               num_object_updates = rh->count;
                for (i=0; i < rh->count; ++i) {
                   objid o;
                   object_state *os;
@@ -636,6 +678,7 @@ void client_net_tick(void)
                   obj[o].velocity.z = os->v[2];
                   obj[o].ang.x = os->o[0];
                   obj[o].ang.z = os->o[1];
+                  obj[o].valid = True;
                }
                break;
             }               
@@ -644,11 +687,14 @@ void client_net_tick(void)
          }
       }
      corrupt:
+      ods("PID: %d; pending input %d; obj updates %d\n", player_id, pending_input, num_object_updates);
       packet_size = net_receive(packet, sizeof(packet), &receive_addr);
    }
 
    if (override_ang)
       obj[player_id].ang = ang;
+
+
 }
 
 //   1024 connections

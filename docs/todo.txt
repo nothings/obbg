@@ -1,9 +1,9 @@
 Possible tasks to work on next:
 
    Networking:
-   -  client transmits last N inputs
+   *  client transmits last N inputs
    -  client replays last K inputs relative to server update data
-   -  server buffers M inputs from client
+   *  server buffers M inputs from client
    -  server sends sparser updates
    -  client interpolates between recent server updates
       - and extrapolates if necessary?!?
