@@ -805,11 +805,13 @@ int SDL_main(int argc, char **argv)
 
       SDL_GL_MakeCurrent(window, context); // is this true by default?
 
+      #if 1
       SDL_SetRelativeMouseMode(SDL_TRUE);
       #if defined(_MSC_VER) && _MSC_VER < 1300
       // work around broken behavior in VC6 debugging
       if (IsDebuggerPresent())
          SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, "1");
+      #endif
       #endif
 
       stbgl_initExtensions();

@@ -9,7 +9,9 @@ obbg:
   - networking
 
 Done in today's stream:
-  - 
+  - print network info on client & server
+  - fix bug
+  - initial client-side prediction
 
 Previous stream:
   - fix jumping up bug

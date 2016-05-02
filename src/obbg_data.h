@@ -133,7 +133,10 @@ typedef struct
    uint16 view_x, view_z;
    uint8  client_frame;
    uint8  reserved;
-} player_net_controls; // 6 bytes    (6 * 10 + 28 = 88 bytes/packet, * 30/sec = 2640 bytes/sec)
+} player_net_controls; // 8 bytes    (8 * 12 + 28 = 124 bytes/packet, * 30/sec = 3720 bytes/sec)
+
+// buffer 12 inputs at 30hz = 124*30 = 3720 bytes/sec   - can lose 5 packets in a row, imposes an extra 33ms latency
+// buffer  5 inputs at 60hz =  68*60 = 4080 bytes/sec   - can lose 4 packets in a row
 
 typedef struct
 {

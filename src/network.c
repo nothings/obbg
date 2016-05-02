@@ -15,67 +15,19 @@
 // There is also clever stuff to do to handle the client player
 // shooting at another player ("lag compenstation").
 //
-// What nobody talks much about is how the server-side is
-// dealing with this, especially since there's variable
-// latency from the client (e.g. even with stable latency,
-// if a packet from client is dropped, then user input from
-// that packet is delayed).
 //
-// So here are four possible approaches to server-side "physics"
-// for the above scenario (doing client-side prediction and
-// receiving only player-input from clients).
+//     Player A: 500ms ping
+//     Player B: 800ms ping
 //
-//   - 1. buffer client input for some length of time, then
-//        execute a global tick for entire system at once
+// Server time T
 //
-//   - 2. simulate globally-timed state; late client input rewinds
-//        time, simulates that client forward (against *cached*
-//        states), emits state to client as it goes forward,
-//        avoids changing anything else so all other clients
-//        only need updating about this client's state
+//     Input player A: T-250ms
+//     Input player B: T-400ms
 //
-//   - 3. simulate globally-timed state; late client input rewinds
-//        time, simulates all clients forward again, may need
-//        to update already-sent state with newer, more correct
-//        values
-//
-//   - 4. simulate opportunistically as soon as you get client
-//        input; all physics state is unchanging while client
-//        is simulating
-//
-// "late client input" is just for expository purposes; effectively,
-// all client input is late by a variable amount (varying depending
-// on lag/dropped packets).
-//
-// We can describe the above in terms of a scenario where player
-// A & B try to move to the same location (even though physics is
-// supposed to prevent the players from being in the same location)
-// and according to their relative clocks player A gets there first,
-// but due to variable latency the server receives the packet for
-// player B first. (Note I'm not talking in detail about what 'clocks'
-// means here, I just need a characterization like that to make sense
-// of the some of the above scenarios):
-//
-//     1. player A ends up in the place and player B doesn't (as long as the
-//        buffering is sufficient to cover the late packet from A)
-//
-//     2. player A and player B end up in the same place
-//
-//     3. player A ends up in the place, and player B doesn't, but a
-//        packet might go out first that claims player B got there
-//
-//     4. player B ends up in the place ("first come first served")
-//
-// Note that in case 1, if a player input packet is delayed by more
-// than the client buffering time, that player input is *dropped
-// entirely*, which is going to cause the player to jump around from
-// their point of view. Since network dropouts can be bursty, this
-// means you could easily lose a bunch of input, say a second's worth,
-// which could mean a pretty big jump. However, the alternative (e.g. #4)
-// would result in all the players seeing A's 1 second of activity all
-// at once in a burst, so we're going to guess that it's better for A
-// to suffer A's net drop, instead of everyone else, so we're going to
-// implement method 1.
+// Player A pressed jump at T-250ms, just got packet from T-500ms, clock at 12:00:00.00
+// Server processing A's jump at T+0ms, clock at 12:00:00.25
+// Server sends packet to B with A jumping at T
+// Player B sees A jumping at T+400ms, clock still at 12:00:00.25
 
 /*
  Stuff marked + or * must _all_ be implemented before the new
@@ -239,10 +191,13 @@ int find_connection(address *addr)
    return -1;
 }
 
-#define NUM_INPUTS_PER_PACKET     6  // 100 ms buffer with 30hz packets = each 60hz input in 3 packets
+#define NUM_INPUTS_PER_PACKET         12  // 200 ms buffer with 30hz packets = each 60hz input in 6 packets
 
-#define MAX_SERVER_STATE_HISTORY       8
-#define MAX_CLIENT_INPUT_HISTORY      12
+#define MAX_SERVER_STATE_HISTORY       8   // lag-compensation history buffer count
+
+#define MAX_CLIENT_INPUT_HISTORY       8   // buffer the client input on the server
+
+
 #define MAX_CLIENT_FRAME_NUMBER_LOG2   8
 #define MAX_CLIENT_FRAME_NUMBER       (1 << MAX_CLIENT_FRAME_NUMBER_LOG2)
 
@@ -256,6 +211,7 @@ typedef struct
    Bool valid[MAX_CLIENT_INPUT_HISTORY];
    uint64 client_input_offset;
    int saw_frame_past_halfway;
+   uint8 done_initial_synchronization;
    uint8 last_frame;
    uint8 last_seq;
    uint8 last_client_input_frame_applied;
@@ -311,33 +267,36 @@ void process_player_input(objid pid, net_client_input *input)
    phistory[pid].valid[0] = True;
    #else
    
+   player_input_history *p = &phistory[pid];
    int i;
    uint64 input_timestamp;
 
-   phistory[pid].last_frame = input->frame;
-   phistory[pid].last_seq = input->sequence;
+   p->last_frame = input->frame;
+   p->last_seq = input->sequence;
+
+   if (input->frame >= CLIENT_FRAME_HALFWAY_POINT)
+      p->saw_frame_past_halfway = True;
 
    if (input->frame < CLIENT_FRAME_HALFWAY_POINT && phistory[pid].saw_frame_past_halfway) {
-      player_input_history *p = &phistory[pid];
       p->client_input_offset += MAX_CLIENT_FRAME_NUMBER;
-
-      // if the input frame is no longer in the valid window, recompute an client offset clock;
-      // @TODO: avoid doing this too frequently
-      if (p->client_input_offset + input->frame < server_timestamp || p->client_input_offset + input->frame >= server_timestamp + MAX_CLIENT_INPUT_HISTORY) {
-         p->client_input_offset = server_timestamp + MAX_CLIENT_INPUT_HISTORY/2 - input->frame;
-      }
-
-      phistory[pid].saw_frame_past_halfway = False;
+      p->saw_frame_past_halfway = False;
    }
 
-   if (input->frame > CLIENT_FRAME_HALFWAY_POINT)
-      phistory[pid].saw_frame_past_halfway = True;
+   // if the input frame is no longer in the valid window, recompute a client buffer offset
+   // @TODO: avoid doing this too frequently
+   // @TODO: avoid synchronizing to old packets unless we're only getting 'old' packets
+   if (!p->done_initial_synchronization ||
+       (p->client_input_offset + input->frame - (MAX_CLIENT_INPUT_HISTORY-1) < server_timestamp || p->client_input_offset + input->frame >= server_timestamp)) {
+      p->client_input_offset = server_timestamp + MAX_CLIENT_INPUT_HISTORY/2 - input->frame;
+      p->done_initial_synchronization = True;
+      // @TODO should we fudge this offset since we're sending so many control inputs per packet?
+   }
 
-   input_timestamp = phistory[pid].client_input_offset + input->frame;
+   input_timestamp = p->client_input_offset + input->frame;
    for (i=0; i < NUM_INPUTS_PER_PACKET; ++i) {
       if (input_timestamp >= server_timestamp && input_timestamp < server_timestamp + MAX_CLIENT_INPUT_HISTORY) {
-         phistory[pid].input[input_timestamp - server_timestamp] = input->last_inputs[i];
-         phistory[pid].valid[input_timestamp - server_timestamp] = True;
+         p->input[input_timestamp - server_timestamp] = input->last_inputs[i];
+         p->valid[input_timestamp - server_timestamp] = True;
       }
       --input_timestamp;
    }
@@ -410,6 +369,7 @@ void server_net_tick_pre_physics(void)
          //ods("buttons: %04x\n", p_input[i].buttons);
 
          phistory[i].last_client_input_frame_applied = phistory[i].input[0].client_frame;
+         #if 0
          ods("Using input frame %d (%d %d %d %d %d %d %d)\n", phistory[i].input[0].client_frame,
                                                               phistory[i].input[1].client_frame, 
                                                               phistory[i].input[2].client_frame, 
@@ -418,6 +378,7 @@ void server_net_tick_pre_physics(void)
                                                               phistory[i].input[5].client_frame, 
                                                               phistory[i].input[6].client_frame, 
                                                               phistory[i].input[7].client_frame);
+         #endif
 
          #ifndef NO_PLAYER_INPUT_BUFFERING         
          memmove(&phistory[i].input[0], &phistory[i].input[1], sizeof(phistory[i].input[0]) * (MAX_CLIENT_INPUT_HISTORY-1));
@@ -640,7 +601,6 @@ static Uint32 get_timestamp_for_seq(int seq)
    return 0;
 }
 
-
 /*
  *    0.  collect player input
  *    1.  send player input to server
@@ -689,6 +649,7 @@ void client_net_tick(void)
    int packet_size, pending_input=-1, num_object_updates=0;
    int last_frame = -1, last_seq = -1;
 
+   ods("client net tick\n");
 
    if (1 || player_id != 0) {
       ang = obj[player_id].ang;
@@ -749,14 +710,14 @@ void client_net_tick(void)
                last_frame = ci->client_frame;
                last_seq = ci->client_seq;
                ping = SDL_GetTicks() - get_timestamp_for_seq(last_seq);
-               ods("PID: %d; ping: %d (pending input %d)\n", player_id, ping, pending_input);
+               //ods("PID: %d; ping: %d (pending input %d)\n", player_id, ping, pending_input);
                break;
             }
             case RECORD_TYPE_object_state: {
                int i;
                if (offset + (int) (sizeof(object_state)+sizeof(net_objid))*rh->count > packet_size)
                   goto corrupt;
-               ods("PID: %d; obj updates %d\n", player_id, rh->count);
+               //ods("PID: %d; obj updates %d\n", player_id, rh->count);
                for (i=0; i < rh->count; ++i) {
                   objid o;
                   object_state *os;
