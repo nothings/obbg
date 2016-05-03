@@ -103,9 +103,9 @@ mesh_chunk *get_physics_chunk_for_coord(int x, int y)
    return NULL;
 }
 
-#define COLLIDE_BLOB_X   12
-#define COLLIDE_BLOB_Y   12
-#define COLLIDE_BLOB_Z   12
+#define COLLIDE_BLOB_X   20
+#define COLLIDE_BLOB_Y   20
+#define COLLIDE_BLOB_Z   20
 
 typedef struct
 {
@@ -345,7 +345,7 @@ Bool raycast(float x1, float y1, float z1, float x2, float y2, float z2, Raycast
       float y = stb_lerp(t, y1, y2);
       float z = stb_lerp(t, z1, z2);
       int ix = (int) x, iy = (int) y, iz = (int) z;
-      if (cg.data[iz][iy][ix] != BT_empty) {
+      if (cg.data[iy][ix][iz] != BT_empty) {
          res->bx = ix + cg.x;
          res->by = iy + cg.y;
          res->bz = iz + cg.z;

@@ -375,6 +375,14 @@ void render_objects(void)
    }
 }
 
+static int face_dir[6][3] = {
+   { 1,0,0 },
+   { 0,1,0 },
+   { -1,0,0 },
+   { 0,-1,0 },
+   { 0,0,1 },
+   { 0,0,-1 },
+};
 
 void draw_main(void)
 {
@@ -448,13 +456,19 @@ void draw_main(void)
    glDisable(GL_CULL_FACE);
    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-   if (0) {
+   if (1) {
+      int i;
       vec pos[2];
       RaycastResult result;
       // show wireframe of currently 'selected' block
-      objspace_to_worldspace(&pos[1].x, player_id, 0,5,0);
+      objspace_to_worldspace(&pos[1].x, player_id, 0,9,0);
       pos[0] = obj[player_id].position;
+      pos[1].x += pos[0].x;
+      pos[1].y += pos[0].y;
+      pos[1].z += pos[0].z;
       if (raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result)) {
+         for (i=0; i < 3; ++i)
+            (&result.bx)[i] += face_dir[result.face][i];
          glColor3f(0.7f,1.0f,0.7f);
          stbgl_drawBox(result.bx+0.5f, result.by+0.5f, result.bz+0.5f, 1.2f, 1.2f, 1.2f, 0);
       }
