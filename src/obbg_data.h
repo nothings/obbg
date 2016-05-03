@@ -72,12 +72,25 @@ enum
    BT_leaves,
 };
 
+
+enum {
+   FACE_east,
+   FACE_north,
+   FACE_west,
+   FACE_south,
+   FACE_up,
+   FACE_down
+};
+
+
+#if 0
 // physics types
 enum
 {
    PT_empty,
    PT_solid,
 };
+#endif
 
 typedef struct
 {
@@ -203,6 +216,13 @@ extern int view_dist_for_display;
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 extern unsigned char tex1_for_blocktype[256][6];
 
-extern Bool is_server;
+enum
+{
+   MODE_single_player,
+   MODE_server,
+   MODE_client
+};
+
+extern int program_mode;
 extern player_controls p_input[PLAYER_OBJECT_MAX];
 #endif

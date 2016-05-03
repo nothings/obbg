@@ -36,8 +36,6 @@
 
 char *game_name = "obbg";
 
-Bool is_server;
-
 
 #define REVERSE_DEPTH
 
@@ -241,60 +239,35 @@ float pending_view_z;
 player_controls client_player_input;
 
 float pending_dt;
-#define MULTIPLAYER
+
+int program_mode = MODE_single_player;
 
 void process_tick(float dt)
 {
    dt += pending_dt;
    pending_dt = 0;
    while (dt > 1.0f/60) {
-      #ifdef MULTIPLAYER
-      if (is_server) {
-         server_net_tick_pre_physics();
-         process_tick_raw(1.0f/60);
-         server_net_tick_post_physics();
-      } else {
-         client_view_physics(player_id, &client_player_input, dt);
-         client_net_tick();
+      switch (program_mode) {
+         case MODE_server:
+            server_net_tick_pre_physics();
+            process_tick_raw(1.0f/60);
+            server_net_tick_post_physics();
+            break;
+         case MODE_client:
+            client_view_physics(player_id, &client_player_input, dt);
+            client_net_tick();
+            break;
+         case MODE_single_player:
+            client_view_physics(player_id, &client_player_input, dt);
+            p_input[player_id] = client_player_input;
+            process_tick_raw(1.0f/60);
+            break;
       }
-      #else
-      client_view_physics(player_id, &client_player_input, dt);
-      process_tick_raw(1.0f/60);
-      #endif
+
       dt -= 1.0f/60;
    }
    pending_dt += dt;
-   #if 0
-   if (is_server) {
-      while (net_receive(&client_player_input, sizeof(client_player_input)) >= 0)
-         ;
-   } else {
-      while (net_receive(&o, sizeof(o)) >= 0) {
-         obj[player_id].position = o.position;
-         obj[player_id].velocity = o.velocity;
-      }
-   }
-   #endif
 }
-
-#if 0
-      if (is_server) {
-         net_receive(&client_player_input, sizeof(client_player_input));
-         obj[player_id].ang = client_player_input.ang;
-         //physics_set_player_coord(NULL, 0, (int) obj[player_id].position.x, (int) obj[player_id].position_y);
-         process_tick_raw(1.0f/60);
-         net_send(&obj[player_id], sizeof(obj[player_id]));
-      } else {
-         client_player_input.ang = obj[player_id].ang;
-         net_send(&client_player_input, sizeof(client_player_input));
-         client_view_physics(player_id, &client_player_input, dt);
-         o = obj[player_id];
-         if (net_receive(&o, sizeof(o))) {
-            obj[player_id].position = o.position;
-            obj[player_id].velocity = o.velocity;
-         }
-      }
-#endif
 
 void update_view(float dx, float dy)
 {
@@ -471,6 +444,24 @@ void draw_main(void)
 
    end_time = SDL_GetPerformanceCounter();
 
+   glDisable(GL_LIGHTING);
+   glDisable(GL_CULL_FACE);
+   glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+   if (0) {
+      vec pos[2];
+      RaycastResult result;
+      // show wireframe of currently 'selected' block
+      objspace_to_worldspace(&pos[1].x, player_id, 0,5,0);
+      pos[0] = obj[player_id].position;
+      if (raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result)) {
+         glColor3f(0.7f,1.0f,0.7f);
+         stbgl_drawBox(result.bx+0.5f, result.by+0.5f, result.bz+0.5f, 1.2f, 1.2f, 1.2f, 0);
+      }
+   }
+
+   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
    render_time = (end_time - start_time) / (float) SDL_GetPerformanceFrequency();
 
    glMatrixMode(GL_PROJECTION);
@@ -582,8 +573,7 @@ int loopmode(float dt, int real, int in_client)
 
    process_tick(dt);
 
-   if (1 || !is_server)
-      draw();
+   draw();
 
    return 0;
 }
@@ -757,8 +747,11 @@ int SDL_main(int argc, char **argv)
    //client_player_input.flying = True;
 
    if (argc > 1 && !strcmp(argv[1], "--server")) {
-      is_server = True;
+      program_mode = MODE_server;
    }
+   if (argc > 1 && !strcmp(argv[1], "--client"))
+      program_mode = MODE_client;
+
    if (argc > 2 && !strcmp(argv[1], "--port")) {
       server_port = atoi(argv[2]);
    }
@@ -788,12 +781,12 @@ int SDL_main(int argc, char **argv)
    screen_y = 720;
    #endif
 
-   if (is_server) {
+   if (program_mode == MODE_server) {
       screen_x = 320;
       screen_y = 200;
    }
 
-   if (1 || !is_server) {
+   if (1 || program_mode != MODE_server) {
       window = SDL_CreateWindow("obbg", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                       screen_x, screen_y,
                                       SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
@@ -827,11 +820,11 @@ int SDL_main(int argc, char **argv)
       SDL_GL_SetSwapInterval(1);
    }
 
-   networking = net_init(is_server, server_port);
+   if (program_mode != MODE_single_player)
+      networking = net_init(program_mode == MODE_server, server_port);
 
    game_init();
-   if (1 || !is_server)
-      render_init();
+   render_init();
 
    //mesh_init();
    world_init();

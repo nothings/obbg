@@ -9,6 +9,11 @@ obbg:
   - networking
 
 Done in today's stream:
+
+Previous stream:
+  - fix sync of client input buffering
+
+Previous stream:
   - print network info on client & server
   - fix bug
   - initial client-side prediction

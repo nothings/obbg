@@ -103,8 +103,8 @@ mesh_chunk *get_physics_chunk_for_coord(int x, int y)
    return NULL;
 }
 
-#define COLLIDE_BLOB_X   8
-#define COLLIDE_BLOB_Y   8
+#define COLLIDE_BLOB_X   12
+#define COLLIDE_BLOB_Y   12
 #define COLLIDE_BLOB_Z   12
 
 typedef struct
@@ -323,4 +323,46 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
    pos->z = z;
 
    return result;
+}
+
+Bool raycast(float x1, float y1, float z1, float x2, float y2, float z2, RaycastResult *res)
+{
+   float t;
+
+   float xm = stb_min(x1,x2);
+   float ym = stb_min(y1,y2);
+   float zm = stb_min(z1,z2);
+
+   collision_geometry cg;
+   gather_collision_geometry(&cg, (int) floor(xm), (int) floor(ym), (int) floor(zm));
+
+   x1 -= cg.x;    x2 -= cg.x;    
+   y1 -= cg.y;    y2 -= cg.y;    
+   z1 -= cg.z;    z2 -= cg.z;    
+
+   for (t=0; t <= 1.0; t += 1.0/1024) {
+      float x = stb_lerp(t, x1, x2);
+      float y = stb_lerp(t, y1, y2);
+      float z = stb_lerp(t, z1, z2);
+      int ix = (int) x, iy = (int) y, iz = (int) z;
+      if (cg.data[iz][iy][ix] != BT_empty) {
+         res->bx = ix + cg.x;
+         res->by = iy + cg.y;
+         res->bz = iz + cg.z;
+
+         x -= ix+0.5f;
+         y -= iy+0.5f;
+         z -= iz+0.5f;
+         if (fabs(x) > fabs(y) && fabs(x) > fabs(z))
+            res->face = x < 0 ? FACE_west  : FACE_east;
+         else if (fabs(y) > fabs(x) && fabs(y) > fabs(z))
+            res->face = y < 0 ? FACE_south : FACE_north;
+         else
+            res->face = z < 0 ? FACE_down  : FACE_up;
+         
+         return True;
+      }
+   }
+
+   return False;
 }

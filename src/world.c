@@ -28,11 +28,13 @@ objid player_id;
 
 void world_init(void)
 {
-   //player_id = allocate_player();
+   if (program_mode == MODE_single_player) {
+      player_id = allocate_player();
 
-   obj[player_id].position.x = 0;
-   obj[player_id].position.y = 0;
-   obj[player_id].position.z = 180;
+      obj[player_id].position.x = 0;
+      obj[player_id].position.y = 0;
+      obj[player_id].position.z = 180;
+   }
 }
 
 float square(float x) { return x*x; }

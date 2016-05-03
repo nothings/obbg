@@ -1,5 +1,55 @@
 Possible tasks to work on next:
 
+   Factorio-esque:
+   -  player block placement
+      - raycast
+         - physics representation
+      - rebuild chunks
+   -  save changes to disk
+      -  (save changes to memory?)
+   -  conveyor belts
+      - animation by scrolling textures
+         - can we use existing texture rotation tech to avoid duplicating textures?
+   -  moving objects need to be treated as 'objects'
+      - can be sprites or polygonal
+      - large quantities (10,000?) of sprites
+      - small quantities of polygonal objects
+   -  conveyor belts (special physics)
+      - factorio-style two-rows-of-sprite-sized stuff per conveyor
+      - or just one row of block-sized stuff
+      - maybe require multi-block things to be supported by multiple conveyors
+      - factorio-style stuff stops at end of conveyor, not infinifactory falling-off-esque
+   -  fixed "objects" can be blocks
+      - any machinery that you can have a lot of should be (geometrically) blocks
+      - machinery that is rare can go through a simpler polygon engine (same as 'moving object' system?)
+   -  can build multi-block machines by infinifactory-style welding
+   -  mine ore from ore blocks
+      - gradual process that slowly depletes ore
+        - graphical representation how?!?
+          - encode as second texture on block so can have many degraded blocks?
+            - if state changes frequently have to rebuild chunk frequently
+   -  player inventory
+   -  player crafting(?)
+   -  tool-equipping system(?)
+
+
+   Game features:
+   -  object system
+   -  object (non-terrain) rendering
+      - what model-file format?
+      - animation? skinning?
+      - procedural animation of characters?
+   -  fix walking physics
+      + push smoothly along walls
+      - smooth camera height when stepping up
+      * don't stick to walls when falling one block
+      - core physics model should steer existing momentum to new direction instead of being so Newtonian
+   -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
+      - 1 byte length
+      - 1 byte type
+   -  raycast (needs physics rep)
+   -  shoot guns
+
    Networking:
    -  client-side prediction
       -  client replays last K inputs relative to server update data
@@ -36,23 +86,6 @@ Possible tasks to work on next:
       - lz4 compression?
    -  user block create/destroy (needs raycast?)
    -  networking
-
-   Game features:
-   -  object system
-   -  object (non-terrain) rendering
-      - what model-file format?
-      - animation? skinning?
-      - procedural animation of characters?
-   -  fix walking physics
-      + push smoothly along walls
-      - smooth camera height when stepping up
-      * don't stick to walls when falling one block
-      - core physics model should steer existing momentum to new direction instead of being so Newtonian
-   -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
-      - 1 byte length
-      - 1 byte type
-   -  raycast (needs physics rep)
-   -  shoot guns
 
    Code quality
    -  check for memory leaks

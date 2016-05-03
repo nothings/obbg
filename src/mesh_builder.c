@@ -1442,19 +1442,8 @@ int worker_manager(void *data)
                   build_phys_chunk(mc, &mcs->cs, rm->x, rm->y);
 
                   memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
-                  #if 1
                   for (i=0; i < 16; ++i)
                      release_gen_chunk(mcs->cs.chunk[0][i]);
-                  #else
-                  release_gen_chunk(mcs->cs.chunk[1][1]);
-                  release_gen_chunk(mcs->cs.chunk[1][2]);
-                  release_gen_chunk(mcs->cs.chunk[2][1]);
-                  release_gen_chunk(mcs->cs.chunk[2][2]);
-                  for (j=0; j < 4; ++j)
-                     for (i=0; i < 4; ++i)
-                        if (i == 0 || j == 0 || i == 3 || j == 3)
-                           assert(mcs->cs.chunk[j][i] == NULL);
-                  #endif
                   memset(&mcs->cs, 0, sizeof(mcs->cs));
 
                   mcs->status = CHUNK_STATUS_processing;

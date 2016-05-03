@@ -31,6 +31,14 @@ extern void physics_process_mesh_chunk(mesh_chunk *mc);
 extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py);
 extern void player_physics(objid oid, player_controls *con, float dt);
 
+
+typedef struct
+{
+   int bx,by,bz;
+   int face;
+} RaycastResult;
+extern Bool raycast(float x1, float y1, float z1, float x2, float y2, float z2, RaycastResult *res);
+
 extern objid allocate_object(void);
 extern objid allocate_player(void);
 extern void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z);
