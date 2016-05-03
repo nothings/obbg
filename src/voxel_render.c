@@ -250,6 +250,7 @@ extern float light_pos[3];
 typedef struct
 {
    int x,y;
+   Bool dirty;
    float priority;
 } consider_mesh_t;
 
@@ -271,10 +272,11 @@ void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
             int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
             int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
             mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
-            if (mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
+            if (mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0 || mc->dirty) {
                consider_mesh[n].x = wx;
                consider_mesh[n].y = wy;  
                consider_mesh[n].priority = (float) (i*i + j*j);
+               consider_mesh[n].dirty = mc && mc->dirty;
                ++n;
             }
          }
@@ -292,6 +294,7 @@ void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
       rm[m].y = consider_mesh[i].y;
       rm[m].state = RMS_requested;
       rm[m].needs_triangles = True;
+      rm[m].rebuild_chunks = consider_mesh[i].dirty;
       ++m;
    }
    for (; i < MAX_BUILT_MESHES; ++i)
@@ -421,7 +424,7 @@ void render_voxel_world(float campos[3])
             int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
             int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
             mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
-            if (mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
+            if (mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0 || mc->dirty) {
                mc = build_mesh_chunk_for_coord(cx * C_MESH_CHUNK_CACHE_X, cy * C_MESH_CHUNK_CACHE_Y);
                --num_build_remaining;
                if (num_build_remaining == 0)

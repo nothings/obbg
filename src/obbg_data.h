@@ -124,6 +124,8 @@ typedef struct
    int num_quads;
    int has_triangles;
 
+   int dirty;
+
    phys_chunk pc;
    arena_chunk **allocs;
 } mesh_chunk;
@@ -207,6 +209,7 @@ typedef struct
    int x,y;
    int state;
    Bool needs_triangles;
+   Bool rebuild_chunks;
 } requested_mesh;
 
 extern int chunk_locations, chunks_considered, chunks_in_frustum;

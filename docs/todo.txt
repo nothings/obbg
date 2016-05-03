@@ -5,6 +5,7 @@ Possible tasks to work on next:
       - raycast
          - physics representation
       - rebuild chunks
+         - make sure we rebuild if we change a block while we're already rebuilding
    -  save changes to disk
       -  (save changes to memory?)
    -  conveyor belts

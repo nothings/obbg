@@ -96,6 +96,7 @@ typedef struct
    int chunk_x, chunk_y;
    int in_new_list;
    int status;
+   Bool rebuild_chunks;
    chunk_set cs;
    int chunk_set_valid[4][4];
 } mesh_chunk_status;
@@ -140,12 +141,12 @@ static void abandon_mesh_chunk_status(mesh_chunk_status *mcs)
    memset(&mcs->cs, 0, sizeof(mcs->cs));
 }
 
-static mesh_chunk_status *get_chunk_status_alloc(int x, int y, Bool needs_triangles)
+static mesh_chunk_status *get_chunk_status_alloc(int x, int y, Bool needs_triangles, Bool rebuild_chunks)
 {
    int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
    int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
    mesh_chunk_status *mcs = &mesh_status[cy & (MESH_STATUS_Y-1)][cx & (MESH_STATUS_X-1)][needs_triangles];
-   if (mcs->chunk_x == cx && mcs->chunk_y == cy)
+   if (mcs->chunk_x == cx && mcs->chunk_y == cy && mcs->status != CHUNK_STATUS_invalid)
       return mcs;
 
    if (mcs->status == CHUNK_STATUS_nonempty_chunk_set)
@@ -155,6 +156,7 @@ static mesh_chunk_status *get_chunk_status_alloc(int x, int y, Bool needs_triang
    mcs->status = CHUNK_STATUS_empty_chunk_set;
    mcs->chunk_x = cx;
    mcs->chunk_y = cy;
+   mcs->rebuild_chunks = rebuild_chunks;
 
    if (0 && !needs_triangles) {
       int i;
@@ -556,6 +558,30 @@ static float tree_shape_function(float pos)
    }
 }
 
+#define MAX_CHANGES  1024
+typedef struct
+{
+   int x,y;
+   uint8 z;
+   uint8 type;
+} BlockChange;
+
+BlockChange edits[MAX_CHANGES] = { 0,0,50, BT_leaves };
+int cur_change=1, max_changes=1;
+
+void change_block(int x, int y, int z, int type)
+{
+   edits[cur_change].x = x;
+   edits[cur_change].y = y;
+   edits[cur_change].z = z;
+   edits[cur_change].type = type;
+
+   max_changes = stb_max(cur_change+1, max_changes);
+   cur_change = (cur_change+1) & (MAX_CHANGES-1);
+
+   force_update_for_block(x,y,z);
+}
+
 gen_chunk *generate_chunk(int x, int y)
 {
    int z_seg;
@@ -571,6 +597,9 @@ gen_chunk *generate_chunk(int x, int y)
 
    memset(gc->non_empty, 0, sizeof(gc->non_empty));
    memset(gc->non_empty, 1, (ground_top+Z_SEGMENT_SIZE-1)>>Z_SEGMENT_SIZE_LOG2);
+
+   // @TODO: compute non_empty based on below updates
+   // @OPTIMIZE: change mesh builder to check non_empty
 
    for (j=-4; j < GEN_CHUNK_SIZE_Y+4; ++j)
       for (i=-4; i < GEN_CHUNK_SIZE_X+4; ++i) {
@@ -707,6 +736,16 @@ gen_chunk *generate_chunk(int x, int y)
    }
    #endif
 
+   for (i=0; i < max_changes; ++i) {
+      if (  edits[i].x >= x && edits[i].x < x+GEN_CHUNK_SIZE_X
+         && edits[i].y >= y && edits[i].y < y+GEN_CHUNK_SIZE_Y) {
+         int zs = edits[i].z >> Z_SEGMENT_SIZE_LOG2;
+         int zoff = edits[i].z & (Z_SEGMENT_SIZE-1);
+         build_column(gc, edits[i].x-x, edits[i].y-y, edits[i].z, 127, BT_wood);
+         //gc->partial[zs].block[edits[i].y-y][edits[i].x-x][zoff] = edits[i].type;
+      }
+   }
+
    // compute lighting for every block by weighted average of neighbors
 
    // loop through every partial chunk separately
@@ -739,6 +778,22 @@ gen_chunk_cache * put_chunk_in_cache(int x, int y, gen_chunk *gc)
    gcc->chunk = gc;
    add_ref_count(gc);
    return gcc;
+}
+
+void invalidate_gen_chunk_cache(int x, int y)
+{
+   int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
+   int cy = GEN_CHUNK_Y_FOR_WORLD_Y(y);
+   int slot_x = cx & (GEN_CHUNK_CACHE_X-1);
+   int slot_y = cy & (GEN_CHUNK_CACHE_Y-1);
+   gen_chunk_cache *gcc = &gen_cache[slot_y][slot_x];
+   if (gcc->chunk_x == x || gcc->chunk_y == y) {
+      if (gcc->chunk != NULL) {
+         free_gen_chunk(gcc);
+         gcc->chunk_x = cx+1;
+         gcc->chunk_y = 0;
+      }
+   }
 }
 
 gen_chunk *get_gen_chunk_for_coord(int x, int y)
@@ -982,6 +1037,28 @@ void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc)
    }
 
    c_mesh_cache[slot_y][slot_x] = new_mc;
+   c_mesh_cache[slot_y][slot_x]->dirty = False;
+}
+
+void force_update_for_block_raw(int x, int y, int z)
+{
+   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
+   int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
+   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
+   mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
+   if (mc->chunk_x == cx && mc->chunk_y == cy)
+      mc->dirty = True;
+}
+
+void force_update_for_block(int x, int y, int z)
+{
+   force_update_for_block_raw(x,y,z);
+   // OPTIMIZE: only update them if needed
+   force_update_for_block_raw(x+1,y,z);
+   force_update_for_block_raw(x,y+1,z);
+   force_update_for_block_raw(x-1,y,z);
+   force_update_for_block_raw(x,y-1,z);
 }
 
 static uint8 vertex_build_buffer[16*1024*1024];
@@ -1356,6 +1433,8 @@ void check_chunk_sets(void)
    }
 }
 
+#error "Need to update the physics cache when blocks change"
+
 int worker_manager(void *data)
 {
    int outstanding_proc_gen = 0;
@@ -1384,10 +1463,19 @@ int worker_manager(void *data)
          if (rm->state == RMS_requested) {
             int valid_chunks=0;
             mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
+            if (mcs->rebuild_chunks) {
+               for (k=0; k < 4; ++k) {
+                  for (j=0; j < 4; ++j) {
+                     int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X, cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
+                     invalidate_gen_chunk_cache(cx, cy);
+                  }
+               }
+               mcs->rebuild_chunks = False;
+            }
             for (k=0; k < 4; ++k) {
                for (j=0; j < 4; ++j) {
                   if (!mcs->chunk_set_valid[k][j]) {
-                     int cx = rm->x + j * GEN_CHUNK_SIZE_X, cy = rm->y + k * GEN_CHUNK_SIZE_Y;
+                     int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X, cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
                      gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(cx, cy);
                      if (gcc) {
                         mcs->status = CHUNK_STATUS_nonempty_chunk_set;
@@ -1531,12 +1619,14 @@ void swap_requested_meshes(void)
    if (locked) {
       int i=0, n=0;
       starvation_count = 0;
+
+      // delete any requests that are already in the mesh-building stage
       for (i=0; i < MAX_BUILT_MESHES; ++i) {
          requested_mesh *rm = &requested_meshes_alternate[i];
          mesh_chunk_status *mcs;
          if (rm->state == RMS_invalid)
             break;
-         mcs = get_chunk_status_alloc(rm->x, rm->y, rm->needs_triangles);
+         mcs = get_chunk_status_alloc(rm->x, rm->y, rm->needs_triangles, rm->rebuild_chunks);
 
          if (mcs->status == CHUNK_STATUS_processing)
             ; // delete
@@ -1547,6 +1637,7 @@ void swap_requested_meshes(void)
       }
       if (n < MAX_BUILT_MESHES)
          requested_meshes_alternate[n].state = RMS_invalid;
+
 
       for (i=0; i < MAX_BUILT_MESHES; ++i) {
          requested_mesh *rm = &requested_meshes_alternate[i];

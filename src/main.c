@@ -384,6 +384,10 @@ static int face_dir[6][3] = {
    { 0,0,-1 },
 };
 
+int selected_block_to_destroy[3];
+int selected_block_to_create[3];
+Bool selected_block_valid;
+
 void draw_main(void)
 {
    glEnable(GL_CULL_FACE);
@@ -466,12 +470,23 @@ void draw_main(void)
       pos[1].x += pos[0].x;
       pos[1].y += pos[0].y;
       pos[1].z += pos[0].z;
-      if (raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result)) {
-         for (i=0; i < 3; ++i)
-            (&result.bx)[i] += face_dir[result.face][i];
+      selected_block_valid = raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result);
+      if (selected_block_valid) {
+         for (i=0; i < 3; ++i) {
+            selected_block_to_destroy[i] = (&result.bx)[i];
+            selected_block_to_create[i] = (&result.bx)[i] + face_dir[result.face][i];
+         }
          glColor3f(0.7f,1.0f,0.7f);
-         stbgl_drawBox(result.bx+0.5f, result.by+0.5f, result.bz+0.5f, 1.2f, 1.2f, 1.2f, 0);
+         stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
       }
+   }
+
+   if (1) {
+      glBegin(GL_LINES);
+         glColor3f(1,0,0); glVertex3f(0,0,0); glVertex3f(1,0,0);
+         glColor3f(0,1,0); glVertex3f(0,0,0); glVertex3f(0,1,0);
+         glColor3f(0,0,1); glVertex3f(0,0,0); glVertex3f(0,0,1);
+      glEnd();
    }
 
    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -509,7 +524,17 @@ void draw_main(void)
 
 }
 
-
+void mouse_down(void)
+{
+   if (selected_block_valid) {
+      change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2]+4, BT_sand);
+      change_block(selected_block_to_destroy[0], selected_block_to_destroy[1], selected_block_to_destroy[2], BT_empty);
+      change_block(selected_block_to_destroy[0], selected_block_to_destroy[1], selected_block_to_destroy[2]+1, BT_empty);
+   }
+}
+void mouse_up(void)
+{
+}
 
 #pragma warning(disable:4244; disable:4305; disable:4018)
 
@@ -618,7 +643,10 @@ void process_event(SDL_Event *e)
          process_sdl_mouse(e);
          break;
       case SDL_MOUSEBUTTONDOWN:
+         mouse_down();
+         break;
       case SDL_MOUSEBUTTONUP:
+         mouse_up();
          break;
 
       case SDL_QUIT:
