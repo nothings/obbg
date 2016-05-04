@@ -62,6 +62,9 @@ void setup_uniforms(float pos[3])
 {
    int i,j;
    texture_offsets[22][0] -= 0.01f;
+   texture_offsets[23][1] += 0.01f;
+   texture_offsets[24][0] += 0.01f;
+   texture_offsets[25][1] -= 0.01f;
 
    for (i=0; i < STBVOX_UNIFORM_count; ++i) {
       stbvox_uniform_info raw, *ui=&raw;

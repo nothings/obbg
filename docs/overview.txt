@@ -9,6 +9,9 @@ obbg:
   - networking
 
 Done in today's stream:
+  - animated conveyor belt textures
+
+Previous stream:
   - re-enable single player mode
   - primitive place & destroy blocks system
 

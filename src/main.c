@@ -87,7 +87,10 @@ texture_info textures[] =
 
    1,"stone/Gray_granite_pxr128",
    1,"metal/Round_mesh_pxr128",
-   1,"machinery/conveyor"
+   1,"machinery/conveyor_east",
+   1,"machinery/conveyor_north",
+   1,"machinery/conveyor_west",
+   1,"machinery/conveyor_south",
 };
 
 void set_blocktype_texture(int bt, int tex)
@@ -114,8 +117,14 @@ void init_mesh_building(void)
    set_blocktype_texture(BT_marble, 16);
    set_blocktype_texture(BT_stone, 20);
    set_blocktype_texture(BT_leaves, 1);
-   set_blocktype_texture(BT_conveyor, 21);
-   tex1_for_blocktype[BT_conveyor][FACE_up] = 22;
+   set_blocktype_texture(BT_conveyor_east, 21);
+   set_blocktype_texture(BT_conveyor_north, 21);
+   set_blocktype_texture(BT_conveyor_west, 21);
+   set_blocktype_texture(BT_conveyor_south, 21);
+   tex1_for_blocktype[BT_conveyor_east ][FACE_up] = 22;
+   tex1_for_blocktype[BT_conveyor_north][FACE_up] = 23;
+   tex1_for_blocktype[BT_conveyor_west ][FACE_up] = 24;
+   tex1_for_blocktype[BT_conveyor_south][FACE_up] = 25;
 
    // { int i; for (i=0; i < 20; ++i) set_blocktype_texture(i, 0); }
 }
@@ -182,6 +191,9 @@ void render_init(void)
 
    texture_scales[21] = 1.0f;
    texture_scales[22] = 1.0f;
+   texture_scales[23] = 1.0f;
+   texture_scales[24] = 1.0f;
+   texture_scales[25] = 1.0f;
 
    // temporary hack:
    voxel_tex[1] = voxel_tex[0];
@@ -543,13 +555,16 @@ void draw_main(void)
 
 }
 
+int place_block=0;
 void mouse_down(int button)
 {
    if (selected_block_valid) {
       if (button == SDL_BUTTON_LEFT)
          change_block(selected_block_to_destroy[0], selected_block_to_destroy[1], selected_block_to_destroy[2], BT_empty);
-      else if (button == SDL_BUTTON_RIGHT)
-         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], BT_conveyor);
+      else if (button == SDL_BUTTON_RIGHT) {
+         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], BT_conveyor_east + place_block);
+         place_block = (place_block + 1) & 3;
+      }
    }
 }
 

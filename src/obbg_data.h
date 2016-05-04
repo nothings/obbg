@@ -74,7 +74,10 @@ enum
    BT_stone,
    BT_leaves,
 
-   BT_conveyor,
+   BT_conveyor_east,
+   BT_conveyor_north,
+   BT_conveyor_west,
+   BT_conveyor_south,
 };
 
 
