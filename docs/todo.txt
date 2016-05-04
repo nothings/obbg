@@ -2,19 +2,21 @@ Possible tasks to work on next:
 
    Factorio-esque:
    -  player block placement
-      - raycast
-         - physics representation
-      - rebuild chunks
+      * raycast
+         * physics representation
+      * rebuild chunks
          - make sure we rebuild if we change a block while we're already rebuilding
-   -  save changes to disk
-      -  (save changes to memory?)
+   -  load textures from JPG
+   -  speed up texture loading
    -  conveyor belts
       - animation by scrolling textures
          - can we use existing texture rotation tech to avoid duplicating textures?
+   -  save changes to memory?
    -  moving objects need to be treated as 'objects'
       - can be sprites or polygonal
       - large quantities (10,000?) of sprites
       - small quantities of polygonal objects
+   -  save changes to disk
    -  conveyor belts (special physics)
       - factorio-style two-rows-of-sprite-sized stuff per conveyor
       - or just one row of block-sized stuff

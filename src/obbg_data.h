@@ -73,6 +73,8 @@ enum
    BT_marble,
    BT_stone,
    BT_leaves,
+
+   BT_conveyor,
 };
 
 

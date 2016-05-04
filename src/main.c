@@ -48,6 +48,7 @@ char *dumb_fragment_shader =
 
 extern int load_crn_to_texture(unsigned char *data, size_t length);
 extern int load_crn_to_texture_array(int slot, unsigned char *data, size_t length);
+extern int load_bitmap_to_texture_array(int slot, unsigned char *data, int w, int h);
 
 GLuint debug_tex, dumb_prog;
 unsigned int voxel_tex[2];
@@ -85,6 +86,8 @@ texture_info textures[] =
    1,"stone/Blue_marble_pxr128",
 
    1,"stone/Gray_granite_pxr128",
+   1,"metal/Round_mesh_pxr128",
+   1,"machinery/conveyor"
 };
 
 void set_blocktype_texture(int bt, int tex)
@@ -111,6 +114,8 @@ void init_mesh_building(void)
    set_blocktype_texture(BT_marble, 16);
    set_blocktype_texture(BT_stone, 20);
    set_blocktype_texture(BT_leaves, 1);
+   set_blocktype_texture(BT_conveyor, 21);
+   tex1_for_blocktype[BT_conveyor][FACE_up] = 22;
 
    // { int i; for (i=0; i < 20; ++i) set_blocktype_texture(i, 0); }
 }
@@ -158,11 +163,25 @@ void render_init(void)
       size_t len;
       char *filename = stb_sprintf("data/pixar/crn/%s.crn", textures[i].filename);
       uint8 *data = stb_file(filename, &len);
-      load_crn_to_texture_array(i, data, len);
-      free(data);
+      if (data == NULL) {
+         char *filename = stb_sprintf("data/%s.jpg", textures[i].filename);
+         int w,h;
+         uint8 *pixels = stbi_load(filename, &w, &h, 0, 4);
+         if (pixels) {
+            load_bitmap_to_texture_array(i, pixels, w, h);
+            free(pixels);
+         } else
+            assert(0);
+      } else {
+         load_crn_to_texture_array(i, data, len);
+         free(data);
+      }
       texture_scales[i] = 1.0f/4;// textures[i].scale;
    }
    #endif
+
+   texture_scales[21] = 1.0f;
+   texture_scales[22] = 1.0f;
 
    // temporary hack:
    voxel_tex[1] = voxel_tex[0];
@@ -530,7 +549,7 @@ void mouse_down(int button)
       if (button == SDL_BUTTON_LEFT)
          change_block(selected_block_to_destroy[0], selected_block_to_destroy[1], selected_block_to_destroy[2], BT_empty);
       else if (button == SDL_BUTTON_RIGHT)
-         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], BT_sand);
+         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], BT_conveyor);
    }
 }
 

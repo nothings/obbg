@@ -19,8 +19,8 @@ extern float light_vel[3];
 
 static float camera_bounds[2][3] =
 {
-   { - 0.75f, - 0.75f, - 4.25f },
-   {   0.75f,   0.75f,   0.25f },
+   { - 0.45f, - 0.45f, - 2.25f },
+   {   0.45f,   0.45f,   0.25f },
 };
 
 
@@ -33,7 +33,7 @@ void world_init(void)
 
       obj[player_id].position.x = 0;
       obj[player_id].position.y = 0;
-      obj[player_id].position.z = 180;
+      obj[player_id].position.z = 80;
    }
 }
 
