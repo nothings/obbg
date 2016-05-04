@@ -524,14 +524,16 @@ void draw_main(void)
 
 }
 
-void mouse_down(void)
+void mouse_down(int button)
 {
    if (selected_block_valid) {
-      change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2]+4, BT_sand);
-      change_block(selected_block_to_destroy[0], selected_block_to_destroy[1], selected_block_to_destroy[2], BT_empty);
-      change_block(selected_block_to_destroy[0], selected_block_to_destroy[1], selected_block_to_destroy[2]+1, BT_empty);
+      if (button == SDL_BUTTON_LEFT)
+         change_block(selected_block_to_destroy[0], selected_block_to_destroy[1], selected_block_to_destroy[2], BT_empty);
+      else if (button == SDL_BUTTON_RIGHT)
+         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], BT_sand);
    }
 }
+
 void mouse_up(void)
 {
 }
@@ -643,7 +645,7 @@ void process_event(SDL_Event *e)
          process_sdl_mouse(e);
          break;
       case SDL_MOUSEBUTTONDOWN:
-         mouse_down();
+         mouse_down(e->button.button);
          break;
       case SDL_MOUSEBUTTONUP:
          mouse_up();

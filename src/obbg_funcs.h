@@ -32,7 +32,8 @@ extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int
 extern void player_physics(objid oid, player_controls *con, float dt);
 extern void force_update_for_block(int x, int y, int z);
 extern void change_block(int x, int y, int z, int type);
-
+extern void update_phys_chunk(mesh_chunk *mc, int x, int y, int z, int type);
+extern void update_physics_cache(int x, int y, int z, int type);
 
 typedef struct
 {

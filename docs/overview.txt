@@ -9,6 +9,8 @@ obbg:
   - networking
 
 Done in today's stream:
+  - re-enable single player mode
+  - primitive place & destroy blocks system
 
 Previous stream:
   - fix sync of client input buffering

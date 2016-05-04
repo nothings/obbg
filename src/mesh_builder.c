@@ -580,6 +580,7 @@ void change_block(int x, int y, int z, int type)
    cur_change = (cur_change+1) & (MAX_CHANGES-1);
 
    force_update_for_block(x,y,z);
+   update_physics_cache(x,y,z,type);
 }
 
 gen_chunk *generate_chunk(int x, int y)
@@ -741,8 +742,8 @@ gen_chunk *generate_chunk(int x, int y)
          && edits[i].y >= y && edits[i].y < y+GEN_CHUNK_SIZE_Y) {
          int zs = edits[i].z >> Z_SEGMENT_SIZE_LOG2;
          int zoff = edits[i].z & (Z_SEGMENT_SIZE-1);
-         build_column(gc, edits[i].x-x, edits[i].y-y, edits[i].z, 127, BT_wood);
-         //gc->partial[zs].block[edits[i].y-y][edits[i].x-x][zoff] = edits[i].type;
+         //build_column(gc, edits[i].x-x, edits[i].y-y, edits[i].z, 127, BT_wood);
+         gc->partial[zs].block[edits[i].y-y][edits[i].x-x][zoff] = edits[i].type;
       }
    }
 
@@ -770,7 +771,7 @@ gen_chunk_cache * put_chunk_in_cache(int x, int y, gen_chunk *gc)
    int slot_x = cx & (GEN_CHUNK_CACHE_X-1);
    int slot_y = cy & (GEN_CHUNK_CACHE_Y-1);
    gen_chunk_cache *gcc = &gen_cache[slot_y][slot_x];
-   assert(gcc->chunk_x != x || gcc->chunk_y != y || gcc->chunk == NULL);
+   assert(gcc->chunk_x != cx || gcc->chunk_y != cy || gcc->chunk == NULL);
    if (gcc->chunk != NULL)
       free_gen_chunk(gcc);
    gcc->chunk_x = cx;
@@ -787,7 +788,7 @@ void invalidate_gen_chunk_cache(int x, int y)
    int slot_x = cx & (GEN_CHUNK_CACHE_X-1);
    int slot_y = cy & (GEN_CHUNK_CACHE_Y-1);
    gen_chunk_cache *gcc = &gen_cache[slot_y][slot_x];
-   if (gcc->chunk_x == x || gcc->chunk_y == y) {
+   if (gcc->chunk_x == cx && gcc->chunk_y == cy) {
       if (gcc->chunk != NULL) {
          free_gen_chunk(gcc);
          gcc->chunk_x = cx+1;
@@ -924,7 +925,17 @@ phys_chunk_run *build_phys_column(mesh_chunk *mc, gen_chunk *gc, int x, int y)
    pr[data_off].length = run_length;
    ++data_off;
 
-   arena_release(mc->allocs, MAX_Z*2 - data_off*2);
+   #if _DEBUG
+   {
+      int rl_sum=0;
+      int i;
+      for (i=0; i < data_off; ++i)
+         rl_sum += pr[i].length;
+      assert(rl_sum == MAX_Z);
+   }
+   #endif
+
+   arena_release(mc->allocs, (MAX_Z-data_off)*sizeof(*pr));
    return pr;
 }
 
@@ -944,6 +955,65 @@ void build_phys_chunk(mesh_chunk *mc, chunk_set *chunks, int wx, int wy)
       }
    }
 }
+
+void update_phys_chunk(mesh_chunk *mc, int ex, int ey, int ez, int type)
+{
+   int i,j;
+   arena_chunk **new_chunks = NULL;
+   for (j=0; j < MESH_CHUNK_SIZE_Y; ++j) {
+      for (i=0; i < MESH_CHUNK_SIZE_X; ++i) {
+         phys_chunk_run *pr_old = mc->pc.column[j][i];
+         phys_chunk_run *pr_new = arena_alloc(&new_chunks, MAX_Z*2, 8192);
+         if (i != ex || j != ey) {
+            // copy existing data unchanged
+            int len = 0, off=0;
+            while (len < MAX_Z) {
+               pr_new[off] = pr_old[off];
+               len += pr_old[off].length;
+               ++off;
+            }
+            assert(len == MAX_Z);
+            arena_release(new_chunks, (MAX_Z-off)*sizeof(*pr_new));
+         } else {
+            // build new RLE data with 'type' updated
+            int z,data_off;
+            int run_length;
+            uint8 types[MAX_Z];
+            int len = 0, off=0;
+            while (len < MAX_Z) {
+               assert(len+pr_old[off].length <= MAX_Z);
+               memset(types+len, pr_old[off].type, pr_old[off].length);
+               len += pr_old[off].length;
+               ++off;
+            }
+            types[ez] = type;
+
+            data_off = 0;
+            run_length = 1;
+            for (z=1; z < MAX_Z; ++z) {
+               int prev_type = types[z-1] != BT_empty;
+               int type = types[z] != BT_empty;
+               if (type != prev_type) {
+                  pr_new[data_off].type = prev_type;
+                  pr_new[data_off].length = run_length;
+                  run_length = 1;
+                  ++data_off;
+               } else   
+                  ++run_length;
+            }
+            pr_new[data_off].type = types[z-1] != BT_empty;
+            pr_new[data_off].length = run_length;
+            ++data_off;
+            arena_release(new_chunks, (MAX_Z-data_off)*sizeof(*pr_new));
+         }
+         mc->pc.column[j][i] = pr_new;
+      }
+   }
+   arena_free_all(mc->allocs);
+   mc->allocs = new_chunks;
+}
+
+
 
 void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i world_coord, chunk_set *chunks, size_t build_size, build_data *bd)
 {
@@ -1056,8 +1126,8 @@ void force_update_for_block(int x, int y, int z)
    force_update_for_block_raw(x,y,z);
    // OPTIMIZE: only update them if needed
    force_update_for_block_raw(x+1,y,z);
-   force_update_for_block_raw(x,y+1,z);
    force_update_for_block_raw(x-1,y,z);
+   force_update_for_block_raw(x,y+1,z);
    force_update_for_block_raw(x,y-1,z);
 }
 
@@ -1433,8 +1503,6 @@ void check_chunk_sets(void)
    }
 }
 
-#error "Need to update the physics cache when blocks change"
-
 int worker_manager(void *data)
 {
    int outstanding_proc_gen = 0;
@@ -1466,7 +1534,8 @@ int worker_manager(void *data)
             if (mcs->rebuild_chunks) {
                for (k=0; k < 4; ++k) {
                   for (j=0; j < 4; ++j) {
-                     int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X, cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
+                     int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X;
+                     int cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
                      invalidate_gen_chunk_cache(cx, cy);
                   }
                }
@@ -1475,7 +1544,8 @@ int worker_manager(void *data)
             for (k=0; k < 4; ++k) {
                for (j=0; j < 4; ++j) {
                   if (!mcs->chunk_set_valid[k][j]) {
-                     int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X, cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
+                     int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X;
+                     int cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
                      gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(cx, cy);
                      if (gcc) {
                         mcs->status = CHUNK_STATUS_nonempty_chunk_set;

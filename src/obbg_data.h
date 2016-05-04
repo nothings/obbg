@@ -47,6 +47,9 @@ typedef int Bool;
 #define C_MESH_CHUNK_X_FOR_WORLD_X(x)   ((x) >> MESH_CHUNK_SIZE_X_LOG2)
 #define C_MESH_CHUNK_Y_FOR_WORLD_Y(y)   ((y) >> MESH_CHUNK_SIZE_Y_LOG2)
 
+#define C_WORLD_X_FOR_MESH_CHUNK_X(x)   ((x) << MESH_CHUNK_SIZE_X_LOG2)
+#define C_WORLD_Y_FOR_MESH_CHUNK_Y(y)   ((y) << MESH_CHUNK_SIZE_Y_LOG2)
+
 typedef struct
 {
    int x,y,z;

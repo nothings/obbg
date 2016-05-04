@@ -103,6 +103,20 @@ mesh_chunk *get_physics_chunk_for_coord(int x, int y)
    return NULL;
 }
 
+void update_physics_cache(int x, int y, int z, int type)
+{
+   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
+   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
+   int rx = cx & (S_PHYSICS_CACHE_X-1);
+   int ry = cy & (S_PHYSICS_CACHE_Y-1);
+   mesh_chunk *mc = &s_phys_cache[ry][rx];
+   if (mc->chunk_x != cx || mc->chunk_y != cy)
+      return;
+
+   update_phys_chunk(mc, x - C_WORLD_X_FOR_MESH_CHUNK_X(cx), y - C_WORLD_Y_FOR_MESH_CHUNK_Y(cy), z, type);
+}
+
+
 #define COLLIDE_BLOB_X   20
 #define COLLIDE_BLOB_Y   20
 #define COLLIDE_BLOB_Z   20
