@@ -1646,11 +1646,15 @@ static const char *stbvox_fragment_program =
          "   uint texprojid = facedata.w & 31u;\n"
          "   uint color_id  = facedata.z;\n"
 
+         "   vec2 tex1_offset = vec2(0.0), tex2_offset = vec2(0.0);\n"
          #ifndef STBVOX_CONFIG_PREFER_TEXBUFFER
             // load from uniforms / texture buffers 
             "   vec3 texgen_s = texgen[texprojid];\n"
             "   vec3 texgen_t = texgen[texprojid+32u];\n"
             "   float tex1_scale = texscale[tex1_id & 63u].x;\n"
+            #ifdef STBVOX_CONFIG_TEXTURE_TRANSLATION
+            "   tex1_offset = texscale[tex1_id & 63u].zw;\n"
+            #endif
             "   vec4 color = color_table[color_id & 63u];\n"
             #ifndef STBVOX_CONFIG_DISABLE_TEX2
             "   vec4 tex2_props = texscale[tex2_id & 63u];\n"
@@ -1659,24 +1663,30 @@ static const char *stbvox_fragment_program =
             "   vec3 texgen_s = texelFetch(texgen, int(texprojid)).xyz;\n"
             "   vec3 texgen_t = texelFetch(texgen, int(texprojid+32u)).xyz;\n"
             "   float tex1_scale = texelFetch(texscale, int(tex1_id & 127u)).x;\n"
+            #ifdef STBVOX_CONFIG_TEXTURE_TRANSLATION
+            "   tex1_offset = texelFetch(texscale, int(tex1_id & 127u)).zw;\n"
+            #endif
             "   vec4 color = texelFetch(color_table, int(color_id & 63u));\n"
             #ifndef STBVOX_CONFIG_DISABLE_TEX2
-            "   vec4 tex2_props = texelFetch(texscale, int(tex1_id & 127u));\n"
+            "   vec4 tex2_props = texelFetch(texscale, int(tex2_id & 127u));\n"
             #endif
          #endif
 
          #ifndef STBVOX_CONFIG_DISABLE_TEX2
          "   float tex2_scale = tex2_props.y;\n"
-         "   bool texblend_mode = tex2_props.z != 0.0;\n"
+         "   bool texblend_mode = int(facedata.w)&128u;\n"
+         #ifndef STBVOX_CONFIG_DISABLE_TEX2
+         //"   tex2_offset = tex2_props.w;\n"
+         #endif
          #endif
          "   vec2 texcoord;\n"
          "   vec3 texturespace_pos = voxelspace_pos + transform[2].xyz;\n"
          "   texcoord.s = dot(texturespace_pos, texgen_s);\n"
          "   texcoord.t = dot(texturespace_pos, texgen_t);\n"
 
-         "   vec2  texcoord_1 = tex1_scale * texcoord;\n"
+         "   vec2  texcoord_1 = tex1_scale * texcoord + tex1_offset;\n"
          #ifndef STBVOX_CONFIG_DISABLE_TEX2
-         "   vec2  texcoord_2 = tex2_scale * texcoord;\n"
+         "   vec2  texcoord_2 = tex2_scale * texcoord + tex2_offset;\n"
          #endif
 
          #ifdef STBVOX_CONFIG_TEX1_EDGE_CLAMP
@@ -1856,7 +1866,7 @@ static const char *stbvox_fragment_program_alpha_only =
 
       #ifndef STBVOX_CONFIG_DISABLE_TEX2
       "   float tex2_scale = tex2_props.y;\n"
-      "   bool texblend_mode = tex2_props.z &((facedata.w & 128u) != 0u);\n"
+      "   bool texblend_mode = int(facedata.w)&128u;\n"
       #endif
 
       "   color.a = min(color.a, 1.0);\n"

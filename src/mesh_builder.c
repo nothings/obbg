@@ -28,6 +28,7 @@
 #define STBVOX_CONFIG_FOG_SMOOTHSTEP
 //#define STBVOX_CONFIG_PREMULTIPLIED_ALPHA  // this doesn't work properly alpha test without next #define
 //#define STBVOX_CONFIG_UNPREMULTIPLY  // slower, fixes alpha test makes windows & fancy leaves look better
+#define STBVOX_CONFIG_TEXTURE_TRANSLATION
 
 #define STBVOX_ROTATION_IN_LIGHTING
 #define STB_VOXEL_RENDER_IMPLEMENTATION

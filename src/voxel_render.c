@@ -56,9 +56,13 @@ int view_distance=300;
 int view_distance=1800;
 #endif
 
+float texture_offsets[128][2];
+
 void setup_uniforms(float pos[3])
 {
    int i,j;
+   texture_offsets[22][0] -= 0.01f;
+
    for (i=0; i < STBVOX_UNIFORM_count; ++i) {
       stbvox_uniform_info raw, *ui=&raw;
       stbvox_get_uniform_info(&raw, i);
@@ -93,8 +97,8 @@ void setup_uniforms(float pos[3])
                for (j=0; j < 128; ++j) {
                   table4[j][0] = texture_scales[j];
                   table4[j][1] = 1.0f;
-                  table4[j][2] = 0;
-                  table4[j][3] = 0;
+                  table4[j][2] = texture_offsets[j][0];
+                  table4[j][3] = texture_offsets[j][1];
                }
                data = table4;
                break;
