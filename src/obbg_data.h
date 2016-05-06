@@ -25,6 +25,7 @@ typedef int Bool;
 #endif
 
 #define MAX_Z                    255
+#define MAX_Z_POW2CEIL           256
 
 #ifdef MINIMIZE_MEMORY
 #define VIEW_DIST_LOG2            9
@@ -49,6 +50,18 @@ typedef int Bool;
 
 #define C_WORLD_X_FOR_MESH_CHUNK_X(x)   ((x) << MESH_CHUNK_SIZE_X_LOG2)
 #define C_WORLD_Y_FOR_MESH_CHUNK_Y(y)   ((y) << MESH_CHUNK_SIZE_Y_LOG2)
+
+#define GEN_CHUNK_SIZE_X_LOG2     5
+#define GEN_CHUNK_SIZE_Y_LOG2     5
+#define GEN_CHUNK_SIZE_X         (1 << GEN_CHUNK_SIZE_X_LOG2)
+#define GEN_CHUNK_SIZE_Y         (1 << GEN_CHUNK_SIZE_Y_LOG2)
+
+#define LOGI_CHUNK_SIZE_X_LOG2      GEN_CHUNK_SIZE_X_LOG2
+#define LOGI_CHUNK_SIZE_Y_LOG2      GEN_CHUNK_SIZE_Y_LOG2
+#define LOGI_CHUNK_SIZE_Z_LOG2      3
+#define LOGI_CHUNK_SIZE_X           (1 << LOGI_CHUNK_SIZE_X_LOG2)
+#define LOGI_CHUNK_SIZE_Y           (1 << LOGI_CHUNK_SIZE_Y_LOG2)
+#define LOGI_CHUNK_SIZE_Z           (1 << LOGI_CHUNK_SIZE_Z_LOG2)
 
 typedef struct
 {

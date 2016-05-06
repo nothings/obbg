@@ -18,6 +18,7 @@ extern void process_tick_raw(float dt);
 extern int get_next_built_mesh(built_mesh *bm);
 extern requested_mesh *get_requested_mesh_alternate(void);
 extern void swap_requested_meshes(void);
+extern int get_block(int x, int y, int z);
 
 extern mesh_chunk *build_mesh_chunk_for_coord(int x, int y);
 extern void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer);
@@ -34,6 +35,8 @@ extern void force_update_for_block(int x, int y, int z);
 extern void change_block(int x, int y, int z, int type);
 extern void update_phys_chunk(mesh_chunk *mc, int x, int y, int z, int type);
 extern void update_physics_cache(int x, int y, int z, int type);
+extern void logistics_update_block(int x, int y, int z, int type);
+
 
 typedef struct
 {

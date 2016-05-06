@@ -51,11 +51,6 @@ static unsigned char color_for_blocktype[256][6];
 static unsigned char geom_for_blocktype[256];
 
 // proc gen mesh
-#define GEN_CHUNK_SIZE_X_LOG2     5
-#define GEN_CHUNK_SIZE_Y_LOG2     5
-#define GEN_CHUNK_SIZE_X         (1 << GEN_CHUNK_SIZE_X_LOG2)
-#define GEN_CHUNK_SIZE_Y         (1 << GEN_CHUNK_SIZE_Y_LOG2)
-
 #define GEN_CHUNK_CACHE_X_LOG2    4
 #define GEN_CHUNK_CACHE_Y_LOG2    4
 #define GEN_CHUNK_CACHE_X         (1 << GEN_CHUNK_CACHE_X_LOG2)
@@ -567,21 +562,45 @@ typedef struct
    uint8 type;
 } BlockChange;
 
-BlockChange edits[MAX_CHANGES] = { 0,0,50, BT_leaves };
-int cur_change=1, max_changes=1;
+BlockChange edits[MAX_CHANGES] = { 0 };
+int cur_change=0, max_changes=0;
+
+int get_block_index(int x, int y, int z)
+{
+   int i;
+   for (i=0; i < max_changes; ++i)
+      if (edits[i].x == x && edits[i].y == y && edits[i].z == z)
+         return i;
+   return -1;
+}
+
+int get_block(int x, int y, int z)
+{
+   int i = get_block_index(x,y,z);
+   if (i >= 0)
+      return edits[i].type;
+   else
+      return 0;
+}
 
 void change_block(int x, int y, int z, int type)
 {
-   edits[cur_change].x = x;
-   edits[cur_change].y = y;
-   edits[cur_change].z = z;
-   edits[cur_change].type = type;
+   int i = get_block_index(x,y,z);
+   if (i >= 0) {
+      edits[i].type = type;
+   } else {
+      edits[cur_change].x = x;
+      edits[cur_change].y = y;
+      edits[cur_change].z = z;
+      edits[cur_change].type = type;
 
-   max_changes = stb_max(cur_change+1, max_changes);
-   cur_change = (cur_change+1) & (MAX_CHANGES-1);
+      max_changes = stb_max(cur_change+1, max_changes);
+      cur_change = (cur_change+1) & (MAX_CHANGES-1);
+   }
 
    force_update_for_block(x,y,z);
    update_physics_cache(x,y,z,type);
+   logistics_update_block(x,y,z,type);
 }
 
 gen_chunk *generate_chunk(int x, int y)

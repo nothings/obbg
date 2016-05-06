@@ -555,7 +555,7 @@ static int face_dir[6][3] = {
    { 0,0,-1 },
 };
 
-int selected_block_to_destroy[3];
+int selected_block[3];
 int selected_block_to_create[3];
 Bool selected_block_valid;
 
@@ -644,12 +644,12 @@ void draw_main(void)
       selected_block_valid = raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result);
       if (selected_block_valid) {
          for (i=0; i < 3; ++i) {
-            selected_block_to_destroy[i] = (&result.bx)[i];
+            selected_block[i] = (&result.bx)[i];
             selected_block_to_create[i] = (&result.bx)[i] + face_dir[result.face][i];
          }
          glColor3f(0.7f,1.0f,0.7f);
          //stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
-         stbgl_drawBox(selected_block_to_destroy[0]+0.5f, selected_block_to_destroy[1]+0.5f, selected_block_to_destroy[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
+         stbgl_drawBox(selected_block[0]+0.5f, selected_block[1]+0.5f, selected_block[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
       }
    }
 
@@ -707,17 +707,23 @@ void draw_main(void)
 
 }
 
-int place_block=0;
+int block_rotation;
 void mouse_down(int button)
 {
    if (selected_block_valid) {
-      if (button == SDL_BUTTON_LEFT)
-         change_block(selected_block_to_destroy[0], selected_block_to_destroy[1], selected_block_to_destroy[2], BT_empty);
-      else if (button == SDL_BUTTON_RIGHT) {
-         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], BT_conveyor_east + place_block);
-         place_block = (place_block + 1) & 3;
+      if (button == SDL_BUTTON_RIGHT)
+         change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty);
+      else if (button == SDL_BUTTON_LEFT) {
+         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], BT_conveyor_east + block_rotation);
       }
    }
+}
+
+void rotate_block(void)
+{
+   int block = get_block(selected_block[0], selected_block[1], selected_block[2]);
+   if (block >= BT_conveyor_east && block <= BT_conveyor_south)
+      change_block(selected_block[0], selected_block[1], selected_block[2], (((block - BT_conveyor_east)+1)&3)+BT_conveyor_east);
 }
 
 void mouse_up(void)
@@ -868,13 +874,16 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_S)   active_control_set(6);
          if (s == SDL_SCANCODE_D)   active_control_set(7);
          if (s == SDL_SCANCODE_F)   client_player_input.flying = !client_player_input.flying;
+         if (s == SDL_SCANCODE_R)   rotate_block();
          if (k == '1') global_hack = !global_hack;
          if (k == '2') global_hack = -1;
          if (k == '3') obj[player_id].position.x += 65536;
+         #if 0
          if (s == SDL_SCANCODE_R) {
             objspace_to_worldspace(light_vel, player_id, 0,32,0);
             memcpy(light_pos, &obj[player_id].position, sizeof(light_pos));
          }
+         #endif
 
          #if 0
          if (game_mode == GAME_editor) {
