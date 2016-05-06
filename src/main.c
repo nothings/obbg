@@ -142,6 +142,7 @@ void game_init(void)
    init_mesh_building();
    init_mesh_build_threads();
    s_init_physics_cache();
+   logistics_init();
 }
 
 static uint8 blinn_8x8(uint8 x, uint8 y)
@@ -546,7 +547,7 @@ void render_objects(void)
    render_sprites();
 }
 
-static int face_dir[6][3] = {
+int face_dir[6][3] = {
    { 1,0,0 },
    { 0,1,0 },
    { -1,0,0 },
@@ -557,6 +558,7 @@ static int face_dir[6][3] = {
 
 int selected_block[3];
 int selected_block_to_create[3];
+int debug_render;
 Bool selected_block_valid;
 
 void draw_main(void)
@@ -652,6 +654,9 @@ void draw_main(void)
          stbgl_drawBox(selected_block[0]+0.5f, selected_block[1]+0.5f, selected_block[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
       }
    }
+
+   if (debug_render)
+      logistics_debug_render();
 
    if (0) {
       glBegin(GL_LINES);
@@ -878,6 +883,7 @@ void process_event(SDL_Event *e)
          if (k == '1') global_hack = !global_hack;
          if (k == '2') global_hack = -1;
          if (k == '3') obj[player_id].position.x += 65536;
+         if (k == '4') debug_render = !debug_render;
          #if 0
          if (s == SDL_SCANCODE_R) {
             objspace_to_worldspace(light_vel, player_id, 0,32,0);

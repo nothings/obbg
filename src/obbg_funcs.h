@@ -36,6 +36,8 @@ extern void change_block(int x, int y, int z, int type);
 extern void update_phys_chunk(mesh_chunk *mc, int x, int y, int z, int type);
 extern void update_physics_cache(int x, int y, int z, int type);
 extern void logistics_update_block(int x, int y, int z, int type);
+extern void logistics_init(void);
+extern void logistics_debug_render(void);
 
 
 typedef struct

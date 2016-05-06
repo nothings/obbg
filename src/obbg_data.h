@@ -233,6 +233,8 @@ typedef struct
    Bool rebuild_chunks;
 } requested_mesh;
 
+extern int face_dir[6][3];
+
 extern int chunk_locations, chunks_considered, chunks_in_frustum;
 extern int quads_considered, quads_rendered;
 extern int chunk_storage_rendered, chunk_storage_considered, chunk_storage_total;
