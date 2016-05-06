@@ -67,7 +67,7 @@ extern "C" int load_crn_to_texture_array(int slot, unsigned char *data, size_t l
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize.h"
 
-extern "C" int load_bitmap_to_texture_array(int slot, unsigned char *data, int w, int h, int wrap)
+extern "C" int load_bitmap_to_texture_array(int slot, unsigned char *data, int w, int h, int wrap, int premul)
 {
    int i;
    unsigned char *old_data = data;
@@ -76,7 +76,7 @@ extern "C" int load_bitmap_to_texture_array(int slot, unsigned char *data, int w
    for (i=1; i < 13 && (w > 1 || h > 1); ++i) {
       int nw = w>>1, nh= h>>1;
       unsigned char *new_data = (unsigned char *) malloc(nw * nh * 4);
-      stbir_resize_uint8_srgb_edgemode(old_data, w, h, 0, new_data, nw, nh, 0, 4, 3, /*STBIR_FLAG_ALPHA_PREMULTIPLIED*/0, wrap ? STBIR_EDGE_WRAP : STBIR_EDGE_ZERO);
+      stbir_resize_uint8_srgb_edgemode(old_data, w, h, 0, new_data, nw, nh, 0, 4, 3, premul ? STBIR_FLAG_ALPHA_PREMULTIPLIED : 0, wrap ? STBIR_EDGE_WRAP : STBIR_EDGE_ZERO);
       if (old_data != data) free(old_data);
       old_data = new_data;
       w = nw;

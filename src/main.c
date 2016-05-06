@@ -48,7 +48,7 @@ char *dumb_fragment_shader =
 
 extern int load_crn_to_texture(unsigned char *data, size_t length);
 extern int load_crn_to_texture_array(int slot, unsigned char *data, size_t length);
-extern int load_bitmap_to_texture_array(int slot, unsigned char *data, int w, int h, int wrap);
+extern int load_bitmap_to_texture_array(int slot, unsigned char *data, int w, int h, int wrap, int premul);
 
 GLuint debug_tex, dumb_prog;
 GLuint voxel_tex[2];
@@ -201,7 +201,7 @@ void render_init(void)
          int w,h;
          uint8 *pixels = stbi_load(filename, &w, &h, 0, 4);
          if (pixels) {
-            load_bitmap_to_texture_array(i, pixels, w, h, 1);
+            load_bitmap_to_texture_array(i, pixels, w, h, 1, 0);
             free(pixels);
          } else
             assert(0);
@@ -274,7 +274,7 @@ void render_init(void)
             pixels[i*4+1] = blinn_8x8(pixels[i*4+1], pixels[i*4+3]);
             pixels[i*4+2] = blinn_8x8(pixels[i*4+2], pixels[i*4+3]);
          }
-         load_bitmap_to_texture_array(0, pixels, w, h, 0);
+         load_bitmap_to_texture_array(0, pixels, w, h, 0, 1);
          free(pixels);
       } else
          assert(0);
@@ -491,7 +491,8 @@ void render_sprites(void)
    stbglUseProgram(dumb_prog);
    
    glEnable(GL_BLEND);
-   glDisable(GL_BLEND);
+   glDisable(GL_ALPHA_TEST);
+   glDepthMask(GL_FALSE);
    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
    glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, sprite_tex);
    stbglUniform1i(stbgl_find_uniform(dumb_prog, "tex"), 0);
@@ -515,6 +516,7 @@ void render_sprites(void)
       glTexCoord3f(1,0,s->id); glVertex3fv(&p3.x);
    }
    glEnd();
+   glDepthMask(GL_TRUE);
 
 
    stbglUseProgram(0);
