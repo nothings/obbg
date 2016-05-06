@@ -9,6 +9,8 @@ Possible tasks to work on next:
    *  load textures from JPG
    *  conveyor belts
       * animation by scrolling textures
+      - how to do 90-degree turns
+      - how to make animated blocks
    -  save changes to memory?
    -  moving objects need to be treated as 'objects'
       - can be sprites or polygonal
@@ -34,6 +36,12 @@ Possible tasks to work on next:
    -  player crafting(?)
    -  tool-equipping system(?)
 
+   -  rendering
+      - 1M blocks
+      - 10,000 sprites
+      - ?1,000 block-like things with animation
+      - ?1,000 block surface decals
+      - 500 polygonal objects
 
    Game features:
    -  object system

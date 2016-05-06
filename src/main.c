@@ -48,10 +48,11 @@ char *dumb_fragment_shader =
 
 extern int load_crn_to_texture(unsigned char *data, size_t length);
 extern int load_crn_to_texture_array(int slot, unsigned char *data, size_t length);
-extern int load_bitmap_to_texture_array(int slot, unsigned char *data, int w, int h);
+extern int load_bitmap_to_texture_array(int slot, unsigned char *data, int w, int h, int wrap);
 
 GLuint debug_tex, dumb_prog;
-unsigned int voxel_tex[2];
+GLuint voxel_tex[2];
+GLuint sprite_tex;
 
 typedef struct
 {
@@ -143,6 +144,25 @@ void game_init(void)
    s_init_physics_cache();
 }
 
+static uint8 blinn_8x8(uint8 x, uint8 y)
+{
+   uint32 t = x*y + 128;
+   return (uint8) ((t + (t >>8)) >> 8);
+}
+
+typedef struct
+{
+   vec pos;
+   float size;
+   int id;
+} sprite;
+
+#define MAX_SPRITES 40000
+sprite sprites[MAX_SPRITES];
+int num_sprites;
+
+#pragma warning(disable:4244)
+
 void render_init(void)
 {
    // @TODO: support non-DXT path
@@ -159,6 +179,10 @@ void render_init(void)
    glGenTextures(2, voxel_tex);
 
    glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, voxel_tex[0]);
+   glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_WRAP_S, GL_REPEAT);
+   glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_WRAP_T, GL_REPEAT);
+   glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
    for (i=0; i < 11; ++i) {
       glTexImage3DEXT(GL_TEXTURE_2D_ARRAY_EXT, i,
@@ -177,7 +201,7 @@ void render_init(void)
          int w,h;
          uint8 *pixels = stbi_load(filename, &w, &h, 0, 4);
          if (pixels) {
-            load_bitmap_to_texture_array(i, pixels, w, h);
+            load_bitmap_to_texture_array(i, pixels, w, h, 1);
             free(pixels);
          } else
             assert(0);
@@ -197,6 +221,7 @@ void render_init(void)
 
    // temporary hack:
    voxel_tex[1] = voxel_tex[0];
+
 
    init_voxel_render(voxel_tex);
 
@@ -223,6 +248,45 @@ void render_init(void)
       free(data);
    }
    #endif
+
+   glGenTextures(1, &sprite_tex);
+   glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, sprite_tex);
+   glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_WRAP_S, GL_REPEAT);
+   glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_WRAP_T, GL_REPEAT);
+   glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+   for (i=0; i < 11; ++i) {
+      glTexImage3DEXT(GL_TEXTURE_2D_ARRAY_EXT, i,
+                         GL_RGBA,
+                         256>>i,256>>i,256,0,
+                         GL_RGBA,GL_UNSIGNED_BYTE,NULL);
+   }
+
+   {
+      char *filename = stb_sprintf("data/sprites/ore.png", textures[i].filename);
+      int w,h;
+      uint8 *pixels = stbi_load(filename, &w, &h, 0, 4);
+      if (pixels) {
+         int i;
+         for (i=0; i < w*h; ++i) {
+            pixels[i*4+0] = blinn_8x8(pixels[i*4+0], pixels[i*4+3]);
+            pixels[i*4+1] = blinn_8x8(pixels[i*4+1], pixels[i*4+3]);
+            pixels[i*4+2] = blinn_8x8(pixels[i*4+2], pixels[i*4+3]);
+         }
+         load_bitmap_to_texture_array(0, pixels, w, h, 0);
+         free(pixels);
+      } else
+         assert(0);
+   }
+
+   for (i=0; i < 500; ++i) {
+      sprite *s = &sprites[num_sprites++];
+      s->pos.x = stb_frand() * 100 - 50;
+      s->pos.y = stb_frand() * 100 - 50;
+      s->pos.z = stb_frand() * 50 + 64;
+      s->size = stb_rand() & 1 ? 0.5 : 0.125;
+   }                
 }
 
 
@@ -384,6 +448,78 @@ void stbgl_drawRectTCArray(float x0, float y0, float x1, float y1, float s0, flo
 Bool third_person;
 float player_zoom = 1.0f;
 
+vec vec_add(vec *b, vec *c)
+{
+   vec a;
+   a.x = b->x + c->x;
+   a.y = b->y + c->y;
+   a.z = b->z + c->z;
+   return a;
+}
+
+vec vec_sub(vec *b, vec *c)
+{
+   vec a;
+   a.x = b->x - c->x;
+   a.y = b->y - c->y;
+   a.z = b->z - c->z;
+   return a;
+}
+
+vec vec_add_scale(vec *b, vec *c, float d)
+{
+   vec a;
+   a.x = b->x + d*c->x;
+   a.y = b->y + d*c->y;
+   a.z = b->z + d*c->z;
+   return a;
+}
+
+vec vec_sub_scale(vec *b, vec *c, float d)
+{
+   vec a;
+   a.x = b->x - d*c->x;
+   a.y = b->y - d*c->y;
+   a.z = b->z - d*c->z;
+   return a;
+}
+
+void render_sprites(void)
+{
+   int i;
+   vec s_off, t_off;
+   stbglUseProgram(dumb_prog);
+   
+   glEnable(GL_BLEND);
+   glDisable(GL_BLEND);
+   glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+   glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, sprite_tex);
+   stbglUniform1i(stbgl_find_uniform(dumb_prog, "tex"), 0);
+
+   objspace_to_worldspace(&s_off.x, player_id, 0.5,0,0);
+   objspace_to_worldspace(&t_off.x, player_id, 0,0,1);
+
+   glBegin(GL_QUADS);
+   for (i=0; i < MAX_SPRITES; ++i) {
+      sprite *s = &sprites[i];
+      vec p0,p1,p2,p3;
+
+      p0 = vec_add_scale(&s->pos, &s_off, s->size);
+      p1 = vec_sub_scale(&s->pos, &s_off, s->size);
+      p2 = vec_add_scale(&p1, &t_off, s->size);
+      p3 = vec_add_scale(&p0, &t_off, s->size);
+      glColor3f(1,1,1);
+      glTexCoord3f(0,0,s->id); glVertex3fv(&p0.x);
+      glTexCoord3f(0,1,s->id); glVertex3fv(&p1.x);
+      glTexCoord3f(1,1,s->id); glVertex3fv(&p2.x);
+      glTexCoord3f(1,0,s->id); glVertex3fv(&p3.x);
+   }
+   glEnd();
+
+
+   stbglUseProgram(0);
+}
+
 void render_objects(void)
 {
    int i;
@@ -404,6 +540,8 @@ void render_objects(void)
          stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
       }
    }
+
+   render_sprites();
 }
 
 static int face_dir[6][3] = {
@@ -508,11 +646,12 @@ void draw_main(void)
             selected_block_to_create[i] = (&result.bx)[i] + face_dir[result.face][i];
          }
          glColor3f(0.7f,1.0f,0.7f);
-         stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
+         //stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
+         stbgl_drawBox(selected_block_to_destroy[0]+0.5f, selected_block_to_destroy[1]+0.5f, selected_block_to_destroy[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
       }
    }
 
-   if (1) {
+   if (0) {
       glBegin(GL_LINES);
          glColor3f(1,0,0); glVertex3f(0,0,0); glVertex3f(1,0,0);
          glColor3f(0,1,0); glVertex3f(0,0,0); glVertex3f(0,1,0);
@@ -533,18 +672,29 @@ void draw_main(void)
    glDisable(GL_CULL_FACE);
    glDisable(GL_DEPTH_TEST);
 
-   if (0) {
+   if (1) {
+      float cx = screen_x / 4.0f;
+      float cy = screen_y / 4.0f;
+      glColor3f(1,1,1);
+      glBegin(GL_LINES);
+      glVertex2f(cx-4,cy); glVertex2f(cx+4,cy);
+      glVertex2f(cx,cy-3); glVertex2f(cx,cy+3);
+      glEnd();
+   }
+
+   if (1 && debug_tex) {
       stbglUseProgram(dumb_prog);
       glDisable(GL_TEXTURE_2D);
-      glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, voxel_tex[0]);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+      glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, debug_tex);
       stbglUniform1i(stbgl_find_uniform(dumb_prog, "tex"), 0);
       glColor3f(1,1,1);
       stbgl_drawRectTCArray(0,0,512,512,0,0,1,1, 0.0);
       stbglUseProgram(0);
    }
 
-
-   if (debug_tex) {
+   if (0 && debug_tex) {
       glEnable(GL_TEXTURE_2D);
       glBindTexture(GL_TEXTURE_2D, debug_tex);
       glColor3f(1,1,1);
