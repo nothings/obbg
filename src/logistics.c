@@ -14,10 +14,11 @@ typedef struct
 typedef struct
 {
    uint8 x_off, y_off, z_off; // 3 bytes
-   uint8 dir:2;               // 1 bytes
-   uint8 len:6;               // 0 bytes
+   uint8 dir  ;               // 1 bytes
+   uint8 len  ;               // 1 bytes
+   uint16 output_id;          // 2 bytes
    beltside_item *items;      // 4 bytes
-} belt_run;
+} belt_run; // 12 bytes
 
 typedef struct
 {
@@ -311,6 +312,65 @@ int face_orig[4][2] = {
    { 0,1 },
 };
 
+static int logistics_long_tick;
+#define LONG_TICK_LENGTH   16
+
+#pragma warning(disable:4244)
+void logistics_render(void)
+{
+   int i,j,k,a,e;
+   for (j=0; j < LOGI_CACHE_SIZE; ++j) {
+      for (i=0; i < LOGI_CACHE_SIZE; ++i) {
+         logi_slice *s = &logi_world[j][i];
+         if (s->slice_x != i+1) {
+            for (k=0; k < stb_arrcount(s->chunk); ++k) {
+               logi_chunk *c = s->chunk[k];
+               if (c != NULL) {
+                  for (a=0; a < stb_arr_len(c->br); ++a) {
+                     belt_run *b = &c->br[a];
+                     float z = k * LOGI_CHUNK_SIZE_Z + 1.0f + b->z_off + 0.125f;
+                     float x1 = (float) s->slice_x * LOGI_CHUNK_SIZE_X + b->x_off;
+                     float y1 = (float) s->slice_y * LOGI_CHUNK_SIZE_Y + b->y_off;
+                     float x2,y2;
+                     float offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
+                     int d0 = b->dir;
+                     int d1 = (d0 + 1) & 3;
+
+                     x1 += face_orig[b->dir][0];
+                     y1 += face_orig[b->dir][1];
+
+                     x2 = x1 + face_dir[d1][0]*(0.8f - 0.5/ITEMS_PER_BELT_SIDE);
+                     x1 = x1 + face_dir[d1][0]*(0.2f + 0.5/ITEMS_PER_BELT_SIDE);
+
+                     y2 = y1 + face_dir[d1][1]*(0.8f - 0.5/ITEMS_PER_BELT_SIDE);
+                     y1 = y1 + face_dir[d1][1]*(0.2f + 0.5/ITEMS_PER_BELT_SIDE);
+
+                     x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                     y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                     x2 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                     y2 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+
+                     for (e=0; e < stb_arr_len(b->items); e += 2) {
+                        if (b->items[e+0].type != 0) {
+                           add_sprite(x1, y1, z, b->items[e+0].type);
+
+                        }
+                        if (b->items[e+1].type != 0) {
+                           add_sprite(x2, y2, z, b->items[e+1].type);
+                        }
+                        x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE);
+                        y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE);
+                        x2 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE);
+                        y2 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE);
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+}
+
 void logistics_debug_render(void)
 {
    int i,j,k,a;
@@ -361,4 +421,46 @@ void logistics_init(void)
    for (j=0; j < LOGI_CACHE_SIZE; ++j)
       for (i=0; i < LOGI_CACHE_SIZE; ++i)
          logi_world[j][i].slice_x = i+1;
+}
+
+void logistics_chunk_tick(logi_slice *s, int cid)
+{
+   int i;
+   logi_chunk *c = s->chunk[cid];
+   assert(c != NULL);
+   for (i=0; i < stb_arr_len(c->br); ++i) {
+      belt_run *br = &c->br[i];
+      memmove(br->items + BELT_SIDES, br->items, sizeof(br->items[0]) * BELT_SIDES * (ITEMS_PER_BELT_SIDE * br->len-1));
+      br->items[0].type = br->items[1].type = 0;
+      if (stb_rand() % 10 < 9) {
+         br->items[stb_rand() & 1].type = stb_rand() % 4;
+         br->items[stb_rand() & 1].type = stb_rand() % 4;
+         br->items[stb_rand() & 1].type = stb_rand() % 4;
+      }
+   }
+}
+
+void logistics_tick(void)
+{
+   logistics_texture_scroll += (1.0 / LONG_TICK_LENGTH / ITEMS_PER_BELT_SIDE);
+   if (logistics_texture_scroll >= 1.0)
+      logistics_texture_scroll -= 1.0;
+
+   if (++logistics_long_tick == LONG_TICK_LENGTH) {
+      int i,j,k;
+      logistics_long_tick = 0;
+      for (j=0; j < LOGI_CACHE_SIZE; ++j) {
+         for (i=0; i < LOGI_CACHE_SIZE; ++i) {
+            logi_slice *s = &logi_world[j][i];
+            if (s->slice_x != i+1) {
+               for (k=0; k < stb_arrcount(s->chunk); ++k) {
+                  logi_chunk *c = s->chunk[k];
+                  if (c != NULL) {
+                     logistics_chunk_tick(s, k);
+                  }
+               }
+            }
+         }
+      }
+   }
 }

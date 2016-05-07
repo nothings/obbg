@@ -43,7 +43,7 @@ char *game_name = "obbg";
 char *dumb_fragment_shader =
    "#version 150 compatibility\n"
    "uniform sampler2DArray tex;\n"
-   "void main(){gl_FragColor = texture(tex,gl_TexCoord[0].xyz);}";
+   "void main(){gl_FragColor = gl_Color*texture(tex,gl_TexCoord[0].xyz);}";
 
 
 extern int load_crn_to_texture(unsigned char *data, size_t length);
@@ -156,6 +156,7 @@ typedef struct
    vec pos;
    float size;
    int id;
+   vec color;
 } sprite;
 
 #define MAX_SPRITES 40000
@@ -163,6 +164,20 @@ sprite sprites[MAX_SPRITES];
 int num_sprites;
 
 #pragma warning(disable:4244)
+
+void add_sprite(float x, float y, float z, int id)
+{
+   sprite *s = &sprites[num_sprites++];
+   s->pos.x = x;
+   s->pos.y = y;
+   s->pos.z = z;
+   s->size = 0.25;
+   s->id = 0;
+   s->color.x = (id == 1) ? 1 : 0;
+   s->color.y = (id == 2) ? 1 : 0;
+   s->color.z = (id == 3) ? 1 : 0;
+}
+
 
 void render_init(void)
 {
@@ -281,6 +296,7 @@ void render_init(void)
          assert(0);
    }
 
+   #if 0
    for (i=0; i < 500; ++i) {
       sprite *s = &sprites[num_sprites++];
       s->pos.x = stb_frand() * 100 - 50;
@@ -288,6 +304,7 @@ void render_init(void)
       s->pos.z = stb_frand() * 50 + 64;
       s->size = stb_rand() & 1 ? 0.5 : 0.125;
    }                
+   #endif
 }
 
 
@@ -499,10 +516,10 @@ void render_sprites(void)
    stbglUniform1i(stbgl_find_uniform(dumb_prog, "tex"), 0);
 
    objspace_to_worldspace(&s_off.x, player_id, 0.5,0,0);
-   objspace_to_worldspace(&t_off.x, player_id, 0,0,1);
+   objspace_to_worldspace(&t_off.x, player_id, 0,0,0.5);
 
    glBegin(GL_QUADS);
-   for (i=0; i < MAX_SPRITES; ++i) {
+   for (i=0; i < num_sprites; ++i) {
       sprite *s = &sprites[i];
       vec p0,p1,p2,p3;
 
@@ -510,11 +527,13 @@ void render_sprites(void)
       p1 = vec_sub_scale(&s->pos, &s_off, s->size);
       p2 = vec_add_scale(&p1, &t_off, s->size);
       p3 = vec_add_scale(&p0, &t_off, s->size);
-      glColor3f(1,1,1);
-      glTexCoord3f(0,0,s->id); glVertex3fv(&p0.x);
-      glTexCoord3f(0,1,s->id); glVertex3fv(&p1.x);
-      glTexCoord3f(1,1,s->id); glVertex3fv(&p2.x);
-      glTexCoord3f(1,0,s->id); glVertex3fv(&p3.x);
+      p0 = vec_sub_scale(&p0, &t_off, s->size);
+      p1 = vec_sub_scale(&p1, &t_off, s->size);
+      glColor3fv(&s->color.x);
+      glTexCoord3f(0,1,s->id); glVertex3fv(&p0.x);
+      glTexCoord3f(1,1,s->id); glVertex3fv(&p1.x);
+      glTexCoord3f(1,0,s->id); glVertex3fv(&p2.x);
+      glTexCoord3f(0,0,s->id); glVertex3fv(&p3.x);
    }
    glEnd();
    glDepthMask(GL_TRUE);
@@ -532,6 +551,8 @@ void render_objects(void)
    glDisable(GL_TEXTURE_2D);
    stbgl_drawBox(light_pos[0], light_pos[1], light_pos[2], 3,3,3, 1);
 
+   num_sprites = 0;
+
    for (i=1; i < max_player_id; ++i) {
       if (obj[i].valid && (i != player_id || third_person)) {
          sz.x = camera_bounds[1][0] - camera_bounds[0][0];
@@ -543,6 +564,8 @@ void render_objects(void)
          stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
       }
    }
+
+   logistics_render();
 
    render_sprites();
 }
@@ -799,11 +822,13 @@ int loopmode(float dt, int real, int in_client)
 
    carried_dt += dt;
    while (carried_dt > 1.0/TICKRATE) {
+      #if 0
       if (global_hack) {
          tex2_alpha += global_hack / 60.0f;
          if (tex2_alpha < 0) tex2_alpha = 0;
          if (tex2_alpha > 1) tex2_alpha = 1;
       }
+      #endif
       //update_input();
       // if the player is dead, stop the sim
       carried_dt -= 1.0/TICKRATE;

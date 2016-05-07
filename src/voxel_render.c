@@ -57,14 +57,15 @@ int view_distance=1800;
 #endif
 
 float texture_offsets[128][2];
+float logistics_texture_scroll;
 
 void setup_uniforms(float pos[3])
 {
    int i,j;
-   texture_offsets[22][0] -= 0.01f;
-   texture_offsets[23][1] += 0.01f;
-   texture_offsets[24][0] += 0.01f;
-   texture_offsets[25][1] -= 0.01f;
+   texture_offsets[22][0] = -logistics_texture_scroll;
+   texture_offsets[23][1] =  logistics_texture_scroll;
+   texture_offsets[24][0] =  logistics_texture_scroll;
+   texture_offsets[25][1] = -logistics_texture_scroll;
 
    for (i=0; i < STBVOX_UNIFORM_count; ++i) {
       stbvox_uniform_info raw, *ui=&raw;

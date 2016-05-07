@@ -37,8 +37,10 @@ extern void update_phys_chunk(mesh_chunk *mc, int x, int y, int z, int type);
 extern void update_physics_cache(int x, int y, int z, int type);
 extern void logistics_update_block(int x, int y, int z, int type);
 extern void logistics_init(void);
+extern void logistics_tick(void);
 extern void logistics_debug_render(void);
-
+extern void logistics_render(void);
+extern void add_sprite(float x, float y, float z, int id);
 
 typedef struct
 {

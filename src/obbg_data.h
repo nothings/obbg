@@ -241,6 +241,7 @@ extern int chunk_storage_rendered, chunk_storage_considered, chunk_storage_total
 extern int view_dist_for_display;
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 extern unsigned char tex1_for_blocktype[256][6];
+extern float logistics_texture_scroll;
 
 enum
 {
@@ -251,4 +252,6 @@ enum
 
 extern int program_mode;
 extern player_controls p_input[PLAYER_OBJECT_MAX];
+extern int global_hack;
+
 #endif

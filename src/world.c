@@ -172,6 +172,8 @@ void process_tick_raw(float dt)
 {
    int i;
 
+   logistics_tick();
+
    for (i=1; i < max_player_id; ++i)
       if (obj[i].valid)
          player_physics((objid) i, &p_input[i], dt);
