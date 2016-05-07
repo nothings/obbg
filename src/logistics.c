@@ -20,9 +20,10 @@ typedef struct
    uint8 dir  ;               // 1 bytes
    uint8 len  ;               // 1 bytes
    uint8 target_is_neighbor;  // 1 bytes
+   uint8 mobile_slots[2];     // 2 bytes
    uint16 target_id;          // 2 bytes
    beltside_item *items;      // 4 bytes
-} belt_run; // 12 bytes
+} belt_run; // 16 bytes
 
 typedef struct
 {
@@ -95,6 +96,30 @@ logi_chunk *logistics_get_chunk_alloc(int x, int y, int z)
       memset(c, 0, sizeof(*c));
    }
    return c;
+}
+
+void compute_mobile_slots(belt_run *br)
+{
+   int j;
+   int blocked[2] = { 1,1 };
+   if (br->len == 0)
+      return;
+   br->mobile_slots[0] = br->mobile_slots[1] = 0;
+   for (j=br->len*ITEMS_PER_BELT_SIDE-1; j >= 0; --j) {
+      if (blocked[0]) {
+         if (br->items[j*2+0].type == 0) {
+            blocked[0] = 0;
+            br->mobile_slots[0] = j;
+         }
+      }
+
+      if (blocked[1]) {
+         if (br->items[j*2+1].type == 0) {
+            blocked[1] = 0;
+            br->mobile_slots[1] = j;
+         }
+      }
+   }
 }
 
 void split_belt_raw(belt_run *a, belt_run *b, int num_a)
@@ -210,6 +235,10 @@ void split_belt(logi_chunk *c, int x, int y, int z, int dir)
 
       assert(f.len == 1);
 
+      compute_mobile_slots(e);
+      compute_mobile_slots(&f);
+      compute_mobile_slots(&g);
+
       if (e->len == 0)
          *e = f;
       else
@@ -318,6 +347,7 @@ void create_belt(logi_chunk *c, int x, int y, int z, int dir)
    }
 
    c->br[i].target_id = TARGET_unknown;
+   compute_mobile_slots(&c->br[i]);
 }
 
 void logistics_update_chunk(int x, int y, int z)
@@ -433,18 +463,24 @@ void logistics_render(void)
                      y2 = y1 + face_dir[d1][1]*(0.8f - 0.5/ITEMS_PER_BELT_SIDE);
                      y1 = y1 + face_dir[d1][1]*(0.2f + 0.5/ITEMS_PER_BELT_SIDE);
 
-                     x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-                     y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-                     x2 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-                     y2 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-
                      for (e=0; e < stb_arr_len(b->items); e += 2) {
+                        float x,y;
                         if (b->items[e+0].type != 0) {
-                           add_sprite(x1, y1, z, b->items[e+0].type);
+                           x = x1, y = y1;
+                           if (e < b->mobile_slots[0]*2) {
+                              x += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                              y += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                           }
+                           add_sprite(x, y, z, b->items[e+0].type);
 
                         }
                         if (b->items[e+1].type != 0) {
-                           add_sprite(x2, y2, z, b->items[e+1].type);
+                           x = x2, y = y2;
+                           if (e < b->mobile_slots[1]*2) {
+                              x += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                              y += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                           }
+                           add_sprite(x, y, z, b->items[e+1].type);
                         }
                         x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE);
                         y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE);
@@ -542,13 +578,38 @@ void logistics_chunk_tick(logi_slice *s, int cid)
    logi_chunk *c = s->chunk[cid];
    assert(c != NULL);
    for (i=0; i < stb_arr_len(c->br); ++i) {
+      uint8 blocked[2] = { 1,1 };
+      int j;
       belt_run *br = &c->br[i];
-      memmove(br->items + BELT_SIDES, br->items, sizeof(br->items[0]) * BELT_SIDES * (ITEMS_PER_BELT_SIDE * br->len-1));
-      br->items[0].type = br->items[1].type = 0;
+      int len = br->len * ITEMS_PER_BELT_SIDE;
+      br->mobile_slots[0] = br->mobile_slots[1] = 0;
+      for (j=len-1; j >= 0; --j) {
+         if (blocked[0]) {
+            if (br->items[j*2+0].type == 0) {
+               blocked[0] = 0;
+               br->mobile_slots[0] = j;
+            }
+         } else if (j < len-1) {
+            br->items[j*2+2] = br->items[j*2];
+         }
+
+         if (blocked[1]) {
+            if (br->items[j*2+1].type == 0) {
+               blocked[1] = 0;
+               br->mobile_slots[1] = j;
+            }
+         } else if (j < len-1) {
+            br->items[j*2+3] = br->items[j*2+1];
+         }
+      }
+      //memmove(br->items + BELT_SIDES, br->items, sizeof(br->items[0]) * BELT_SIDES * (ITEMS_PER_BELT_SIDE * br->len-1));
+      if (!blocked[0])
+         br->items[0].type = 0;
+      if (!blocked[1])
+         br->items[1].type = 0;
       if (stb_rand() % 10 < 1) {
-         br->items[stb_rand() & 1].type = stb_rand() % 4;
-         br->items[stb_rand() & 1].type = stb_rand() % 4;
-         //br->items[stb_rand() & 1].type = stb_rand() % 4;
+         if (!blocked[0] && stb_rand() % 4 < 2) br->items[0].type = stb_rand() % 4;
+         if (!blocked[1] && stb_rand() % 4 < 2) br->items[1].type = stb_rand() % 4;
       }
    }
 }
