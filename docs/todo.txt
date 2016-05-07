@@ -18,7 +18,7 @@ Possible tasks to work on next:
       - small quantities of polygonal objects
    -  save changes to disk
    -  conveyor belts (special physics)
-      - factorio-style two-rows-of-sprite-sized stuff per conveyor
+      * factorio-style two-rows-of-sprite-sized stuff per conveyor
       - or just one row of block-sized stuff
       - maybe require multi-block things to be supported by multiple conveyors
       - factorio-style stuff stops at end of conveyor, not infinifactory falling-off-esque
