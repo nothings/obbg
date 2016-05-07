@@ -685,6 +685,8 @@ void draw_main(void)
       }
    }
 
+   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
    if (debug_render)
       logistics_debug_render();
 
@@ -695,8 +697,6 @@ void draw_main(void)
          glColor3f(0,0,1); glVertex3f(0,0,0); glVertex3f(0,0,1);
       glEnd();
    }
-
-   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
    render_time = (end_time - start_time) / (float) SDL_GetPerformanceFrequency();
 

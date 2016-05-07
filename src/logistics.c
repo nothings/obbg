@@ -1,5 +1,6 @@
 #include "obbg_funcs.h"
 #include "stb_gl.h"
+#include <math.h>
 
 #define ITEMS_PER_BELT_SIDE   4
 #define BELT_SIDES   2
@@ -366,7 +367,7 @@ void logistics_update_chunk(int x, int y, int z)
             int ey = b->y_off + b->len * face_dir[b->dir][1];
             int ez = b->z_off, is_neighbor=0;
             if (ex < 0 || ey < 0 || ex >= LOGI_CHUNK_SIZE_X || ey >= LOGI_CHUNK_SIZE_Y) {
-               d = logistics_get_chunk(base_x + x, base_y + ey, z);
+               d = logistics_get_chunk(base_x + ex, base_y + ey, z);
                ex = LOGI_CHUNK_MASK_X(ex);
                ey = LOGI_CHUNK_MASK_Y(ey);
                b->target_is_neighbor = 1;
@@ -565,6 +566,29 @@ void logistics_debug_render(void)
          }
       }
    }
+
+
+   {
+      vec pos = obj[player_id].position;
+      int x,y,z;
+      x = (int) floor(pos.x);
+      y = (int) floor(pos.y);
+      z = (int) floor(pos.z);
+
+      x &= ~(LOGI_CHUNK_SIZE_X-1);
+      y &= ~(LOGI_CHUNK_SIZE_Y-1);
+      z &= ~(LOGI_CHUNK_SIZE_Z-1);
+
+      glDisable(GL_TEXTURE_2D);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+      glColor4f(0.2f,0.2f,0.2f,0.2f);
+      glDisable(GL_CULL_FACE);
+      stbgl_drawBox(x+LOGI_CHUNK_SIZE_X/2, y+LOGI_CHUNK_SIZE_Y/2, z+LOGI_CHUNK_SIZE_Z/2, LOGI_CHUNK_SIZE_X-0.125f, LOGI_CHUNK_SIZE_Y-0.125f, LOGI_CHUNK_SIZE_Z-0.125f, 0);
+      glEnable(GL_TEXTURE_2D);
+      glDisable(GL_BLEND);
+   }
+
 }
 
 void logistics_init(void)
@@ -580,16 +604,137 @@ void logistics_init(void)
 // X X . X X . . .
 // X X X X . . . .
 
+typedef struct
+{
+   int off_x, off_y, off_z;
+   logi_chunk *c;
+} target_chunk;
+
+static void get_target_chunk(target_chunk *tc, int bx, int by, int bz, logi_chunk *c, belt_run *br)
+{
+   if (1 || br->target_is_neighbor) {
+      int ex = bx + br->x_off + br->len * face_dir[br->dir][0];
+      int ey = by + br->y_off + br->len * face_dir[br->dir][1];
+      int ez = bz + br->z_off;
+      logi_chunk *c = logistics_get_chunk(ex,ey,ez);
+      tc->c = c;
+      tc->off_x = (ex & ~(LOGI_CHUNK_SIZE_X-1)) - bx;
+      tc->off_y = (ey & ~(LOGI_CHUNK_SIZE_Y-1)) - by;
+      tc->off_z = (ez & ~(LOGI_CHUNK_SIZE_Z-1)) - bz;
+   }
+}
+
 void logistics_chunk_tick(logi_slice *s, int cid)
 {
    int i;
    logi_chunk *c = s->chunk[cid];
    assert(c != NULL);
+
    for (i=0; i < stb_arr_len(c->br); ++i) {
-      uint8 blocked[2] = { 1,1 };
       int j;
       belt_run *br = &c->br[i];
-      int len = br->len * ITEMS_PER_BELT_SIDE;
+      int len;
+      int force_mobile[2] = { 0,0 };
+
+      len = br->len * ITEMS_PER_BELT;
+      if (global_hack == -1)
+         memset(br->items, 0, sizeof(br->items[0]) * len);
+
+      if (br->target_id != TARGET_none) {
+         int turn;
+         target_chunk tc;
+         belt_run *tb;
+         get_target_chunk(&tc, s->slice_x * LOGI_CHUNK_SIZE_X, s->slice_y * LOGI_CHUNK_SIZE_Y, cid * LOGI_CHUNK_SIZE_Z, c, br);
+         assert(tc.c != NULL);
+         tb = &tc.c->br[br->target_id];
+         turn = (tb->dir - br->dir) & 3;
+         switch (turn) {
+            case 0: {
+               // conveyor continues straight ahead
+               if (tb->items[0].type == 0) {
+                  tb->items[0] = br->items[len-2];
+                  br->items[len-2].type = 0;
+               }
+               if (tb->items[1].type == 0) {
+                  tb->items[1] = br->items[len-1];
+                  br->items[len-1].type = 0;
+               }
+               force_mobile[0] = (tb->mobile_slots[0] > 0);
+               force_mobile[1] = (tb->mobile_slots[1] > 0);
+               break;
+            }
+            case 1: {
+               // e.g. from east to north
+               //
+               //                 ^  ^
+               //  [1] X X X X -> O  O 
+               //                 O  O
+               //  [0] X X X X -> O  O
+               //                 O  O
+
+               int ex = br->x_off + br->len*face_dir[br->dir][0];
+               int ey = br->y_off + br->len*face_dir[br->dir][1];
+               // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
+               int pos = abs(ex - (tc.off_x + tb->x_off)) + abs(ey - (tc.off_y + tb->y_off));
+               int itembase = pos * ITEMS_PER_BELT_SIDE;
+
+               if (br->items[len-2].type != 0) {
+                  int itempos = (itembase + (ITEMS_PER_BELT_SIDE/4-1))*2+1;
+                  assert(itempos < stb_arr_len(tb->items));
+                  if (tb->items[itempos].type == 0) {
+                     tb->items[itempos] = br->items[len-2];
+                     br->items[len-2].type = 0;
+                  }
+               }
+
+               if (br->items[len-1].type != 0) {
+                  int itempos = (itembase + (ITEMS_PER_BELT_SIDE*3/4-1))*2+1;
+                  if (tb->items[itempos].type == 0) {
+                     tb->items[itempos] = br->items[len-1];
+                     br->items[len-1].type = 0;
+                  }
+               }
+               break;
+            }
+            case 2:
+               // conveyors point in opposite directions
+               break;
+            case 3: {
+               // e.g. from west to north
+               //
+               //   ^  ^
+               //   O  O <- X X X X [0]
+               //   O  O
+               //   O  O <- X X X X [1]
+               //   O  O
+               int ex = br->x_off + br->len*face_dir[br->dir][0];
+               int ey = br->y_off + br->len*face_dir[br->dir][1];
+               // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
+               int pos = abs(ex - (tc.off_x + tb->x_off)) + abs(ey - (tc.off_y + tb->y_off));
+               int itembase = pos * ITEMS_PER_BELT_SIDE;
+
+               if (br->items[len-2].type != 0) {
+                  int itempos = (itembase + (ITEMS_PER_BELT_SIDE*3/4))*2+0;
+                  assert(itempos < stb_arr_len(tb->items));
+                  if (tb->items[itempos].type == 0) {
+                     tb->items[itempos] = br->items[len-2];
+                     br->items[len-2].type = 0;
+                  }
+               }
+
+               if (br->items[len-1].type != 0) {
+                  int itempos = (itembase + (ITEMS_PER_BELT_SIDE/4))*2+0;
+                  if (tb->items[itempos].type == 0) {
+                     tb->items[itempos] = br->items[len-1];
+                     br->items[len-1].type = 0;
+                  }
+               }
+               break;
+            }
+         }
+      }
+      len = br->len * ITEMS_PER_BELT_SIDE;
+
       for (j=len-2; j >= 0; --j)
          if (br->items[j*2+0].type != 0 && br->items[j*2+2].type == 0) {
             br->items[j*2+2] = br->items[j*2+0];
@@ -604,13 +749,17 @@ void logistics_chunk_tick(logi_slice *s, int cid)
          if (br->items[j*2+0].type == 0)
             break;
       br->mobile_slots[0] = j < 0 ? 0 : j;
+      if (force_mobile[0]) br->mobile_slots[0] = len;
       for (j=len-1; j >= 0; --j)
          if (br->items[j*2+1].type == 0)
             break;
       br->mobile_slots[1] = j < 0 ? 0 : j;
-      if (stb_rand() % 10 < 1) {
-         if (br->items[0].type == 0 && stb_rand() % 4 < 2) br->items[0].type = stb_rand() % 4;
-         if (br->items[1].type == 0 && stb_rand() % 4 < 2) br->items[1].type = stb_rand() % 4;
+      if (force_mobile[1]) br->mobile_slots[1] = len;
+      if (global_hack) {
+         if (stb_rand() % 10 < 2) {
+            if (br->items[0].type == 0 && stb_rand() % 9 < 2) br->items[0].type = stb_rand() % 4;
+            if (br->items[1].type == 0 && stb_rand() % 9 < 2) br->items[1].type = stb_rand() % 4;
+         }
       }
    }
 }
