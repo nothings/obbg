@@ -129,6 +129,10 @@ SOURCE=..\stb\stb_image.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\stb\stb_image_resize.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\stb\stb_voxel_render.h
 # End Source File
 # End Group
@@ -156,6 +160,10 @@ SOURCE=..\src\obbg_data.h
 SOURCE=..\src\obbg_funcs.h
 # End Source File
 # End Group
+# Begin Source File
+
+SOURCE=..\src\logistics.c
+# End Source File
 # Begin Source File
 
 SOURCE=..\src\main.c
