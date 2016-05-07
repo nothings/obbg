@@ -9,6 +9,13 @@ obbg:
   - networking
 
 Done in today's stream:
+  - clean up rules for moving between belt runs
+  - topologically sort belts so movement is "perfect"
+
+Previous stream:
+  - moving objects on conveyor belts
+
+Previous stream:
   - animated conveyor belt textures
 
 Previous stream:
