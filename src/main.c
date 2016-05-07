@@ -502,16 +502,22 @@ vec vec_sub_scale(vec *b, vec *c, float d)
    return a;
 }
 
+int alpha_test_sprites=1;
+
 void render_sprites(void)
 {
    int i;
    vec s_off, t_off;
    stbglUseProgram(dumb_prog);
    
-   glEnable(GL_BLEND);
-   glDisable(GL_ALPHA_TEST);
-   glDepthMask(GL_FALSE);
-   glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+   if (alpha_test_sprites) {
+      glEnable(GL_ALPHA_TEST);
+      glDisable(GL_BLEND);
+   } else {
+      glEnable(GL_BLEND);
+      glDepthMask(GL_FALSE);
+      glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+   }
    glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, sprite_tex);
    stbglUniform1i(stbgl_find_uniform(dumb_prog, "tex"), 0);
 
@@ -537,6 +543,7 @@ void render_sprites(void)
    }
    glEnd();
    glDepthMask(GL_TRUE);
+   glDisable(GL_ALPHA_TEST);
 
 
    stbglUseProgram(0);

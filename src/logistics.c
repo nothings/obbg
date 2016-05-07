@@ -457,6 +457,9 @@ void logistics_render(void)
                      x1 += face_orig[b->dir][0];
                      y1 += face_orig[b->dir][1];
 
+                     x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
+                     y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
+
                      x2 = x1 + face_dir[d1][0]*(0.8f - 0.5/ITEMS_PER_BELT_SIDE);
                      x1 = x1 + face_dir[d1][0]*(0.2f + 0.5/ITEMS_PER_BELT_SIDE);
 
@@ -572,6 +575,11 @@ void logistics_init(void)
          logi_world[j][i].slice_x = i+1;
 }
 
+// 7 6 5 4 3 2 1 0
+// X X . . X X . .
+// X X . X X . . .
+// X X X X . . . .
+
 void logistics_chunk_tick(logi_slice *s, int cid)
 {
    int i;
@@ -582,34 +590,27 @@ void logistics_chunk_tick(logi_slice *s, int cid)
       int j;
       belt_run *br = &c->br[i];
       int len = br->len * ITEMS_PER_BELT_SIDE;
-      br->mobile_slots[0] = br->mobile_slots[1] = 0;
-      for (j=len-1; j >= 0; --j) {
-         if (blocked[0]) {
-            if (br->items[j*2+0].type == 0) {
-               blocked[0] = 0;
-               br->mobile_slots[0] = j;
-            }
-         } else if (j < len-1) {
-            br->items[j*2+2] = br->items[j*2];
+      for (j=len-2; j >= 0; --j)
+         if (br->items[j*2+0].type != 0 && br->items[j*2+2].type == 0) {
+            br->items[j*2+2] = br->items[j*2+0];
+            br->items[j*2+0].type = 0;
          }
-
-         if (blocked[1]) {
-            if (br->items[j*2+1].type == 0) {
-               blocked[1] = 0;
-               br->mobile_slots[1] = j;
-            }
-         } else if (j < len-1) {
+      for (j=len-2; j >= 0; --j)
+         if (br->items[j*2+1].type != 0 && br->items[j*2+3].type == 0) {
             br->items[j*2+3] = br->items[j*2+1];
+            br->items[j*2+1].type = 0;
          }
-      }
-      //memmove(br->items + BELT_SIDES, br->items, sizeof(br->items[0]) * BELT_SIDES * (ITEMS_PER_BELT_SIDE * br->len-1));
-      if (!blocked[0])
-         br->items[0].type = 0;
-      if (!blocked[1])
-         br->items[1].type = 0;
+      for (j=len-1; j >= 0; --j)
+         if (br->items[j*2+0].type == 0)
+            break;
+      br->mobile_slots[0] = j < 0 ? 0 : j;
+      for (j=len-1; j >= 0; --j)
+         if (br->items[j*2+1].type == 0)
+            break;
+      br->mobile_slots[1] = j < 0 ? 0 : j;
       if (stb_rand() % 10 < 1) {
-         if (!blocked[0] && stb_rand() % 4 < 2) br->items[0].type = stb_rand() % 4;
-         if (!blocked[1] && stb_rand() % 4 < 2) br->items[1].type = stb_rand() % 4;
+         if (br->items[0].type == 0 && stb_rand() % 4 < 2) br->items[0].type = stb_rand() % 4;
+         if (br->items[1].type == 0 && stb_rand() % 4 < 2) br->items[1].type = stb_rand() % 4;
       }
    }
 }
