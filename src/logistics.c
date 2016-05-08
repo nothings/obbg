@@ -38,6 +38,11 @@ enum
 
 typedef struct
 {
+   uint8 type;
+} logi_machine;
+
+typedef struct
+{
    uint8 type[LOGI_CHUNK_SIZE_Z][LOGI_CHUNK_SIZE_Y][LOGI_CHUNK_SIZE_X];
    belt_run *br; // stb_arr 
 } logi_chunk;
@@ -418,6 +423,10 @@ void logistics_update_chunk(int x, int y, int z)
    }
 }
 
+#define IS_RAMP_HEAD(x) \
+   (    ((x) >= BT_conveyor_ramp_up_east_low    && (x) <= BT_conveyor_ramp_up_south_low   )    \
+     || ((x) >= BT_conveyor_ramp_down_east_high && (x) <= BT_conveyor_ramp_down_south_high) )
+
 void logistics_update_block(int x, int y, int z, int type)
 {
    logi_chunk *c = logistics_get_chunk_alloc(x,y,z);
@@ -437,6 +446,18 @@ void logistics_update_block(int x, int y, int z, int type)
    } else if (oldtype >= BT_conveyor_east && oldtype <= BT_conveyor_south) {
       destroy_belt(c, ox,oy,oz);
    }
+
+   if (IS_BELT_HEAD(type)) {
+      if (IS_BELT_HEAD(oldtype)) {
+         // @TODO changing ramp types
+      } else {
+         // create new ramp
+      }
+   } else if (IS_BELT_HEAD(oldtype)) {
+      // delete old ramp
+   }
+
+
    logistics_update_chunk(x,y,z);
    logistics_update_chunk(x - LOGI_CHUNK_SIZE_X, y, z);
    logistics_update_chunk(x + LOGI_CHUNK_SIZE_X, y, z);

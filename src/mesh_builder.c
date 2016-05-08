@@ -49,24 +49,24 @@ unsigned char geom_for_blocktype[256] =
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
 
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
 
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
 
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
 
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
 
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
@@ -1276,7 +1276,7 @@ void force_update_for_block_raw(int x, int y, int z)
 void force_update_for_block(int x, int y, int z)
 {
    force_update_for_block_raw(x,y,z);
-   // OPTIMIZE: only update them if needed
+   // @OPTIMIZE: only update them if needed
    force_update_for_block_raw(x+1,y,z);
    force_update_for_block_raw(x-1,y,z);
    force_update_for_block_raw(x,y+1,z);

@@ -938,7 +938,7 @@ void process_event(SDL_Event *e)
          if (k == '4') block_base = BT_conveyor_ramp_down_east_low;
          if (k == '5') block_base = BT_conveyor_ramp_down_east_high;
          //if (k == '6') block_base = BT_conveyor_up_east_low;
-         //if (k == '1') global_hack = !global_hack;
+         if (s == SDL_SCANCODE_H) global_hack = !global_hack;
          //if (k == '2') global_hack = -1;
          //if (k == '3') obj[player_id].position.x += 65536;
          if (s == SDL_SCANCODE_P) debug_render = !debug_render;
