@@ -22,6 +22,8 @@ typedef struct
    uint8 len  ;               // 1 bytes             // 5
    uint8 target_is_neighbor:1;// 1 bytes             // 1
    uint8 mark:2;              // 0 bytes             // 2
+   int8  end_dz:2;            // 0 bytes             // 2
+   int8  input_dz:2;          // 0 bytes             // 2
    uint8 mobile_slots[2];     // 2 bytes             // 7,7
    uint8 last_slot_filled_next_tick[2];  // 2 bytes  // 1,1
    uint16 target_id;          // 2 bytes             // 16
@@ -35,11 +37,6 @@ enum
    M_temporary,
    M_permanent
 };
-
-typedef struct
-{
-   uint8 type;
-} logi_machine;
 
 typedef struct
 {
@@ -141,6 +138,7 @@ void compute_mobile_slots(belt_run *br)
 
 void split_belt_raw(belt_run *a, belt_run *b, int num_a)
 {
+   assert(a->end_dz==0);
    assert(num_a <= a->len);
    b->len = a->len - num_a;
    a->len = num_a;
@@ -226,6 +224,7 @@ void split_belt(logi_chunk *c, int x, int y, int z, int dir)
       assert(pos >= 0 && pos < e->len);
       assert(e->x_off + face_dir[e->dir][0]*pos == x);
       assert(e->y_off + face_dir[e->dir][1]*pos == y);
+      assert(e->end_dz==0);
 
       if (e->len == 1)
          return;
@@ -237,6 +236,7 @@ void split_belt(logi_chunk *c, int x, int y, int z, int dir)
       f.z_off = z;
       f.target_id = TARGET_unknown;
       f.input_id = TARGET_none;
+      f.end_dz = 0;
 
       split_belt_raw(e, &f, pos);
       assert(e->x_off + face_dir[e->dir][0]*e->len == f.x_off);
@@ -248,6 +248,7 @@ void split_belt(logi_chunk *c, int x, int y, int z, int dir)
       g.z_off = z;
       g.target_id = TARGET_unknown;
       g.input_id = TARGET_none;
+      g.end_dz = 0;
 
       assert(f.len >= 1);
 
@@ -286,6 +287,7 @@ void destroy_belt(logi_chunk *c, int x, int y, int z)
    for (i=0; i < stb_arr_len(c->br); ++i) {
       belt_run *b = &c->br[i];
       if (b->x_off == x && b->y_off == y && b->z_off == z) {
+         assert(b->len == 1);
          destroy_belt_raw(c, i);
          return;
       }
@@ -321,6 +323,35 @@ int merge_run(logi_chunk *c, int i, int j)
       return i;
 }
 
+void create_ramp(logi_chunk *c, int x, int y, int z, int dir, int dz)
+{
+   belt_run nb;
+   nb.x_off = x;
+   nb.y_off = y;
+   nb.z_off = z;
+   nb.len = 2;
+   nb.dir = dir;
+   nb.items = NULL;
+   nb.end_dz = dz;
+   nb.input_id = TARGET_none;
+   nb.target_id = TARGET_unknown;
+   stb_arr_setlen(nb.items, ITEMS_PER_BELT*nb.len);
+   memset(nb.items, 0, sizeof(nb.items[0]) * stb_arr_len(nb.items));
+   stb_arr_push(c->br, nb);
+}
+
+void destroy_ramp(logi_chunk *c, int x, int y, int z)
+{
+   int i;
+   for (i=0; i < stb_arr_len(c->br); ++i) {
+      if (c->br[i].x_off == x && c->br[i].y_off == y && c->br[i].z_off == z) {
+         assert(c->br[i].end_dz != 0);
+         destroy_belt_raw(c,i);
+         return;
+      }
+   }
+}
+
 // if there is already a belt there, it is one-long
 void create_belt(logi_chunk *c, int x, int y, int z, int dir)
 {
@@ -337,6 +368,7 @@ void create_belt(logi_chunk *c, int x, int y, int z, int dir)
       nb.len = 1;
       nb.dir = dir;
       nb.items = NULL;
+      nb.end_dz = 0;
       stb_arr_setlen(nb.items, 8);
       memset(nb.items, 0, sizeof(nb.items[0]) * stb_arr_len(nb.items));
       stb_arr_push(c->br, nb);
@@ -349,7 +381,7 @@ void create_belt(logi_chunk *c, int x, int y, int z, int dir)
    for (j=0; j < stb_arr_len(c->br); ++j) {
       if (j != i) {
          belt_run *b = &c->br[j];
-         if (b->dir == dir && b->z_off == a->z_off) {
+         if (b->end_dz == 0 && b->dir == dir && b->z_off == a->z_off) {
             if (b->x_off + face_dir[dir][0]*b->len == a->x_off && b->y_off + face_dir[dir][1]*b->len == a->y_off) {
                i = merge_run(c, j, i);
                break;
@@ -362,7 +394,7 @@ void create_belt(logi_chunk *c, int x, int y, int z, int dir)
    for (j=0; j < stb_arr_len(c->br); ++j) {
       if (j != i) {
          belt_run *b = &c->br[j];
-         if (b->dir == dir && b->z_off == a->z_off) {
+         if (b->end_dz == 0 && b->dir == dir && b->z_off == a->z_off) {
             if (a->x_off + face_dir[dir][0]*a->len == b->x_off && a->y_off + face_dir[dir][1]*a->len == b->y_off) {
                i = merge_run(c, i, j);
                break;  
@@ -390,9 +422,9 @@ void logistics_update_chunk(int x, int y, int z)
             belt_run *b = &c->br[i];
             int ex = b->x_off + b->len * face_dir[b->dir][0];
             int ey = b->y_off + b->len * face_dir[b->dir][1];
-            int ez = b->z_off, is_neighbor=0;
-            if (ex < 0 || ey < 0 || ex >= LOGI_CHUNK_SIZE_X || ey >= LOGI_CHUNK_SIZE_Y) {
-               d = logistics_get_chunk(base_x + ex, base_y + ey, z,0);
+            int ez = b->z_off + b->end_dz, is_neighbor=0;
+            if (ex < 0 || ey < 0 || ex >= LOGI_CHUNK_SIZE_X || ey >= LOGI_CHUNK_SIZE_Y || ez < 0 || ez >= LOGI_CHUNK_SIZE_Z) {
+               d = logistics_get_chunk(base_x + ex, base_y + ey, base_z + ez,0);
                ex = LOGI_CHUNK_MASK_X(ex);
                ey = LOGI_CHUNK_MASK_Y(ey);
                b->target_is_neighbor = 1;
@@ -401,10 +433,12 @@ void logistics_update_chunk(int x, int y, int z)
 
             if (d != NULL) {
                for (j=0; j < stb_arr_len(d->br); ++j) {
-                  if (does_belt_intersect(&d->br[j], ex,ey,ez)) {
+                  if ((d->br[j].dir == b->dir || d->br[j].end_dz == b->end_dz) && does_belt_intersect(&d->br[j], ex,ey,ez)) {
                      b->target_id = j;
-                     if (d->br[j].dir == b->dir)
+                     if (d->br[j].dir == b->dir) {
                         d->br[j].input_id = i;
+                        d->br[j].input_dz = b->end_dz;
+                     }
                      break;
                   }
                }
@@ -427,7 +461,11 @@ void logistics_update_chunk(int x, int y, int z)
    (    ((x) >= BT_conveyor_ramp_up_east_low    && (x) <= BT_conveyor_ramp_up_south_low   )    \
      || ((x) >= BT_conveyor_ramp_down_east_high && (x) <= BT_conveyor_ramp_down_south_high) )
 
-void logistics_update_block(int x, int y, int z, int type)
+//
+//  
+//  /
+
+void logistics_update_block_core(int x, int y, int z, int type)
 {
    logi_chunk *c = logistics_get_chunk_alloc(x,y,z);
    int ox = LOGI_CHUNK_MASK_X(x);
@@ -447,16 +485,17 @@ void logistics_update_block(int x, int y, int z, int type)
       destroy_belt(c, ox,oy,oz);
    }
 
-   if (IS_BELT_HEAD(type)) {
-      if (IS_BELT_HEAD(oldtype)) {
+   if (IS_RAMP_HEAD(type)) {
+      if (IS_RAMP_HEAD(oldtype)) {
          // @TODO changing ramp types
+         destroy_ramp(c, ox,oy,oz);
+         create_ramp(c, ox,oy,oz, type & 3, type <= BT_conveyor_ramp_up_south_low ? 1 : -1);
       } else {
-         // create new ramp
+         create_ramp(c, ox,oy,oz, type & 3, type <= BT_conveyor_ramp_up_south_low ? 1 : -1);
       }
-   } else if (IS_BELT_HEAD(oldtype)) {
-      // delete old ramp
+   } else if (IS_RAMP_HEAD(oldtype)) {
+      destroy_ramp(c, ox,oy,oz);
    }
-
 
    logistics_update_chunk(x,y,z);
    logistics_update_chunk(x - LOGI_CHUNK_SIZE_X, y, z);
@@ -465,6 +504,27 @@ void logistics_update_block(int x, int y, int z, int type)
    logistics_update_chunk(x, y + LOGI_CHUNK_SIZE_Y, z);
    logistics_update_chunk(x, y, z - LOGI_CHUNK_SIZE_Z);
    logistics_update_chunk(x, y, z + LOGI_CHUNK_SIZE_Z);
+
+   logistics_update_chunk(x - LOGI_CHUNK_SIZE_X, y, z - LOGI_CHUNK_SIZE_Z);
+   logistics_update_chunk(x - LOGI_CHUNK_SIZE_X, y, z + LOGI_CHUNK_SIZE_Z);
+   logistics_update_chunk(x + LOGI_CHUNK_SIZE_X, y, z - LOGI_CHUNK_SIZE_Z);
+   logistics_update_chunk(x + LOGI_CHUNK_SIZE_X, y, z + LOGI_CHUNK_SIZE_Z);
+   logistics_update_chunk(x, y - LOGI_CHUNK_SIZE_Y, z - LOGI_CHUNK_SIZE_Z);
+   logistics_update_chunk(x, y - LOGI_CHUNK_SIZE_Y, z + LOGI_CHUNK_SIZE_Z);
+   logistics_update_chunk(x, y + LOGI_CHUNK_SIZE_Y, z - LOGI_CHUNK_SIZE_Z);
+   logistics_update_chunk(x, y + LOGI_CHUNK_SIZE_Y, z + LOGI_CHUNK_SIZE_Z);
+
+   if (oldtype == BT_down_marker)
+      logistics_update_block_core(x,y,z-1,BT_empty);
+}
+
+void logistics_update_block(int x, int y, int z, int type)
+{
+   if (type >= BT_conveyor_ramp_up_east_low && type <= BT_conveyor_ramp_up_south_low) {
+      logistics_update_block_core(x,y,z, BT_down_marker);
+      logistics_update_block_core(x,y,z-1,type);
+   } else
+      logistics_update_block_core(x,y,z,type);
 }
 
 int face_orig[4][2] = {
@@ -512,28 +572,31 @@ void logistics_render(void)
                      y1 = y1 + face_dir[d1][1]*(0.1f + 0.5/ITEMS_PER_BELT_SIDE);
 
                      for (e=0; e < stb_arr_len(b->items); e += 2) {
-                        float x,y;
+                        float ax,ay,az;
                         if (b->items[e+0].type != 0) {
-                           x = x1, y = y1;
+                           ax = x1, ay = y1, az=z;
                            if (e < b->mobile_slots[0]*2) {
-                              x += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-                              y += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                              ax += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                              ay += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                              az += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE) * offset;
                            }
-                           add_sprite(x, y, z, b->items[e+0].type);
+                           add_sprite(ax, ay, az, b->items[e+0].type);
 
                         }
                         if (b->items[e+1].type != 0) {
-                           x = x2, y = y2;
+                           ax = x2, ay = y2, az=z;
                            if (e < b->mobile_slots[1]*2) {
-                              x += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-                              y += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                              ax += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                              ay += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                              az += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE) * offset;
                            }
-                           add_sprite(x, y, z, b->items[e+1].type);
+                           add_sprite(ax, ay, az, b->items[e+1].type);
                         }
                         x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE);
                         y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE);
                         x2 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE);
                         y2 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE);
+                        z += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE);
                      }
                   }
                }
@@ -561,6 +624,7 @@ typedef struct
    int off_x, off_y, off_z;
    logi_chunk *c;
    logi_slice *s;
+   int cid;
 } target_chunk;
 
 static void get_target_chunk(target_chunk *tc, int bx, int by, int bz, logi_chunk *c, belt_run *br)
@@ -568,8 +632,9 @@ static void get_target_chunk(target_chunk *tc, int bx, int by, int bz, logi_chun
    if (1 || br->target_is_neighbor) {
       int ex = bx + br->x_off + br->len * face_dir[br->dir][0];
       int ey = by + br->y_off + br->len * face_dir[br->dir][1];
-      int ez = bz + br->z_off;
+      int ez = bz + br->z_off + br->end_dz;
       logi_chunk *c = logistics_get_chunk(ex,ey,ez, &tc->s);
+      tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
       tc->c = c;
       tc->off_x = (ex & ~(LOGI_CHUNK_SIZE_X-1)) - bx;
       tc->off_y = (ey & ~(LOGI_CHUNK_SIZE_Y-1)) - by;
@@ -581,10 +646,10 @@ static void get_input_chunk(target_chunk *tc, int bx, int by, int bz, logi_chunk
 {
    int ex = bx + br->x_off - face_dir[br->dir][0];
    int ey = by + br->y_off - face_dir[br->dir][1];
-   int ez = bz + br->z_off;
+   int ez = bz + br->z_off - br->input_dz;
    logi_chunk *nc = logistics_get_chunk(ex,ey,ez, &tc->s);
-   assert(c != nc);
    tc->c = nc;
+   tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
 }
 
 #define BELT_SLOT_IS_EMPTY_NEXT_TICK(b,slot) \
@@ -792,7 +857,7 @@ static void visit(belt_ref *ref)
          belt_ref target;
          get_target_chunk(&tc, ref->slice->slice_x * LOGI_CHUNK_SIZE_X, ref->slice->slice_y * LOGI_CHUNK_SIZE_Y, ref->cid * LOGI_CHUNK_SIZE_Z, c, br);
          target.belt_id = br->target_id;
-         target.cid = ref->cid;
+         target.cid = tc.cid;
          target.slice = tc.s;
          visit(&target);
       }
@@ -807,7 +872,7 @@ static void visit(belt_ref *ref)
             target_chunk tc;
             get_input_chunk(&tc,  target.slice->slice_x * LOGI_CHUNK_SIZE_X, target.slice->slice_y * LOGI_CHUNK_SIZE_Y, target.cid * LOGI_CHUNK_SIZE_Z, c, br);
             target.belt_id = br->input_id;
-            target.cid = ref->cid;
+            target.cid = tc.cid;
             target.slice = tc.s;
             c = tc.c;
             br = &c->br[target.belt_id];

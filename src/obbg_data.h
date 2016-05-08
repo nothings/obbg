@@ -112,7 +112,8 @@ enum
    BT_stone,
    BT_leaves,
 
-   BT_no_change=255
+   BT_down_marker=255,
+   BT_no_change=255,
 };
 
 
