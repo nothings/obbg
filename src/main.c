@@ -53,6 +53,11 @@ extern int load_bitmap_to_texture_array(int slot, unsigned char *data, int w, in
 GLuint debug_tex, dumb_prog;
 GLuint voxel_tex[2];
 GLuint sprite_tex;
+int selected_block[3];
+int selected_block_to_create[3];
+int debug_render;
+Bool selected_block_valid;
+
 
 typedef struct
 {
@@ -103,6 +108,7 @@ void set_blocktype_texture(int bt, int tex)
 
 void init_mesh_building(void)
 {
+   int i;
 #if 0
    int i,j;
    for (i=0; i < 256; ++i)
@@ -118,14 +124,19 @@ void init_mesh_building(void)
    set_blocktype_texture(BT_marble, 16);
    set_blocktype_texture(BT_stone, 20);
    set_blocktype_texture(BT_leaves, 1);
-   set_blocktype_texture(BT_conveyor_east, 21);
-   set_blocktype_texture(BT_conveyor_north, 21);
-   set_blocktype_texture(BT_conveyor_west, 21);
-   set_blocktype_texture(BT_conveyor_south, 21);
-   tex1_for_blocktype[BT_conveyor_east ][FACE_up] = 22;
-   tex1_for_blocktype[BT_conveyor_north][FACE_up] = 23;
-   tex1_for_blocktype[BT_conveyor_west ][FACE_up] = 24;
-   tex1_for_blocktype[BT_conveyor_south][FACE_up] = 25;
+   for (i=0; i < 4; ++i) {
+      set_blocktype_texture(BT_conveyor_east+i, 21);
+      set_blocktype_texture(BT_conveyor_ramp_up_east_low+i, 21);
+      set_blocktype_texture(BT_conveyor_ramp_up_east_high+i, 21);
+      set_blocktype_texture(BT_conveyor_ramp_down_east_low+i, 21);
+      set_blocktype_texture(BT_conveyor_ramp_down_east_high+i, 21);
+   }
+   for (i=0; i < 5; ++i) {
+      tex1_for_blocktype[BT_conveyor_east +i*4][FACE_up] = 22;
+      tex1_for_blocktype[BT_conveyor_north+i*4][FACE_up] = 23;
+      tex1_for_blocktype[BT_conveyor_west +i*4][FACE_up] = 24;
+      tex1_for_blocktype[BT_conveyor_south+i*4][FACE_up] = 25;
+   }
 
    // { int i; for (i=0; i < 20; ++i) set_blocktype_texture(i, 0); }
 }
@@ -230,10 +241,13 @@ void render_init(void)
    #endif
 
    texture_scales[21] = 1.0f;
+
+   #if 0
    texture_scales[22] = 1.0f;
    texture_scales[23] = 1.0f;
    texture_scales[24] = 1.0f;
    texture_scales[25] = 1.0f;
+   #endif
 
    // temporary hack:
    voxel_tex[1] = voxel_tex[0];
@@ -430,22 +444,24 @@ void draw_stats(void)
    text_color[0] = text_color[1] = text_color[2] = 1.0f;
    print("Frame time: %6.2fms, CPU frame render time: %5.2fms", frame_time*1000, render_time*1000);
    print("Tris: %4.1fM drawn of %4.1fM in range", 2*quads_rendered/1000000.0f, 2*quads_considered/1000000.0f);
-   print("Vbuf storage: %dMB in frustum of %dMB in range of %dMB in cache", chunk_storage_rendered>>20, chunk_storage_considered>>20, chunk_storage_total>>20);
-   print("Num mesh builds started this frame: %d; num uploaded this frame: %d\n", num_meshes_started, num_meshes_uploaded);
-   print("QChunks: %3d in frustum of %3d valid of %3d in range", chunks_in_frustum, chunks_considered, chunk_locations);
-   print("Mesh worker threads active: %d", num_threads_active);
-   print("View distance: %d blocks", view_dist_for_display);
-   print("x=%5.2f, y=%5.2f, z=%5.2f", obj[player_id].position.x, obj[player_id].position.y, obj[player_id].position.z);
-   print("Belt sort order: %d", sort_order);
-   print("%s", glGetString(GL_RENDERER));
-   #if 1
-   for (i=0; i < 4; ++i)
-      print("[ %4d,%4d  %4d,%4d  %4d,%4d  %4d,%4d ]",
-                                   physics_cache_feedback[i][0].x, physics_cache_feedback[i][0].y, 
-                                   physics_cache_feedback[i][1].x, physics_cache_feedback[i][1].y, 
-                                   physics_cache_feedback[i][2].x, physics_cache_feedback[i][2].y, 
-                                   physics_cache_feedback[i][3].x, physics_cache_feedback[i][3].y);
-   #endif
+   if (debug_render) {
+      print("Vbuf storage: %dMB in frustum of %dMB in range of %dMB in cache", chunk_storage_rendered>>20, chunk_storage_considered>>20, chunk_storage_total>>20);
+      print("Num mesh builds started this frame: %d; num uploaded this frame: %d\n", num_meshes_started, num_meshes_uploaded);
+      print("QChunks: %3d in frustum of %3d valid of %3d in range", chunks_in_frustum, chunks_considered, chunk_locations);
+      print("Mesh worker threads active: %d", num_threads_active);
+      print("View distance: %d blocks", view_dist_for_display);
+      print("x=%5.2f, y=%5.2f, z=%5.2f", obj[player_id].position.x, obj[player_id].position.y, obj[player_id].position.z);
+      print("Belt sort order: %d", sort_order);
+      print("%s", glGetString(GL_RENDERER));
+      #if 0
+      for (i=0; i < 4; ++i)
+         print("[ %4d,%4d  %4d,%4d  %4d,%4d  %4d,%4d ]",
+                                      physics_cache_feedback[i][0].x, physics_cache_feedback[i][0].y, 
+                                      physics_cache_feedback[i][1].x, physics_cache_feedback[i][1].y, 
+                                      physics_cache_feedback[i][2].x, physics_cache_feedback[i][2].y, 
+                                      physics_cache_feedback[i][3].x, physics_cache_feedback[i][3].y);
+      #endif
+   }
 
    if (is_synchronous_debug) {
       text_color[0] = 1.0;
@@ -587,11 +603,6 @@ int face_dir[6][3] = {
    { 0,0,1 },
    { 0,0,-1 },
 };
-
-int selected_block[3];
-int selected_block_to_create[3];
-int debug_render;
-Bool selected_block_valid;
 
 void draw_main(void)
 {
@@ -745,13 +756,15 @@ void draw_main(void)
 }
 
 int block_rotation;
+int block_base = BT_conveyor_east;
+
 void mouse_down(int button)
 {
    if (selected_block_valid) {
       if (button == SDL_BUTTON_RIGHT)
          change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty);
       else if (button == SDL_BUTTON_LEFT) {
-         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], BT_conveyor_east + block_rotation);
+         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base);
       }
    }
 }
@@ -759,8 +772,12 @@ void mouse_down(int button)
 void rotate_block(void)
 {
    int block = get_block(selected_block[0], selected_block[1], selected_block[2]);
-   if (block >= BT_conveyor_east && block <= BT_conveyor_south)
-      change_block(selected_block[0], selected_block[1], selected_block[2], (((block - BT_conveyor_east)+1)&3)+BT_conveyor_east);
+   if (block >= BT_conveyor_east && block <= BT_conveyor_ramp_down_south_low) {
+      int rot  = block & 3;
+      int base = block - rot;
+      rot = (rot+1) & 3;
+      change_block(selected_block[0], selected_block[1], selected_block[2], base+rot);
+   }
 }
 
 void mouse_up(void)
@@ -914,10 +931,17 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_D)   active_control_set(7);
          if (s == SDL_SCANCODE_F)   client_player_input.flying = !client_player_input.flying;
          if (s == SDL_SCANCODE_R)   rotate_block();
-         if (k == '1') global_hack = !global_hack;
-         if (k == '2') global_hack = -1;
-         if (k == '3') obj[player_id].position.x += 65536;
-         if (k == '4') debug_render = !debug_render;
+         if (s == SDL_SCANCODE_M)   save_edits();
+         if (k == '1') block_base = BT_conveyor_east;
+         if (k == '2') block_base = BT_conveyor_ramp_up_east_low;
+         if (k == '3') block_base = BT_conveyor_ramp_up_east_high;
+         if (k == '4') block_base = BT_conveyor_ramp_down_east_low;
+         if (k == '5') block_base = BT_conveyor_ramp_down_east_high;
+         //if (k == '6') block_base = BT_conveyor_up_east_low;
+         //if (k == '1') global_hack = !global_hack;
+         //if (k == '2') global_hack = -1;
+         //if (k == '3') obj[player_id].position.x += 65536;
+         if (s == SDL_SCANCODE_P) debug_render = !debug_render;
          #if 0
          if (s == SDL_SCANCODE_R) {
             objspace_to_worldspace(light_vel, player_id, 0,32,0);
@@ -1107,6 +1131,7 @@ int SDL_main(int argc, char **argv)
 
    //mesh_init();
    world_init();
+   load_edits();
 
    initialized = 1;
 

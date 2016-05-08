@@ -804,7 +804,7 @@ extern int sort_order;
 
 void logistics_tick(void)
 {
-   logistics_texture_scroll += (1.0 / LONG_TICK_LENGTH / ITEMS_PER_BELT_SIDE);
+   logistics_texture_scroll += (1.0 / LONG_TICK_LENGTH / ITEMS_PER_BELT_SIDE) / 4.0; // texture repeats = 4
    if (logistics_texture_scroll >= 1.0)
       logistics_texture_scroll -= 1.0;
 

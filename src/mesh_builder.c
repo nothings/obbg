@@ -36,9 +36,77 @@
 
 extern void ods(char *fmt, ...);
 
+unsigned char geom_for_blocktype[256] =
+{
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_empty, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
+
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
+
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
+
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
+
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+};
+
+unsigned char vheight_for_blocktype[256] =
+{
+   0,0,0,0,
+   0,0,0,0,
+
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
+
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
+
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
+
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
+   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
+
+   0,0,0,0,0,
+   // Encode with STBVOX_MAKE_VHEIGHT(sw_height, se_height, nw_height, ne_height)
+};
+
 unsigned char geom_map[] =
 {
-   STBVOX_GEOM_empty,
    STBVOX_GEOM_solid,
    STBVOX_GEOM_solid,
    STBVOX_GEOM_solid,
@@ -48,7 +116,6 @@ unsigned char geom_map[] =
 unsigned char tex1_for_blocktype[256][6];
 static unsigned char tex2_for_blocktype[256][6];
 static unsigned char color_for_blocktype[256][6];
-static unsigned char geom_for_blocktype[256];
 
 // proc gen mesh
 #define GEN_CHUNK_CACHE_X_LOG2    4
@@ -554,53 +621,112 @@ static float tree_shape_function(float pos)
    }
 }
 
-#define MAX_CHANGES  1024
+
+// 4K x 4K x 256 = > 2^12 * 2^12 * 2^8  => 2^32  /  2^10 => 2^22 4M => 4MB
+
+// 32x32x4
+
+#define EDIT_CHUNK_Z_COUNT_LOG2   2
+#define EDIT_CHUNK_Z_COUNT        (1 << EDIT_CHUNK_Z_COUNT_LOG2)
+#define NUM_EDIT_CHUNK_Z_SEG      (MAX_Z_POW2CEIL / EDIT_CHUNK_Z_COUNT)
+
 typedef struct
 {
-   int x,y;
-   uint8 z;
    uint8 type;
-} BlockChange;
+   //uint8 rot:2;
+} block_change;
 
-BlockChange edits[MAX_CHANGES] = { 0 };
-int cur_change=0, max_changes=0;
-
-int get_block_index(int x, int y, int z)
+typedef struct
 {
+   int x,y,z;
+   block_change blocks[EDIT_CHUNK_Z_COUNT][GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X];
+} edit_chunk;
+
+edit_chunk **edit_chunks;
+
+void save_edits(void)
+{
+   FILE *f = fopen("savegame.dat", "wb");
    int i;
-   for (i=0; i < max_changes; ++i)
-      if (edits[i].x == x && edits[i].y == y && edits[i].z == z)
-         return i;
-   return -1;
+   for (i=0; i < stb_arr_len(edit_chunks); ++i) {
+      fwrite(edit_chunks[i], sizeof(edit_chunk), 1, f);
+   }
+   fclose(f);
 }
+
+void load_edits(void)
+{
+   FILE *f = fopen("savegame.dat", "rb");
+   if (f) {
+      while (!feof(f)) {
+         edit_chunk ec;
+         if (fread(&ec, sizeof(edit_chunk), 1, f)) {
+            int i,j,k;
+            for (k=0; k < EDIT_CHUNK_Z_COUNT; ++k) {
+               for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
+                  for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+                     if (ec.blocks[k][j][i].type != BT_no_change) {
+                        change_block(ec.x*GEN_CHUNK_SIZE_X+i, ec.y*GEN_CHUNK_SIZE_Y+j, ec.z*EDIT_CHUNK_Z_COUNT+k, ec.blocks[k][j][i].type);
+                     }
+                  }
+               }
+            }
+         
+         }
+      }
+      fclose(f);
+   }
+}
+
+static edit_chunk *get_edit_chunk_for_coord_raw(int x, int y, int z, Bool alloc)
+{
+   int cx = x >> GEN_CHUNK_SIZE_X_LOG2;
+   int cy = y >> GEN_CHUNK_SIZE_Y_LOG2;
+   int cz = z >> EDIT_CHUNK_Z_COUNT_LOG2;
+   int i;
+   for (i=0; i < stb_arr_len(edit_chunks); ++i) {
+      edit_chunk *e = edit_chunks[i];
+      if (e->x == cx && e->y == cy && e->z == cz)
+         return e;
+   }
+   if (alloc) {
+      edit_chunk *e = malloc(sizeof(*e));
+      e->x = cx;
+      e->y = cy;
+      e->z = cz;
+      memset(e->blocks, BT_no_change, sizeof(e->blocks));
+      stb_arr_push(edit_chunks, e);
+      return e;
+   } else
+      return NULL;
+}
+
+static edit_chunk *get_edit_chunk      (int x, int y, int z) { return get_edit_chunk_for_coord_raw(x,y,z,False); }
+static edit_chunk *get_edit_chunk_alloc(int x, int y, int z) { return get_edit_chunk_for_coord_raw(x,y,z,True ); }
 
 int get_block(int x, int y, int z)
 {
-   int i = get_block_index(x,y,z);
-   if (i >= 0)
-      return edits[i].type;
-   else
-      return 0;
+   edit_chunk *e = get_edit_chunk(x,y,z);   
+   x &= (GEN_CHUNK_SIZE_X-1);
+   y &= (GEN_CHUNK_SIZE_Y-1);
+   z &= (EDIT_CHUNK_Z_COUNT-1);
+   return e->blocks[z][y][x].type;
 }
 
 void change_block(int x, int y, int z, int type)
 {
-   int i = get_block_index(x,y,z);
-   if (i >= 0) {
-      edits[i].type = type;
-   } else {
-      edits[cur_change].x = x;
-      edits[cur_change].y = y;
-      edits[cur_change].z = z;
-      edits[cur_change].type = type;
+   edit_chunk *e = get_edit_chunk_alloc(x,y,z);
+   int sx = x & (GEN_CHUNK_SIZE_X-1);
+   int sy = y & (GEN_CHUNK_SIZE_Y-1);
+   int sz = z & (EDIT_CHUNK_Z_COUNT-1);
 
-      max_changes = stb_max(cur_change+1, max_changes);
-      cur_change = (cur_change+1) & (MAX_CHANGES-1);
+   if (e->blocks[sz][sy][sx].type != type) {
+      e->blocks[sz][sy][sx].type = type;
+
+      force_update_for_block(x,y,z);
+      update_physics_cache(x,y,z,type);
+      logistics_update_block(x,y,z,type);
    }
-
-   force_update_for_block(x,y,z);
-   update_physics_cache(x,y,z,type);
-   logistics_update_block(x,y,z,type);
 }
 
 gen_chunk *generate_chunk(int x, int y)
@@ -757,13 +883,19 @@ gen_chunk *generate_chunk(int x, int y)
    }
    #endif
 
-   for (i=0; i < max_changes; ++i) {
-      if (  edits[i].x >= x && edits[i].x < x+GEN_CHUNK_SIZE_X
-         && edits[i].y >= y && edits[i].y < y+GEN_CHUNK_SIZE_Y) {
-         int zs = edits[i].z >> Z_SEGMENT_SIZE_LOG2;
-         int zoff = edits[i].z & (Z_SEGMENT_SIZE-1);
-         //build_column(gc, edits[i].x-x, edits[i].y-y, edits[i].z, 127, BT_wood);
-         gc->partial[zs].block[edits[i].y-y][edits[i].x-x][zoff] = edits[i].type;
+   for (z=0; z < NUM_EDIT_CHUNK_Z_SEG; ++z) {
+      edit_chunk *e = get_edit_chunk(x, y, z * EDIT_CHUNK_Z_COUNT);
+      if (e) {
+         int k;
+         for (k=0; k < EDIT_CHUNK_Z_COUNT; ++k)
+            for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+               for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
+                  if (e->blocks[k][j][i].type != BT_no_change) {
+                     int ht = z*EDIT_CHUNK_Z_COUNT + k;
+                     int zs = ht >> Z_SEGMENT_SIZE_LOG2;
+                     int zoff = ht & (Z_SEGMENT_SIZE-1);
+                     gc->partial[zs].block[j][i][zoff] = e->blocks[k][j][i].type;
+                  }
       }
    }
 
@@ -1056,8 +1188,8 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    map->block_tex1_face = tex1_for_blocktype;
    //map->block_tex2_face = tex2_for_blocktype;
    //static unsigned char color_for_blocktype[256][6];
-   //static unsigned char geom_for_blocktype[256];
-   //map->block_geometry = minecraft_geom_for_blocktype;
+   map->block_geometry = geom_for_blocktype;
+   map->block_vheight = vheight_for_blocktype;
 
    //stbvox_reset_buffers(mm);
    stbvox_set_buffer(mm, 0, 0, bd->vertex_build_buffer, build_size);
@@ -1137,7 +1269,7 @@ void force_update_for_block_raw(int x, int y, int z)
    int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
    int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
    mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
-   if (mc->chunk_x == cx && mc->chunk_y == cy)
+   if (mc && mc->chunk_x == cx && mc->chunk_y == cy)
       mc->dirty = True;
 }
 

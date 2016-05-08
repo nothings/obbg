@@ -19,6 +19,8 @@ extern int get_next_built_mesh(built_mesh *bm);
 extern requested_mesh *get_requested_mesh_alternate(void);
 extern void swap_requested_meshes(void);
 extern int get_block(int x, int y, int z);
+extern void save_edits(void);
+extern void load_edits(void);
 
 extern mesh_chunk *build_mesh_chunk_for_coord(int x, int y);
 extern void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer);

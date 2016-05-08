@@ -9,6 +9,11 @@ obbg:
   - networking
 
 Done in today's stream:
+
+Previous stream:
+  - ramp conveyors texture animation
+
+Previous stream:
   - clean up rules for moving between belt runs
   - topologically sort belts so movement is "perfect"
 
