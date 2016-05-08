@@ -97,55 +97,12 @@ texture_info textures[] =
    1,"machinery/conveyor_north",
    1,"machinery/conveyor_west",
    1,"machinery/conveyor_south",
+
+   1,"machinery/ore_maker",
+   1,"machinery/ore_eater",
 };
 
-void set_blocktype_texture(int bt, int tex)
-{
-   int i;
-   for (i=0; i < 6; ++i)
-      tex1_for_blocktype[bt][i] = tex;
-}
-
-void init_mesh_building(void)
-{
-   int i;
-#if 0
-   int i,j;
-   for (i=0; i < 256; ++i)
-      for (j=0; j < 6; ++j)
-         tex1_for_blocktype[i][j] = (uint8) i-1;
-#endif
-
-   set_blocktype_texture(BT_sand, 0);
-   set_blocktype_texture(BT_grass, 5);
-   set_blocktype_texture(BT_gravel, 2);
-   set_blocktype_texture(BT_asphalt, 9);
-   set_blocktype_texture(BT_wood, 15);
-   set_blocktype_texture(BT_marble, 16);
-   set_blocktype_texture(BT_stone, 20);
-   set_blocktype_texture(BT_leaves, 1);
-   for (i=0; i < 4; ++i) {
-      set_blocktype_texture(BT_conveyor_east+i, 21);
-      set_blocktype_texture(BT_conveyor_ramp_up_east_low+i, 21);
-      set_blocktype_texture(BT_conveyor_ramp_up_east_high+i, 21);
-      set_blocktype_texture(BT_conveyor_ramp_down_east_low+i, 21);
-      set_blocktype_texture(BT_conveyor_ramp_down_east_high+i, 21);
-   }
-   for (i=0; i < 5; ++i) {
-      tex1_for_blocktype[BT_conveyor_east +i*4][FACE_up] = 22;
-      tex1_for_blocktype[BT_conveyor_north+i*4][FACE_up] = 23;
-      tex1_for_blocktype[BT_conveyor_west +i*4][FACE_up] = 24;
-      tex1_for_blocktype[BT_conveyor_south+i*4][FACE_up] = 25;
-   }
-
-   // { int i; for (i=0; i < 20; ++i) set_blocktype_texture(i, 0); }
-}
-
-
-
 static float camera_bounds[2][3];
-
-float texture_scales[256];
 
 void game_init(void)
 {
@@ -224,9 +181,11 @@ void render_init(void)
       char *filename = stb_sprintf("data/pixar/crn/%s.crn", textures[i].filename);
       uint8 *data = stb_file(filename, &len);
       if (data == NULL) {
-         char *filename = stb_sprintf("data/%s.jpg", textures[i].filename);
          int w,h;
-         uint8 *pixels = stbi_load(filename, &w, &h, 0, 4);
+         uint8 *pixels = stbi_load(stb_sprintf("data/%s.jpg", textures[i].filename), &w, &h, 0, 4);
+         if (!pixels)
+            pixels = stbi_load(stb_sprintf("data/%s.png", textures[i].filename), &w, &h, 0, 4);
+            
          if (pixels) {
             load_bitmap_to_texture_array(i, pixels, w, h, 1, 0);
             free(pixels);
@@ -236,17 +195,7 @@ void render_init(void)
          load_crn_to_texture_array(i, data, len);
          free(data);
       }
-      texture_scales[i] = 1.0f/4;// textures[i].scale;
    }
-   #endif
-
-   texture_scales[21] = 1.0f;
-
-   #if 0
-   texture_scales[22] = 1.0f;
-   texture_scales[23] = 1.0f;
-   texture_scales[24] = 1.0f;
-   texture_scales[25] = 1.0f;
    #endif
 
    // temporary hack:
@@ -762,9 +711,9 @@ void mouse_down(int button)
 {
    if (selected_block_valid) {
       if (button == SDL_BUTTON_RIGHT)
-         change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty);
+         change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty, block_rotation);
       else if (button == SDL_BUTTON_LEFT) {
-         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base);
+         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base, block_rotation);
       }
    }
 }
@@ -776,7 +725,11 @@ void rotate_block(void)
       int rot  = block & 3;
       int base = block - rot;
       rot = (rot+1) & 3;
-      change_block(selected_block[0], selected_block[1], selected_block[2], base+rot);
+      change_block(selected_block[0], selected_block[1], selected_block[2], base+rot, 0);
+   } else if (block >= BT_machines) {
+      int rot = get_block_rot(selected_block[0], selected_block[1], selected_block[2]);
+      rot = (rot+1) & 3;
+      change_block(selected_block[0], selected_block[1], selected_block[2], block, rot);
    }
 }
 
@@ -937,6 +890,8 @@ void process_event(SDL_Event *e)
          if (k == '3') block_base = BT_conveyor_ramp_up_east_high;
          if (k == '4') block_base = BT_conveyor_ramp_down_east_low;
          if (k == '5') block_base = BT_conveyor_ramp_down_east_high;
+         if (k == '6') block_base = BT_ore_maker;
+         if (k == '7') block_base = BT_ore_eater;
          //if (k == '6') block_base = BT_conveyor_up_east_low;
          if (s == SDL_SCANCODE_H) global_hack = !global_hack;
          //if (k == '2') global_hack = -1;
@@ -1131,7 +1086,7 @@ int SDL_main(int argc, char **argv)
 
    //mesh_init();
    world_init();
-   load_edits();
+   //load_edits();
 
    initialized = 1;
 

@@ -103,7 +103,7 @@ mesh_chunk *get_physics_chunk_for_coord(int x, int y)
    return NULL;
 }
 
-void update_physics_cache(int x, int y, int z, int type)
+void update_physics_cache(int x, int y, int z, int type, int rot)
 {
    int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
    int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);

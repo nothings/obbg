@@ -77,9 +77,9 @@ typedef struct
 enum
 {
    BT_empty,
-   BT_sand,
    BT_grass,
-   BT_gravel,
+   BT_stone,
+   BT_sand,
 
    BT_conveyor_east,
    BT_conveyor_north,
@@ -106,11 +106,15 @@ enum
    BT_conveyor_ramp_down_north_low,
    BT_conveyor_ramp_down_south_low,
 
-   BT_asphalt,
    BT_wood,
-   BT_marble,
-   BT_stone,
    BT_leaves,
+   BT_gravel,
+   BT_asphalt,
+   BT_marble,
+
+   BT_machines=128,
+   BT_ore_maker=128,
+   BT_ore_eater=129,
 
    BT_down_marker=255,
    BT_no_change=255,

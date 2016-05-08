@@ -105,17 +105,64 @@ unsigned char vheight_for_blocktype[256] =
    // Encode with STBVOX_MAKE_VHEIGHT(sw_height, se_height, nw_height, ne_height)
 };
 
-unsigned char geom_map[] =
-{
-   STBVOX_GEOM_solid,
-   STBVOX_GEOM_solid,
-   STBVOX_GEOM_solid,
-   STBVOX_GEOM_solid,
-};
-
 unsigned char tex1_for_blocktype[256][6];
 static unsigned char tex2_for_blocktype[256][6];
 static unsigned char color_for_blocktype[256][6];
+
+void set_blocktype_texture(int bt, int tex)
+{
+   int i;
+   for (i=0; i < 6; ++i)
+      tex1_for_blocktype[bt][i] = tex;
+}
+
+float texture_scales[256];
+
+void init_mesh_building(void)
+{
+   int i;
+
+   set_blocktype_texture(BT_sand, 0);
+   set_blocktype_texture(BT_grass, 5);
+   set_blocktype_texture(BT_gravel, 2);
+   set_blocktype_texture(BT_asphalt, 9);
+   set_blocktype_texture(BT_wood, 15);
+   set_blocktype_texture(BT_marble, 16);
+   set_blocktype_texture(BT_stone, 20);
+   set_blocktype_texture(BT_leaves, 1);
+   for (i=0; i < 4; ++i) {
+      set_blocktype_texture(BT_conveyor_east+i, 21);
+      set_blocktype_texture(BT_conveyor_ramp_up_east_low+i, 21);
+      set_blocktype_texture(BT_conveyor_ramp_up_east_high+i, 21);
+      set_blocktype_texture(BT_conveyor_ramp_down_east_low+i, 21);
+      set_blocktype_texture(BT_conveyor_ramp_down_east_high+i, 21);
+   }
+   for (i=0; i < 5; ++i) {
+      tex1_for_blocktype[BT_conveyor_east +i*4][FACE_up] = 22;
+      tex1_for_blocktype[BT_conveyor_north+i*4][FACE_up] = 23;
+      tex1_for_blocktype[BT_conveyor_west +i*4][FACE_up] = 24;
+      tex1_for_blocktype[BT_conveyor_south+i*4][FACE_up] = 25;
+   }
+
+   set_blocktype_texture(BT_ore_eater, 17); tex1_for_blocktype[BT_ore_eater][FACE_east] = 26;
+   set_blocktype_texture(BT_ore_maker, 17); tex1_for_blocktype[BT_ore_maker][FACE_east] = 27;
+
+   geom_for_blocktype[BT_ore_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
+   geom_for_blocktype[BT_ore_eater] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
+
+   for (i=0; i < 256; ++i)
+      texture_scales[i] = 1.0f/4;// textures[i].scale;
+   texture_scales[21] = 1.0f;
+
+   #if 0
+   texture_scales[22] = 1.0f;
+   texture_scales[23] = 1.0f;
+   texture_scales[24] = 1.0f;
+   texture_scales[25] = 1.0f;
+   #endif
+}
+
+
 
 // proc gen mesh
 #define GEN_CHUNK_CACHE_X_LOG2    4
@@ -139,6 +186,7 @@ typedef struct
    uint8 block   [GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X][Z_SEGMENT_SIZE];
    uint8 lighting[GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X][Z_SEGMENT_SIZE];
    uint8 overlay [GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X][Z_SEGMENT_SIZE];
+   uint8 rotate  [GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X][Z_SEGMENT_SIZE];
 } gen_chunk_partial;
 
 struct st_gen_chunk
@@ -633,7 +681,8 @@ static float tree_shape_function(float pos)
 typedef struct
 {
    uint8 type;
-   //uint8 rot:2;
+   uint8 rotate:2;
+   uint8 unused:6;
 } block_change;
 
 typedef struct
@@ -666,7 +715,7 @@ void load_edits(void)
                for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
                   for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
                      if (ec.blocks[k][j][i].type != BT_no_change) {
-                        change_block(ec.x*GEN_CHUNK_SIZE_X+i, ec.y*GEN_CHUNK_SIZE_Y+j, ec.z*EDIT_CHUNK_Z_COUNT+k, ec.blocks[k][j][i].type);
+                        change_block(ec.x*GEN_CHUNK_SIZE_X+i, ec.y*GEN_CHUNK_SIZE_Y+j, ec.z*EDIT_CHUNK_Z_COUNT+k, ec.blocks[k][j][i].type, ec.blocks[k][j][i].rotate);
                      }
                   }
                }
@@ -713,19 +762,29 @@ int get_block(int x, int y, int z)
    return e->blocks[z][y][x].type;
 }
 
-void change_block(int x, int y, int z, int type)
+int get_block_rot(int x, int y, int z)
+{
+   edit_chunk *e = get_edit_chunk(x,y,z);   
+   x &= (GEN_CHUNK_SIZE_X-1);
+   y &= (GEN_CHUNK_SIZE_Y-1);
+   z &= (EDIT_CHUNK_Z_COUNT-1);
+   return e->blocks[z][y][x].rotate;
+}
+
+void change_block(int x, int y, int z, int type, int rot)
 {
    edit_chunk *e = get_edit_chunk_alloc(x,y,z);
    int sx = x & (GEN_CHUNK_SIZE_X-1);
    int sy = y & (GEN_CHUNK_SIZE_Y-1);
    int sz = z & (EDIT_CHUNK_Z_COUNT-1);
 
-   if (e->blocks[sz][sy][sx].type != type) {
-      e->blocks[sz][sy][sx].type = type;
+   if (e->blocks[sz][sy][sx].type != type || e->blocks[sz][sy][sx].rotate != rot) {
+      e->blocks[sz][sy][sx].type   = type;
+      e->blocks[sz][sy][sx].rotate = rot;
 
       force_update_for_block(x,y,z);
-      update_physics_cache(x,y,z,type);
-      logistics_update_block(x,y,z,type);
+      update_physics_cache(x,y,z,type,rot);
+      logistics_update_block(x,y,z,type,rot);
    }
 }
 
@@ -781,6 +840,7 @@ gen_chunk *generate_chunk(int x, int y)
             //bt = (int) stb_lerp(height_lerp[j][i], BT_sand, BT_marble+0.99f);
             assert(z_limit >= 0 && Z_SEGMENT_SIZE - z_limit >= 0);
 
+            memset(&gcp->rotate[j][i][0], 0, Z_SEGMENT_SIZE);
             if (z_limit > 0) {
                memset(&gcp->block[j][i][   0   ], BT_stone, z_stone);
                memset(&gcp->block[j][i][z_stone],  bt     , z_limit-z_stone);
@@ -895,6 +955,7 @@ gen_chunk *generate_chunk(int x, int y)
                      int zs = ht >> Z_SEGMENT_SIZE_LOG2;
                      int zoff = ht & (Z_SEGMENT_SIZE-1);
                      gc->partial[zs].block[j][i][zoff] = e->blocks[k][j][i].type;
+                     gc->partial[zs].rotate[j][i][zoff] = e->blocks[k][j][i].rotate;
                   }
       }
    }
@@ -979,6 +1040,7 @@ typedef struct
    uint8 *face_buffer;
    uint8 segment_blocktype[66][66][18];
    uint8 segment_lighting[66][66][18];
+   uint8 segment_rotate[66][66][18];
 } build_data;
 
 //uint8 segment_blocktype[66][66][18];
@@ -1008,9 +1070,11 @@ void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg, build_data *bd)
          for (y=y0; y < y1; ++y) {
             uint8 *bt = &bd->segment_blocktype[y+y_off][x_off][0];
             uint8 *lt = &bd->segment_lighting [y+y_off][x_off][0];
+            uint8 *rt = &bd->segment_rotate   [y+y_off][x_off][0];
             for (x=x0; x < x1; ++x) {
                memcpy(bt + sizeof(bd->segment_blocktype[0][0])*x, &gcp->block   [y][x][0], 16);
                memcpy(lt + sizeof(bd->segment_lighting [0][0])*x, &gcp->lighting[y][x][0], 16);
+               memcpy(rt + sizeof(bd->segment_rotate   [0][0])*x, &gcp->rotate  [y][x][0], 16);
             }
          }
       }
@@ -1197,6 +1261,7 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
 
    map->blocktype = &bd->segment_blocktype[1][1][1]; // this is (0,0,0), but we need to be able to query off the edges
    map->lighting = &bd->segment_lighting[1][1][1];
+   map->rotate   = &bd->segment_rotate[1][1][1];
 
    // fill in the top two rows of the buffer
    for (b=0; b < 66; ++b) {
@@ -1220,6 +1285,7 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
 
       map->blocktype = &bd->segment_blocktype[1][1][1-z];
       map->lighting = &bd->segment_lighting[1][1][1-z];
+      map->rotate   = &bd->segment_rotate[1][1][1-z];
 
       {
          stbvox_set_input_range(mm, 0,0,z0, 64,64,z1);
@@ -1234,6 +1300,8 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
             bd->segment_blocktype[b][a][17] = bd->segment_blocktype[b][a][1];
             bd->segment_lighting [b][a][16] = bd->segment_lighting [b][a][0];
             bd->segment_lighting [b][a][17] = bd->segment_lighting [b][a][1];
+            bd->segment_rotate   [b][a][16] = bd->segment_rotate   [b][a][0];
+            bd->segment_rotate   [b][a][17] = bd->segment_rotate   [b][a][1];
          }
       }
    }

@@ -41,6 +41,7 @@ enum
 typedef struct
 {
    uint8 type[LOGI_CHUNK_SIZE_Z][LOGI_CHUNK_SIZE_Y][LOGI_CHUNK_SIZE_X];
+   uint8 rot[LOGI_CHUNK_SIZE_Z][LOGI_CHUNK_SIZE_Y][LOGI_CHUNK_SIZE_X];
    belt_run *br; // stb_arr 
 } logi_chunk;
 
@@ -408,6 +409,15 @@ void create_belt(logi_chunk *c, int x, int y, int z, int dir)
    compute_mobile_slots(&c->br[i]);
 }
 
+void create_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot)
+{
+
+}
+
+void destroy_machine(logi_chunk *c, int ox, int oy, int oz)
+{
+}
+
 void logistics_update_chunk(int x, int y, int z)
 {
    logi_chunk *c = logistics_get_chunk(x,y,z,0);
@@ -468,7 +478,7 @@ void logistics_update_chunk(int x, int y, int z)
 //  
 //  /
 
-void logistics_update_block_core(int x, int y, int z, int type)
+void logistics_update_block_core(int x, int y, int z, int type, int rot)
 {
    logi_chunk *c = logistics_get_chunk_alloc(x,y,z);
    int ox = LOGI_CHUNK_MASK_X(x);
@@ -480,12 +490,19 @@ void logistics_update_block_core(int x, int y, int z, int type)
       split_belt(c, ox,oy,oz, oldtype - BT_conveyor_east);
    }
 
+   if (oldtype >= BT_machines) {
+      destroy_machine(c, ox,oy,oz);
+   }
+
    c->type[oz][oy][ox] = type;
+   c->rot[oz][oy][ox] = type;
 
    if (type >= BT_conveyor_east && type <= BT_conveyor_south) {
       create_belt(c, ox,oy,oz, type-BT_conveyor_east);
    } else if (oldtype >= BT_conveyor_east && oldtype <= BT_conveyor_south) {
       destroy_belt(c, ox,oy,oz);
+   } else if (type >= BT_machines) {
+      create_machine(c, ox,oy,oz, type, rot);
    }
 
    if (IS_RAMP_HEAD(type)) {
@@ -518,16 +535,16 @@ void logistics_update_block_core(int x, int y, int z, int type)
    logistics_update_chunk(x, y + LOGI_CHUNK_SIZE_Y, z + LOGI_CHUNK_SIZE_Z);
 
    if (oldtype == BT_down_marker)
-      logistics_update_block_core(x,y,z-1,BT_empty);
+      logistics_update_block_core(x,y,z-1,BT_empty,0);
 }
 
-void logistics_update_block(int x, int y, int z, int type)
+void logistics_update_block(int x, int y, int z, int type, int rot)
 {
    if (type >= BT_conveyor_ramp_up_east_low && type <= BT_conveyor_ramp_up_south_low) {
-      logistics_update_block_core(x,y,z, BT_down_marker);
-      logistics_update_block_core(x,y,z-1,type);
+      logistics_update_block_core(x,y,z, BT_down_marker, 0);
+      logistics_update_block_core(x,y,z-1,type,rot);
    } else
-      logistics_update_block_core(x,y,z,type);
+      logistics_update_block_core(x,y,z,type,rot);
 }
 
 int face_orig[4][2] = {
