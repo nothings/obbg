@@ -30,7 +30,7 @@
 //#define STBVOX_CONFIG_UNPREMULTIPLY  // slower, fixes alpha test makes windows & fancy leaves look better
 #define STBVOX_CONFIG_TEXTURE_TRANSLATION
 
-#define STBVOX_ROTATION_IN_LIGHTING
+#define STBVOX_CONFIG_ROTATION_IN_LIGHTING
 #define STB_VOXEL_RENDER_IMPLEMENTATION
 #include "stb_voxel_render.h"
 
@@ -968,8 +968,10 @@ gen_chunk *generate_chunk(int x, int y)
       gen_chunk_partial *gcp = &gc->partial[z_seg];
       for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
          for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
-            for (z=0; z < Z_SEGMENT_SIZE; ++z)
-               gcp->lighting[j][i][z] = (gcp->block[j][i][z]) ? 0 : 255;
+            for (z=0; z < Z_SEGMENT_SIZE; ++z) {
+               static uint8 convert_rot[4] = { 0,3,2,1 };
+               gcp->lighting[j][i][z] = STBVOX_MAKE_LIGHTING_EXT((gcp->block[j][i][z]) ? 0 : 255, convert_rot[gcp->rotate[j][i][z]]);
+            }
    }
 
    gc->ref_count = 0;
@@ -1040,11 +1042,7 @@ typedef struct
    uint8 *face_buffer;
    uint8 segment_blocktype[66][66][18];
    uint8 segment_lighting[66][66][18];
-   uint8 segment_rotate[66][66][18];
 } build_data;
-
-//uint8 segment_blocktype[66][66][18];
-//uint8 segment_lighting[66][66][18];
 
 void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg, build_data *bd)
 {
@@ -1070,11 +1068,9 @@ void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg, build_data *bd)
          for (y=y0; y < y1; ++y) {
             uint8 *bt = &bd->segment_blocktype[y+y_off][x_off][0];
             uint8 *lt = &bd->segment_lighting [y+y_off][x_off][0];
-            uint8 *rt = &bd->segment_rotate   [y+y_off][x_off][0];
             for (x=x0; x < x1; ++x) {
                memcpy(bt + sizeof(bd->segment_blocktype[0][0])*x, &gcp->block   [y][x][0], 16);
                memcpy(lt + sizeof(bd->segment_lighting [0][0])*x, &gcp->lighting[y][x][0], 16);
-               memcpy(rt + sizeof(bd->segment_rotate   [0][0])*x, &gcp->rotate  [y][x][0], 16);
             }
          }
       }
@@ -1260,8 +1256,8 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    stbvox_set_buffer(mm, 0, 1, bd->face_buffer , build_size>>2);
 
    map->blocktype = &bd->segment_blocktype[1][1][1]; // this is (0,0,0), but we need to be able to query off the edges
-   map->lighting = &bd->segment_lighting[1][1][1];
-   map->rotate   = &bd->segment_rotate[1][1][1];
+   map->lighting  = &bd->segment_lighting[1][1][1];
+   //map->rotate    = &bd->segment_rotate[1][1][1];
 
    // fill in the top two rows of the buffer
    for (b=0; b < 66; ++b) {
@@ -1284,8 +1280,8 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
       copy_chunk_set_to_segment(chunks, z >> 4, bd);   // @TODO use MAX_Z and Z_SEGMENT_SIZE
 
       map->blocktype = &bd->segment_blocktype[1][1][1-z];
-      map->lighting = &bd->segment_lighting[1][1][1-z];
-      map->rotate   = &bd->segment_rotate[1][1][1-z];
+      map->lighting  = &bd->segment_lighting[1][1][1-z];
+      //map->rotate    = &bd->segment_rotate[1][1][1-z];
 
       {
          stbvox_set_input_range(mm, 0,0,z0, 64,64,z1);
@@ -1300,8 +1296,8 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
             bd->segment_blocktype[b][a][17] = bd->segment_blocktype[b][a][1];
             bd->segment_lighting [b][a][16] = bd->segment_lighting [b][a][0];
             bd->segment_lighting [b][a][17] = bd->segment_lighting [b][a][1];
-            bd->segment_rotate   [b][a][16] = bd->segment_rotate   [b][a][0];
-            bd->segment_rotate   [b][a][17] = bd->segment_rotate   [b][a][1];
+            //bd->segment_rotate   [b][a][16] = bd->segment_rotate   [b][a][0];
+            //bd->segment_rotate   [b][a][17] = bd->segment_rotate   [b][a][1];
          }
       }
    }

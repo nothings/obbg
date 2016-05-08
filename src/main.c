@@ -892,6 +892,7 @@ void process_event(SDL_Event *e)
          if (k == '5') block_base = BT_conveyor_ramp_down_east_high;
          if (k == '6') block_base = BT_ore_maker;
          if (k == '7') block_base = BT_ore_eater;
+         if (k == '0') block_base = BT_stone;
          //if (k == '6') block_base = BT_conveyor_up_east_low;
          if (s == SDL_SCANCODE_H) global_hack = !global_hack;
          //if (k == '2') global_hack = -1;
@@ -1086,7 +1087,7 @@ int SDL_main(int argc, char **argv)
 
    //mesh_init();
    world_init();
-   //load_edits();
+   load_edits();
 
    initialized = 1;
 
