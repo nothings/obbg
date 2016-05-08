@@ -9,6 +9,10 @@ obbg:
   - networking
 
 Done in today's stream:
+  - fix conveyor animation glitch 
+
+Previous stream:
+  - initial ramp simulation
 
 Previous stream:
   - ramp conveyors texture animation

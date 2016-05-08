@@ -433,13 +433,16 @@ void logistics_update_chunk(int x, int y, int z)
 
             if (d != NULL) {
                for (j=0; j < stb_arr_len(d->br); ++j) {
-                  if ((d->br[j].dir == b->dir || d->br[j].end_dz == b->end_dz) && does_belt_intersect(&d->br[j], ex,ey,ez)) {
-                     b->target_id = j;
-                     if (d->br[j].dir == b->dir) {
-                        d->br[j].input_id = i;
-                        d->br[j].input_dz = b->end_dz;
+                  // don't feed from conveyor/ramp that points to side of ramp
+                  if (d->br[j].end_dz == 0 || d->br[j].dir == b->dir) {
+                     if (does_belt_intersect(&d->br[j], ex,ey,ez)) {
+                        b->target_id = j;
+                        if (d->br[j].dir == b->dir) {
+                           d->br[j].input_id = i;
+                           d->br[j].input_dz = b->end_dz;
+                        }
+                        break;
                      }
-                     break;
                   }
                }
                if (j == stb_arr_len(d->br)) {
@@ -825,7 +828,7 @@ void logistics_belt_tick(logi_slice *s, int cid, belt_run *br)
 
    if (br->mobile_slots[0] == 0 && br->items[0].type != 0)
       br->last_slot_filled_next_tick[0] = 1;
-   if (br->mobile_slots[1] == 0 && br->items[0].type != 0)
+   if (br->mobile_slots[1] == 0 && br->items[1].type != 0)
       br->last_slot_filled_next_tick[1] = 1;
 
    if (global_hack) {
