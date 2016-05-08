@@ -7,8 +7,8 @@
 
 #define ITEMS_PER_BELT (ITEMS_PER_BELT_SIDE * BELT_SIDES)
 
-#define TARGET_none    0xffff
-#define TARGET_unknown 0xfffe
+#define TARGET_none    0x7fff
+#define TARGET_unknown 0x7ffe
 
 typedef struct
 {
@@ -47,12 +47,28 @@ typedef struct
    uint8 type;           // 1 byte
    uint8 timer;          // 1 byte
 
+   uint8 output;         // 1 byte
    uint8 config;         // 1 byte
    uint8 uses;           // 1 byte
-   uint8 output;         // 1 byte
    uint8 input_flags:6;  // 1 byte
    uint8 rot:2;          // 0 bytes
 } machine_info;  // 8 bytes
+
+// 32 * 32 * 8 => 2^(5+5+3) = 2^13
+typedef struct
+{
+   logi_chunk_coord pos;
+   uint8 type;
+   uint8 rot;
+   uint8 state;
+   uint8 item;
+
+   uint8 input_is_belt:1;
+   uint8 output_is_belt:1;
+   uint16 input_id;
+   uint16 output_id;
+} picker_info; // 12
+
 
 enum
 {
@@ -67,6 +83,7 @@ typedef struct
    uint8 rot[LOGI_CHUNK_SIZE_Z][LOGI_CHUNK_SIZE_Y][LOGI_CHUNK_SIZE_X];
    belt_run *br; // stb_arr 
    machine_info *machine;
+   picker_info *pickers;
 } logi_chunk;
 
 typedef struct
@@ -433,6 +450,37 @@ void create_belt(logi_chunk *c, int x, int y, int z, int dir)
    compute_mobile_slots(&c->br[i]);
 }
 
+void create_picker(logi_chunk *c, int ox, int oy, int oz, int type, int rot)
+{
+   picker_info pi = { 0 };
+   pi.pos.unpacked.x = ox;
+   pi.pos.unpacked.y = oy;
+   pi.pos.unpacked.z = oz;
+   pi.type = type;
+   pi.rot = rot;
+   stb_arr_push(c->pickers, pi);
+}
+
+int find_picker(logi_chunk *c, int ox, int oy, int oz)
+{
+   int i;
+   logi_chunk_coord sc;
+   sc.unpacked.x = ox;
+   sc.unpacked.y = oy;
+   sc.unpacked.z = oz;
+   for (i=0; i < stb_arr_len(c->pickers); ++i)
+      if (c->pickers[i].pos.packed == sc.packed)
+         return i;
+   return -1;
+}
+
+void destroy_picker(logi_chunk *c, int ox, int oy, int oz)
+{
+   int n = find_picker(c, ox,oy,oz);
+   if (n >= 0)
+      stb_arr_fastdelete(c->pickers, n);
+}
+
 void create_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot)
 {
    machine_info mi = { 0 };
@@ -462,6 +510,34 @@ void destroy_machine(logi_chunk *c, int ox, int oy, int oz)
    int n = find_machine(c, ox,oy,oz);
    if (n >= 0)
       stb_arr_fastdelete(c->machine, n);
+}
+
+static int get_belt_id_noramp(int x, int y, int z)
+{
+   int j;
+
+   logi_chunk *c = logistics_get_chunk(x,y,z, NULL);
+
+   int ox = x & (LOGI_CHUNK_SIZE_X-1);
+   int oy = y & (LOGI_CHUNK_SIZE_Y-1);
+   int oz = z & (LOGI_CHUNK_SIZE_Z-1);
+
+   for (j=0; j < stb_arr_len(c->br); ++j)
+      if (c->br[j].end_dz == 0)
+         if (does_belt_intersect(&c->br[j], ox,oy,oz))
+            return j;
+   return -1;
+}
+
+static int get_machine_id(int x, int y, int z)
+{
+   logi_chunk *c = logistics_get_chunk(x,y,z, NULL);
+
+   int ox = x & (LOGI_CHUNK_SIZE_X-1);
+   int oy = y & (LOGI_CHUNK_SIZE_Y-1);
+   int oz = z & (LOGI_CHUNK_SIZE_Z-1);
+
+   return find_machine(c, ox,oy,oz);
 }
 
 void logistics_update_chunk(int x, int y, int z)
@@ -513,6 +589,35 @@ void logistics_update_chunk(int x, int y, int z)
          for (i=0; i < stb_arr_len(c->br); ++i)
             assert(c->br[i].target_id != TARGET_unknown);
       }
+
+      for (i=0; i < stb_arr_len(c->pickers); ++i) {
+         picker_info *p = &c->pickers[i];
+         int ix = base_x + p->pos.unpacked.x + face_dir[p->rot  ][0];
+         int iy = base_y + p->pos.unpacked.y + face_dir[p->rot  ][1];
+         int ox = base_x + p->pos.unpacked.x + face_dir[p->rot^2][0];
+         int oy = base_y + p->pos.unpacked.y + face_dir[p->rot^2][1];
+         int id;
+
+         id = get_belt_id_noramp(ix,iy, base_z + p->pos.unpacked.z-1);
+         if (id >= 0) {
+            p->input_id = id;
+            p->input_is_belt = True;
+         } else {
+            id = get_machine_id(ix, iy, base_z + p->pos.unpacked.z);
+            p->input_id = id >= 0 ? id : TARGET_none;
+            p->input_is_belt = False;
+         }
+
+         id = get_belt_id_noramp(ox, oy, base_z + p->pos.unpacked.z-1);
+         if (id >= 0) {
+            p->output_id = id;
+            p->output_is_belt = True;
+         } else {
+            id = get_machine_id(ox, oy, base_z + p->pos.unpacked.z);
+            p->output_id = id >= 0 ? id : TARGET_none;
+            p->output_is_belt = False;
+         } 
+      }
    }
 }
 
@@ -532,24 +637,25 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot)
    int oz = LOGI_CHUNK_MASK_Z(z);
    int oldtype = c->type[oz][oy][ox];
 
-   if (oldtype >= BT_conveyor_east && oldtype <= BT_conveyor_south) {
+   if (oldtype >= BT_conveyor_east && oldtype <= BT_conveyor_south)
       split_belt(c, ox,oy,oz, oldtype - BT_conveyor_east);
-   }
 
-   if (oldtype >= BT_machines) {
+   if (oldtype >= BT_picker && oldtype <= BT_picker)
+      destroy_picker(c, ox,oy,oz);
+   else if (oldtype >= BT_machines)
       destroy_machine(c, ox,oy,oz);
-   }
 
    c->type[oz][oy][ox] = type;
    c->rot[oz][oy][ox] = type;
 
-   if (type >= BT_conveyor_east && type <= BT_conveyor_south) {
+   if (type >= BT_conveyor_east && type <= BT_conveyor_south)
       create_belt(c, ox,oy,oz, type-BT_conveyor_east);
-   } else if (oldtype >= BT_conveyor_east && oldtype <= BT_conveyor_south) {
+   else if (oldtype >= BT_conveyor_east && oldtype <= BT_conveyor_south)
       destroy_belt(c, ox,oy,oz);
-   } else if (type >= BT_machines) {
+   else if (type >= BT_picker && type <= BT_picker)
+      create_picker(c, ox,oy,oz, type,rot);
+   else if (type >= BT_machines)
       create_machine(c, ox,oy,oz, type, rot);
-   }
 
    if (IS_RAMP_HEAD(type)) {
       if (IS_RAMP_HEAD(oldtype)) {
@@ -684,6 +790,14 @@ void logistics_init(void)
 // X X . . X X . .
 // X X . X X . . .
 // X X X X . . . .
+
+static int get_interaction_pos(belt_run *b, int x, int y, int z)
+{
+   x = x & (LOGI_CHUNK_SIZE_X-1);
+   y = y & (LOGI_CHUNK_SIZE_Y-1);
+   z = z & (LOGI_CHUNK_SIZE_Z-1);
+   return abs(x-b->x_off) + abs(y-b->y_off);
+}
 
 static belt_run *get_interaction_belt(int x, int y, int z, int facing, int *pos)
 {
@@ -1033,6 +1147,145 @@ Bool try_add_item_to_belt(belt_run *b, int slot, int type)
       return False;
 }
 
+belt_run *find_belt_slot_for_picker(int belt_id, int ix, int iy, int iz, int rot, int *slot)
+{
+   logi_chunk *d = logistics_get_chunk(ix, iy, iz, 0);
+   belt_run *b = &d->br[belt_id];
+   int pos, side, dist;
+   assert(belt_id < stb_arr_len(d->br));
+   pos = get_interaction_pos(b, ix,iy,iz);
+   side = ((b->dir - rot)&3) == 1;
+   dist = (b->dir == rot) ? 0 : ((b->dir^2) == rot) ? ITEMS_PER_BELT_SIDE-1 : 1;
+   *slot = pos * ITEMS_PER_BELT + dist*BELT_SIDES + side;
+   assert(*slot < stb_arr_len(b->items));
+   return b;
+}
+
+void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, int base_z)
+{
+   int m;
+   #if 0
+   for (m=0; m < stb_arr_len(c->machine); ++m) {
+      machine_info *x = &c->machine[m];
+      Bool went_to_zero = False;
+      if (x->timer) {
+         --x->timer;
+         went_to_zero = (x->timer == 0);
+      }
+      if (x->type == BT_ore_eater && x->timer == 0) {
+         int pos;
+         belt_run *br;
+         br = get_interaction_belt(s->slice_x * LOGI_CHUNK_SIZE_X + x->pos.unpacked.x,
+                                   s->slice_y * LOGI_CHUNK_SIZE_Y + x->pos.unpacked.y,
+                                   k          * LOGI_CHUNK_SIZE_Z + x->pos.unpacked.z-1,
+                                   x->rot, &pos);
+         if (br != NULL) {
+            switch ((br->dir - x->rot) & 3) {
+               case 0:  break;
+
+               case 1:  if (try_remove_item_from_belt(br, pos*ITEMS_PER_BELT+3, 1,2))
+                           x->timer = 8;
+                        break;
+
+               case 2:  if (try_remove_item_from_belt(br, pos*ITEMS_PER_BELT+ITEMS_PER_BELT-2,  1,2))
+                           x->timer = 8;
+                        if (try_remove_item_from_belt(br, pos*ITEMS_PER_BELT+ITEMS_PER_BELT-1,  1,2))
+                           x->timer = 8;
+                        break;
+
+               case 3:  if (try_remove_item_from_belt(br, pos*ITEMS_PER_BELT+2,  1,2))
+                           x->timer = 8;
+                        break;
+            }
+         }
+      }
+      if (x->type == BT_ore_maker) {
+
+         if (x->output) {
+            int pos;
+            belt_run *br;
+
+            br = get_interaction_belt(s->slice_x * LOGI_CHUNK_SIZE_X + x->pos.unpacked.x,
+                                      s->slice_y * LOGI_CHUNK_SIZE_Y + x->pos.unpacked.y,
+                                      k          * LOGI_CHUNK_SIZE_Z + x->pos.unpacked.z-1,
+                                      x->rot, &pos);
+            if (br != NULL) {
+               switch ((br->dir - x->rot) & 3) {
+                  case 0:  break;
+
+                  case 1:  if (try_add_item_to_belt(br, pos*ITEMS_PER_BELT+3, x->output))
+                              x->output = 0;
+                           break;
+
+                  case 2:  if (try_add_item_to_belt(br, pos*ITEMS_PER_BELT+ITEMS_PER_BELT-2, x->output))
+                              x->output = 0;
+                           if (try_add_item_to_belt(br, pos*ITEMS_PER_BELT+ITEMS_PER_BELT-1, x->output))
+                              x->output = 0;
+                           break;
+
+                  case 3:  if (try_add_item_to_belt(br, pos*ITEMS_PER_BELT+2, x->output))
+                              x->output = 0;
+                           break;
+               }
+            }
+         }
+         if (went_to_zero) {
+            assert(x->output == 0);
+            x->output = 1 + (stb_rand() % 2);
+         }
+         if (x->timer == 0 && x->output == 0) {
+            x->timer = 7; // start drilling
+         }
+      }
+   }
+   #endif
+   for (m=0; m < stb_arr_len(c->pickers); ++m) {
+      picker_info *pi = &c->pickers[m];
+      Bool went_to_zero = False;
+      if (pi->state) {
+         --pi->state;
+         went_to_zero = (pi->state == 0);
+      }
+      if (pi->item == 0 && pi->input_id != TARGET_none) {
+         int ix = base_x + pi->pos.unpacked.x + face_dir[pi->rot  ][0];
+         int iy = base_y + pi->pos.unpacked.y + face_dir[pi->rot  ][1];
+         int iz = base_z + pi->pos.unpacked.z;
+         if (pi->input_is_belt) {
+            int slot;
+            belt_run *b = find_belt_slot_for_picker(pi->input_id, ix,iy,iz-1, pi->rot, &slot);
+            pi->item = b->items[slot].type;
+            remove_item_from_belt(b, slot);
+            pi->state = 2;
+         } else {
+            logi_chunk *d = logistics_get_chunk(ix, iy, base_z + pi->pos.unpacked.z, 0);
+            assert(pi->input_id < stb_arr_len(d->machine));
+            //d->machines[pi->input_id]
+         }
+      } else {
+         if (pi->item != 0 && pi->state == 0 && pi->output_id != TARGET_none) {
+            int ox = base_x + pi->pos.unpacked.x + face_dir[pi->rot^2][0];
+            int oy = base_y + pi->pos.unpacked.y + face_dir[pi->rot^2][1];
+            int oz = base_z + pi->pos.unpacked.z;
+            assert(pi->item != 0);
+            if (pi->output_is_belt) {
+               int slot;
+               belt_run *b = find_belt_slot_for_picker(pi->output_id, ox,oy,oz-1, pi->rot^2, &slot);
+               if (b->items[slot].type == 0) {
+                  add_item_to_belt(b, slot, pi->item);
+                  pi->item = 0;
+               } else {
+                  pi->state = 1;
+               }
+            } else {
+               logi_chunk *d = logistics_get_chunk(ox, oy, base_z + pi->pos.unpacked.z, 0);
+               assert(pi->input_id < stb_arr_len(d->machine));
+
+            }
+         }
+      }
+   }
+}
+
 void logistics_do_long_tick(void)
 {
    int i,j,k,m;
@@ -1091,88 +1344,18 @@ void logistics_do_long_tick(void)
       for (i=0; i < LOGI_CACHE_SIZE; ++i) {
          logi_slice *s = &logi_world[j][i];
          if (s->slice_x != i+1) {
+            int base_x = s->slice_x * LOGI_CHUNK_SIZE_X;
+            int base_y = s->slice_y * LOGI_CHUNK_SIZE_Y;
             for (k=0; k < stb_arrcount(s->chunk); ++k) {
+               int base_z = k * LOGI_CHUNK_SIZE_Z;
                logi_chunk *c = s->chunk[k];
                if (c != NULL) {
-                  for (m=0; m < stb_arr_len(c->machine); ++m) {
-                     machine_info *x = &c->machine[m];
-                     Bool went_to_zero = False;
-                     if (x->timer) {
-                        --x->timer;
-                        went_to_zero = (x->timer == 0);
-                     }
-                     if (x->type == BT_ore_eater && x->timer == 0) {
-                        int pos;
-                        belt_run *br;
-                        br = get_interaction_belt(s->slice_x * LOGI_CHUNK_SIZE_X + x->pos.unpacked.x,
-                                                  s->slice_y * LOGI_CHUNK_SIZE_Y + x->pos.unpacked.y,
-                                                  k          * LOGI_CHUNK_SIZE_Z + x->pos.unpacked.z-1,
-                                                  x->rot, &pos);
-                        if (br != NULL) {
-                           switch ((br->dir - x->rot) & 3) {
-                              case 0:  break;
-
-                              case 1:  if (try_remove_item_from_belt(br, pos*ITEMS_PER_BELT+3, 1,2))
-                                          x->timer = 8;
-                                       break;
-
-                              case 2:  if (try_remove_item_from_belt(br, pos*ITEMS_PER_BELT+ITEMS_PER_BELT-2,  1,2))
-                                          x->timer = 8;
-                                       if (try_remove_item_from_belt(br, pos*ITEMS_PER_BELT+ITEMS_PER_BELT-1,  1,2))
-                                          x->timer = 8;
-                                       break;
-
-                              case 3:  if (try_remove_item_from_belt(br, pos*ITEMS_PER_BELT+2,  1,2))
-                                          x->timer = 8;
-                                       break;
-                           }
-                        }
-                     }
-                     if (x->type == BT_ore_maker) {
-
-                        if (x->output) {
-                           int pos;
-                           belt_run *br;
-
-                           br = get_interaction_belt(s->slice_x * LOGI_CHUNK_SIZE_X + x->pos.unpacked.x,
-                                                     s->slice_y * LOGI_CHUNK_SIZE_Y + x->pos.unpacked.y,
-                                                     k          * LOGI_CHUNK_SIZE_Z + x->pos.unpacked.z-1,
-                                                     x->rot, &pos);
-                           if (br != NULL) {
-                              switch ((br->dir - x->rot) & 3) {
-                                 case 0:  break;
-
-                                 case 1:  if (try_add_item_to_belt(br, pos*ITEMS_PER_BELT+3, x->output))
-                                             x->output = 0;
-                                          break;
-
-                                 case 2:  if (try_add_item_to_belt(br, pos*ITEMS_PER_BELT+ITEMS_PER_BELT-2, x->output))
-                                             x->output = 0;
-                                          if (try_add_item_to_belt(br, pos*ITEMS_PER_BELT+ITEMS_PER_BELT-1, x->output))
-                                             x->output = 0;
-                                          break;
-
-                                 case 3:  if (try_add_item_to_belt(br, pos*ITEMS_PER_BELT+2, x->output))
-                                             x->output = 0;
-                                          break;
-                              }
-                           }
-                        }
-                        if (went_to_zero) {
-                           assert(x->output == 0);
-                           x->output = 1 + (stb_rand() % 2);
-                        }
-                        if (x->timer == 0 && x->output == 0) {
-                           x->timer = 7; // start drilling
-                        }
-                     }
-                  }
+                  logistics_longtick_chunk_machines(c, base_x, base_y, base_z);
                }
             }
          }
       }
    }
-
 }
 
 void logistics_tick(void)

@@ -1,5 +1,12 @@
 Possible tasks to work on next:
 
+   -  conveyor belts use voxel rotation instead of 4 block types
+   -  try making conveyor belts half-height
+   -  90-degree turns
+      - animated blocks
+   -  store 'promises' on conveyor belts
+   -  pickers (factorio "inserters")
+
    Factorio-esque:
    +  player block placement
       * raycast
@@ -11,17 +18,17 @@ Possible tasks to work on next:
       * animation by scrolling textures
       - how to do 90-degree turns
       - how to make animated blocks
-   -  save changes to memory?
+   *  save changes to memory?
    -  moving objects need to be treated as 'objects'
       - can be sprites or polygonal
-      - large quantities (10,000?) of sprites
+      * large quantities (10,000?) of sprites
       - small quantities of polygonal objects
-   -  save changes to disk
+   *  save changes to disk
    -  conveyor belts (special physics)
       * factorio-style two-rows-of-sprite-sized stuff per conveyor
       - or just one row of block-sized stuff
       - maybe require multi-block things to be supported by multiple conveyors
-      - factorio-style stuff stops at end of conveyor, not infinifactory falling-off-esque
+      * factorio-style stuff stops at end of conveyor, not infinifactory falling-off-esque
    -  speed up texture loading
    -  fixed "objects" can be blocks
       - any machinery that you can have a lot of should be (geometrically) blocks

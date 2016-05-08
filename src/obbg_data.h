@@ -1,7 +1,7 @@
 #ifndef INCLUDE_OBBG_DATA_H
 #define INCLUDE_OBBG_DATA_H
 
-//#define MINIMIZE_MEMORY
+#define MINIMIZE_MEMORY
 
 #include "stb.h"
 
@@ -115,6 +115,8 @@ enum
    BT_machines=128,
    BT_ore_maker=128,
    BT_ore_eater=129,
+
+   BT_picker = 254,
 
    BT_down_marker=255,
    BT_no_change=255,

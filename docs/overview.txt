@@ -8,8 +8,9 @@ obbg:
   - save/load to disk
   - networking
 
-Done in today's stream:
+Done in today's stream (26.1):
   - fix conveyor animation glitch 
+  - simple test machines
 
 Previous stream:
   - initial ramp simulation

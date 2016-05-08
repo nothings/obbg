@@ -43,10 +43,17 @@ unsigned char geom_for_blocktype[256] =
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
 
+   #if 1
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
+   #else
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_upper, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_upper, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_upper, 0, 0),
+   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_upper, 0, 0),
+   #endif
 
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
@@ -149,6 +156,11 @@ void init_mesh_building(void)
 
    geom_for_blocktype[BT_ore_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_ore_eater] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
+   geom_for_blocktype[BT_picker   ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
+
+   set_blocktype_texture(BT_picker, 2);
+   tex1_for_blocktype[BT_picker][FACE_east] = 26;
+   tex1_for_blocktype[BT_picker][FACE_west] = 27;
 
    for (i=0; i < 256; ++i)
       texture_scales[i] = 1.0f/4;// textures[i].scale;

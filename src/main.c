@@ -713,7 +713,10 @@ void mouse_down(int button)
       if (button == SDL_BUTTON_RIGHT)
          change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty, block_rotation);
       else if (button == SDL_BUTTON_LEFT) {
-         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base, block_rotation);
+         if (block_base >= BT_conveyor_east && block_base <= BT_conveyor_ramp_down_south_low)
+            change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base + block_rotation, 0);
+         else
+            change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base, block_rotation);
       }
    }
 }
@@ -725,10 +728,12 @@ void rotate_block(void)
       int rot  = block & 3;
       int base = block - rot;
       rot = (rot+1) & 3;
+      block_rotation = rot;
       change_block(selected_block[0], selected_block[1], selected_block[2], base+rot, 0);
    } else if (block >= BT_machines) {
       int rot = get_block_rot(selected_block[0], selected_block[1], selected_block[2]);
       rot = (rot+1) & 3;
+      block_rotation = rot;
       change_block(selected_block[0], selected_block[1], selected_block[2], block, rot);
    }
 }
@@ -892,6 +897,7 @@ void process_event(SDL_Event *e)
          if (k == '5') block_base = BT_conveyor_ramp_down_east_high;
          if (k == '6') block_base = BT_ore_maker;
          if (k == '7') block_base = BT_ore_eater;
+         if (k == '8') block_base = BT_picker;
          if (k == '0') block_base = BT_stone;
          //if (k == '6') block_base = BT_conveyor_up_east_low;
          if (s == SDL_SCANCODE_H) global_hack = !global_hack;
