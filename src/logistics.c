@@ -622,8 +622,8 @@ void logistics_update_chunk(int x, int y, int z)
 }
 
 #define IS_RAMP_HEAD(x) \
-   (    ((x) >= BT_conveyor_ramp_up_east_low    && (x) <= BT_conveyor_ramp_up_south_low   )    \
-     || ((x) >= BT_conveyor_ramp_down_east_high && (x) <= BT_conveyor_ramp_down_south_high) )
+   (    ((x) == BT_conveyor_ramp_up_low    )    \
+     || ((x) == BT_conveyor_ramp_down_high )   )
 
 //
 //  
@@ -637,8 +637,8 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot)
    int oz = LOGI_CHUNK_MASK_Z(z);
    int oldtype = c->type[oz][oy][ox];
 
-   if (oldtype >= BT_conveyor_east && oldtype <= BT_conveyor_south)
-      split_belt(c, ox,oy,oz, oldtype - BT_conveyor_east);
+   if (oldtype == BT_conveyor)
+      split_belt(c, ox,oy,oz, c->rot[oz][oy][ox]);
 
    if (oldtype >= BT_picker && oldtype <= BT_picker)
       destroy_picker(c, ox,oy,oz);
@@ -646,11 +646,11 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot)
       destroy_machine(c, ox,oy,oz);
 
    c->type[oz][oy][ox] = type;
-   c->rot[oz][oy][ox] = type;
+   c->rot[oz][oy][ox] = rot;
 
-   if (type >= BT_conveyor_east && type <= BT_conveyor_south)
-      create_belt(c, ox,oy,oz, type-BT_conveyor_east);
-   else if (oldtype >= BT_conveyor_east && oldtype <= BT_conveyor_south)
+   if (type == BT_conveyor)
+      create_belt(c, ox,oy,oz, rot);
+   else if (oldtype == BT_conveyor)
       destroy_belt(c, ox,oy,oz);
    else if (type >= BT_picker && type <= BT_picker)
       create_picker(c, ox,oy,oz, type,rot);
@@ -661,9 +661,9 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot)
       if (IS_RAMP_HEAD(oldtype)) {
          // @TODO changing ramp types
          destroy_ramp(c, ox,oy,oz);
-         create_ramp(c, ox,oy,oz, type & 3, type <= BT_conveyor_ramp_up_south_low ? 1 : -1);
+         create_ramp(c, ox,oy,oz, rot, type == BT_conveyor_ramp_up_low ? 1 : -1);
       } else {
-         create_ramp(c, ox,oy,oz, type & 3, type <= BT_conveyor_ramp_up_south_low ? 1 : -1);
+         create_ramp(c, ox,oy,oz, rot, type == BT_conveyor_ramp_up_low ? 1 : -1);
       }
    } else if (IS_RAMP_HEAD(oldtype)) {
       destroy_ramp(c, ox,oy,oz);
@@ -692,7 +692,7 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot)
 
 void logistics_update_block(int x, int y, int z, int type, int rot)
 {
-   if (type >= BT_conveyor_ramp_up_east_low && type <= BT_conveyor_ramp_up_south_low) {
+   if (type == BT_conveyor_ramp_up_low) {
       logistics_update_block_core(x,y,z, BT_down_marker, 0);
       logistics_update_block_core(x,y,z-1,type,rot);
    } else

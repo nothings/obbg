@@ -1369,7 +1369,7 @@ static float stbvox_default_texgen[2][32][3] =
      {  0,-1,0 }, { 0, 0, 1 }, {  0, 1,0 }, { 0, 0,-1 },
      {  1, 0,0 }, { 0, 0, 1 }, { -1, 0,0 }, { 0, 0,-1 },
 
-     {  1, 0,0 }, { 0, 1, 0 }, { -1, 0,0 }, { 0,-1, 0 },
+     {  1, 0,0 }, { 0,-1, 0 }, { -1, 0,0 }, { 0, 1, 0 },
      { -1, 0,0 }, { 0,-1, 0 }, {  1, 0,0 }, { 0, 1, 0 },
      {  1, 0,0 }, { 0, 1, 0 }, { -1, 0,0 }, { 0,-1, 0 },
      { -1, 0,0 }, { 0,-1, 0 }, {  1, 0,0 }, { 0, 1, 0 },
@@ -3188,6 +3188,7 @@ static void stbvox_make_mesh_for_block_with_geo(stbvox_mesh_maker *mm, stbvox_po
 
       // @TODO generate split faces
       if (visible_faces & (1 << STBVOX_FACE_up)) {
+         rotate.facerot = simple_rot;
          if (geo >= STBVOX_GEOM_ceil_vheight_03)
             // flat
             stbvox_make_mesh_for_face(mm, rotate, STBVOX_FACE_up  , v_off, pos, basevert, vmesh[STBVOX_FACE_up], mesh, STBVOX_FACE_up);
@@ -3208,6 +3209,7 @@ static void stbvox_make_mesh_for_block_with_geo(stbvox_mesh_maker *mm, stbvox_po
          }
       }
       if (visible_faces & (1 << STBVOX_FACE_down)) {
+         rotate.facerot = (-simple_rot)&3;
          if (geo < STBVOX_GEOM_ceil_vheight_03)
             // flat
             stbvox_make_mesh_for_face(mm, rotate, STBVOX_FACE_down, v_off, pos, basevert, vmesh[STBVOX_FACE_down], mesh, STBVOX_FACE_down);
@@ -3227,6 +3229,7 @@ static void stbvox_make_mesh_for_block_with_geo(stbvox_mesh_maker *mm, stbvox_po
          #endif
          }
       }
+      rotate.facerot = 0;
 
       if (mm->input.rotate) {
          unsigned char val = mm->input.rotate[v_off];

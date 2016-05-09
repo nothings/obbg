@@ -45,35 +45,14 @@ unsigned char geom_for_blocktype[256] =
 
    #if 1
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
    #else
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_upper, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_upper, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_upper, 0, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_upper, 0, 0),
    #endif
 
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
-
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
-
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
-
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 3, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 2, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 1, 0),
 
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
@@ -86,26 +65,11 @@ unsigned char geom_for_blocktype[256] =
 unsigned char vheight_for_blocktype[256] =
 {
    0,0,0,0,
-   0,0,0,0,
+   0,
 
    STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
-
    STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
-
    STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
-
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
    STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
 
    0,0,0,0,0,
@@ -137,30 +101,22 @@ void init_mesh_building(void)
    set_blocktype_texture(BT_marble, 16);
    set_blocktype_texture(BT_stone, 20);
    set_blocktype_texture(BT_leaves, 1);
-   for (i=0; i < 4; ++i) {
-      set_blocktype_texture(BT_conveyor_east+i, 21);
-      set_blocktype_texture(BT_conveyor_ramp_up_east_low+i, 21);
-      set_blocktype_texture(BT_conveyor_ramp_up_east_high+i, 21);
-      set_blocktype_texture(BT_conveyor_ramp_down_east_low+i, 21);
-      set_blocktype_texture(BT_conveyor_ramp_down_east_high+i, 21);
-   }
+   set_blocktype_texture(BT_conveyor, 21);
+   set_blocktype_texture(BT_conveyor_ramp_up_low, 21);
+   set_blocktype_texture(BT_conveyor_ramp_up_high, 21);
+   set_blocktype_texture(BT_conveyor_ramp_down_low, 21);
+   set_blocktype_texture(BT_conveyor_ramp_down_high, 21);
+
    for (i=0; i < 5; ++i) {
-      tex1_for_blocktype[BT_conveyor_east +i*4][FACE_up] = 22;
-      tex1_for_blocktype[BT_conveyor_north+i*4][FACE_up] = 23;
-      tex1_for_blocktype[BT_conveyor_west +i*4][FACE_up] = 24;
-      tex1_for_blocktype[BT_conveyor_south+i*4][FACE_up] = 25;
+      tex1_for_blocktype[BT_conveyor+i][FACE_up] = 22;
    }
 
-   set_blocktype_texture(BT_ore_eater, 17); tex1_for_blocktype[BT_ore_eater][FACE_east] = 26;
-   set_blocktype_texture(BT_ore_maker, 17); tex1_for_blocktype[BT_ore_maker][FACE_east] = 27;
+   set_blocktype_texture(BT_ore_eater, 17); tex1_for_blocktype[BT_ore_eater][FACE_east] = 23;
+   set_blocktype_texture(BT_ore_maker, 17); tex1_for_blocktype[BT_ore_maker][FACE_east] = 24;
 
    geom_for_blocktype[BT_ore_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_ore_eater] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
-   geom_for_blocktype[BT_picker   ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
-
-   set_blocktype_texture(BT_picker, 2);
-   tex1_for_blocktype[BT_picker][FACE_east] = 26;
-   tex1_for_blocktype[BT_picker][FACE_west] = 27;
+   geom_for_blocktype[BT_picker   ] = 0;
 
    for (i=0; i < 256; ++i)
       texture_scales[i] = 1.0f/4;// textures[i].scale;
@@ -768,6 +724,8 @@ static edit_chunk *get_edit_chunk_alloc(int x, int y, int z) { return get_edit_c
 int get_block(int x, int y, int z)
 {
    edit_chunk *e = get_edit_chunk(x,y,z);   
+   if (e == NULL)
+      return 0;
    x &= (GEN_CHUNK_SIZE_X-1);
    y &= (GEN_CHUNK_SIZE_Y-1);
    z &= (EDIT_CHUNK_Z_COUNT-1);
@@ -777,6 +735,8 @@ int get_block(int x, int y, int z)
 int get_block_rot(int x, int y, int z)
 {
    edit_chunk *e = get_edit_chunk(x,y,z);   
+   if (e == NULL)
+      return 0;
    x &= (GEN_CHUNK_SIZE_X-1);
    y &= (GEN_CHUNK_SIZE_Y-1);
    z &= (EDIT_CHUNK_Z_COUNT-1);

@@ -93,10 +93,7 @@ texture_info textures[] =
 
    1,"stone/Gray_granite_pxr128",
    1,"metal/Round_mesh_pxr128",
-   1,"machinery/conveyor_east",
-   1,"machinery/conveyor_north",
-   1,"machinery/conveyor_west",
-   1,"machinery/conveyor_south",
+   1,"machinery/conveyor",
 
    1,"machinery/ore_maker",
    1,"machinery/ore_eater",
@@ -705,32 +702,22 @@ void draw_main(void)
 }
 
 int block_rotation;
-int block_base = BT_conveyor_east;
+int block_base = BT_conveyor;
 
 void mouse_down(int button)
 {
    if (selected_block_valid) {
       if (button == SDL_BUTTON_RIGHT)
          change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty, block_rotation);
-      else if (button == SDL_BUTTON_LEFT) {
-         if (block_base >= BT_conveyor_east && block_base <= BT_conveyor_ramp_down_south_low)
-            change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base + block_rotation, 0);
-         else
-            change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base, block_rotation);
-      }
+      else if (button == SDL_BUTTON_LEFT)
+         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base, block_rotation);
    }
 }
 
 void rotate_block(void)
 {
    int block = get_block(selected_block[0], selected_block[1], selected_block[2]);
-   if (block >= BT_conveyor_east && block <= BT_conveyor_ramp_down_south_low) {
-      int rot  = block & 3;
-      int base = block - rot;
-      rot = (rot+1) & 3;
-      block_rotation = rot;
-      change_block(selected_block[0], selected_block[1], selected_block[2], base+rot, 0);
-   } else if (block >= BT_machines) {
+   if ((block >= BT_conveyor && block <= BT_conveyor_ramp_down_low) || block >= BT_machines) {
       int rot = get_block_rot(selected_block[0], selected_block[1], selected_block[2]);
       rot = (rot+1) & 3;
       block_rotation = rot;
@@ -890,11 +877,11 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_F)   client_player_input.flying = !client_player_input.flying;
          if (s == SDL_SCANCODE_R)   rotate_block();
          if (s == SDL_SCANCODE_M)   save_edits();
-         if (k == '1') block_base = BT_conveyor_east;
-         if (k == '2') block_base = BT_conveyor_ramp_up_east_low;
-         if (k == '3') block_base = BT_conveyor_ramp_up_east_high;
-         if (k == '4') block_base = BT_conveyor_ramp_down_east_low;
-         if (k == '5') block_base = BT_conveyor_ramp_down_east_high;
+         if (k == '1') block_base = BT_conveyor;
+         if (k == '2') block_base = BT_conveyor_ramp_up_low;
+         if (k == '3') block_base = BT_conveyor_ramp_up_high;
+         if (k == '4') block_base = BT_conveyor_ramp_down_low;
+         if (k == '5') block_base = BT_conveyor_ramp_down_high;
          if (k == '6') block_base = BT_ore_maker;
          if (k == '7') block_base = BT_ore_eater;
          if (k == '8') block_base = BT_picker;
@@ -1093,7 +1080,7 @@ int SDL_main(int argc, char **argv)
 
    //mesh_init();
    world_init();
-   load_edits();
+   //load_edits();
 
    initialized = 1;
 

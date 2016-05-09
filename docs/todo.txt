@@ -1,11 +1,19 @@
 Possible tasks to work on next:
 
    -  conveyor belts use voxel rotation instead of 4 block types
-   -  try making conveyor belts half-height
    -  90-degree turns
       - animated blocks
    -  store 'promises' on conveyor belts
-   *  pickers (factorio "inserters")
+   *  try making conveyor belts half-height
+   *  basic pickers (factorio "inserters")
+   -  correct picker logic for machine sides
+   -  real driller machines (attached to specific block types that have ore)
+   -  furnaces - factorio & minecraft
+ ===> assemblers - factorio
+   -  liquid - factorio & minecraft
+   -  power - factorio 
+   -  enemies & tower defense-ish gameplay - factorio?
+
 
    Factorio-esque:
    +  player block placement

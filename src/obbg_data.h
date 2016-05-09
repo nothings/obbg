@@ -81,30 +81,11 @@ enum
    BT_stone,
    BT_sand,
 
-   BT_conveyor_east,
-   BT_conveyor_north,
-   BT_conveyor_west,
-   BT_conveyor_south,
-
-   BT_conveyor_ramp_up_east_low,
-   BT_conveyor_ramp_up_west_low,
-   BT_conveyor_ramp_up_north_low,
-   BT_conveyor_ramp_up_south_low,
-
-   BT_conveyor_ramp_up_east_high,
-   BT_conveyor_ramp_up_west_high,
-   BT_conveyor_ramp_up_north_high,
-   BT_conveyor_ramp_up_south_high,
-
-   BT_conveyor_ramp_down_east_high,
-   BT_conveyor_ramp_down_west_high,
-   BT_conveyor_ramp_down_north_high,
-   BT_conveyor_ramp_down_south_high,
-
-   BT_conveyor_ramp_down_east_low,
-   BT_conveyor_ramp_down_west_low,
-   BT_conveyor_ramp_down_north_low,
-   BT_conveyor_ramp_down_south_low,
+   BT_conveyor,
+   BT_conveyor_ramp_up_low,
+   BT_conveyor_ramp_up_high,
+   BT_conveyor_ramp_down_high,
+   BT_conveyor_ramp_down_low,
 
    BT_wood,
    BT_leaves,

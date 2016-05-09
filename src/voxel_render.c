@@ -63,9 +63,6 @@ void setup_uniforms(float pos[3])
 {
    int i,j;
    texture_offsets[22][0] = -logistics_texture_scroll;
-   texture_offsets[23][1] =  logistics_texture_scroll;
-   texture_offsets[24][0] =  logistics_texture_scroll;
-   texture_offsets[25][1] = -logistics_texture_scroll;
 
    for (i=0; i < STBVOX_UNIFORM_count; ++i) {
       stbvox_uniform_info raw, *ui=&raw;
