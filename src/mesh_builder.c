@@ -41,7 +41,7 @@ static unsigned char geom_for_blocktype[256] =
 
 static unsigned char vheight_for_blocktype[256];
 
-static unsigned char tex1_for_blocktype[256][6];
+unsigned char tex1_for_blocktype[256][6];
 static unsigned char tex2_for_blocktype[256][6];
 static unsigned char color_for_blocktype[256][6];
 
@@ -251,8 +251,8 @@ void free_mesh_chunk_physics(mesh_chunk *mc)
 void free_mesh_chunk(mesh_chunk *mc)
 {
    glDeleteTextures(1, &mc->fbuf_tex);
-   xglDeleteBuffersARB(1, &mc->vbuf);
-   xglDeleteBuffersARB(1, &mc->fbuf);
+   glDeleteBuffersARB(1, &mc->vbuf);
+   glDeleteBuffersARB(1, &mc->fbuf);
 
    free_mesh_chunk_physics(mc);
    free(mc);

@@ -2,16 +2,19 @@ srcs := $(wildcard ../src/*.c)
 objs := $(patsubst ../src/%.c,%.o,$(srcs)) texture_loader.o
 hdrs := $(wildcard ../src/*.h)
 
+CFLAGS := -D_GNU_SOURCE -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -g -I../stb/ $(shell sdl2-config --cflags)
+LDFLAGS := -lGL -lGLU -lSDL2 -lm -lSDL_net
+
 all: ../obbg
 
 ../obbg: $(objs)
-	g++ -g -m32 $^ -o $@ -lGL -lSDL2 -lX11 -lm -lGLU -lSDL_net
+	g++ $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 texture_loader.o: ../src/texture_loader.cpp $(hdrs)
-	g++ -g -std=c++11 -m32 -I../stb/ -I/usr/include/SDL2/ -c $< -o $@
+	g++ $(CFLAGS) -std=c++11 -fpermissive -c $< -o $@
 
 %.o: ../src/%.c $(hdrs)
-	gcc -g -D_GNU_SOURCE -std=c99 -m32 -I../stb/ -I/usr/include/SDL2/ -c $< -o $@
+	gcc $(CFLAGS) -std=c99 -c $< -o $@
 
 clean:
 	$(RM) $(objs) ../obbg

@@ -192,7 +192,7 @@ void render_init(void)
    glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
    for (i=0; i < 11; ++i) {
-      xglTexImage3DEXT(GL_TEXTURE_2D_ARRAY_EXT, i,
+      glTexImage3DEXT(GL_TEXTURE_2D_ARRAY_EXT, i,
                          GL_COMPRESSED_RGB_S3TC_DXT1_EXT,
                          1024>>i,1024>>i,128,0,
                          GL_RGBA,GL_UNSIGNED_BYTE,NULL);

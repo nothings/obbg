@@ -1052,7 +1052,7 @@ int stbgl_TexImage2D_Extra(int texid, int w, int h, void *data, int chan, char *
 #endif
 
 #if defined(STB_GLEXT_DECLARE) && !defined(STB_GLEXT_DEFINE)
-   #define GLE(a,b) extern PFNGL##b##PROC xgl##a;
+   #define GLE(a,b) extern PFNGL##b##PROC gl##a;
 
    #ifdef __cplusplus
    extern "C" {
@@ -1090,11 +1090,11 @@ int stbgl_TexImage2D_Extra(int texid, int w, int h, void *data, int chan, char *
    #undef GLE
    #endif
 
-   #define GLE(a,b)  PFNGL##b##PROC xgl##a;
+   #define GLE(a,b)  PFNGL##b##PROC gl##a;
    #include STB_GLEXT_DEFINE
 
    #undef GLE
-   #define GLE(a,b) xgl##a = (PFNGL##b##PROC) STBGL__GET_FUNC("gl" #a );
+   #define GLE(a,b) gl##a = (PFNGL##b##PROC) STBGL__GET_FUNC("gl" #a );
 
 
    void stbgl_initExtensions(void)
