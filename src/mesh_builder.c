@@ -795,6 +795,7 @@ void change_block(int x, int y, int z, int type, int rot)
       e->blocks[sz][sy][sx].rotate = rot;
 
       force_update_for_block(x,y,z);
+
       update_physics_cache(x,y,z,type,rot);
       logistics_update_block(x,y,z,type,rot);
    }
@@ -982,7 +983,9 @@ gen_chunk *generate_chunk(int x, int y)
          for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
             for (z=0; z < Z_SEGMENT_SIZE; ++z) {
                static uint8 convert_rot[4] = { 0,3,2,1 };
-               gcp->lighting[j][i][z] = STBVOX_MAKE_LIGHTING_EXT((gcp->block[j][i][z]) ? 0 : 255, convert_rot[gcp->rotate[j][i][z]]);
+               int type = gcp->block[j][i][z];
+               int is_solid = type != 0 && type != BT_picker;
+               gcp->lighting[j][i][z] = STBVOX_MAKE_LIGHTING_EXT(is_solid ? 0 : 255, convert_rot[gcp->rotate[j][i][z]]);
             }
    }
 
@@ -1058,7 +1061,7 @@ typedef struct
 
 void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg, build_data *bd)
 {
-   int j,i,x,y;
+   int j,i,x,y,a;
    for (j=0; j < 4; ++j)
       for (i=0; i < 4; ++i) {
          gen_chunk_partial *gcp;
@@ -1083,6 +1086,9 @@ void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg, build_data *bd)
             for (x=x0; x < x1; ++x) {
                memcpy(bt + sizeof(bd->segment_blocktype[0][0])*x, &gcp->block   [y][x][0], 16);
                memcpy(lt + sizeof(bd->segment_lighting [0][0])*x, &gcp->lighting[y][x][0], 16);
+               for (a=0; a < 16; ++a)
+                  if ((bt + sizeof(bd->segment_blocktype[0][0])*x)[a] == BT_picker)
+                     (bt + sizeof(bd->segment_blocktype[0][0])*x)[a] = BT_empty;
             }
          }
       }

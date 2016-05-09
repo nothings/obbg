@@ -8,7 +8,8 @@ obbg:
   - save/load to disk
   - networking
 
-Done in today's stream (26.1):
+Done in today's stream (26.1,26.2,26.3)
+  - initial implementation of pickers
   - fix conveyor animation glitch 
   - simple test machines
 

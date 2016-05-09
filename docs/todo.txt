@@ -5,7 +5,7 @@ Possible tasks to work on next:
    -  90-degree turns
       - animated blocks
    -  store 'promises' on conveyor belts
-   -  pickers (factorio "inserters")
+   *  pickers (factorio "inserters")
 
    Factorio-esque:
    +  player block placement
