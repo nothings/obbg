@@ -1260,6 +1260,7 @@ void logistics_do_long_tick(void)
    }
 }
 
+extern int tex_anim_offset;
 void logistics_tick(void)
 {
    logistics_texture_scroll += (1.0 / LONG_TICK_LENGTH / ITEMS_PER_BELT_SIDE) / 4.0; // texture repeats = 4
@@ -1267,6 +1268,7 @@ void logistics_tick(void)
       logistics_texture_scroll -= 1.0;
 
    ++logistics_ticks;
+   tex_anim_offset = ((logistics_ticks >> 3) & 3) * 16;
 
    if (++logistics_long_tick == LONG_TICK_LENGTH) {
       logistics_do_long_tick();

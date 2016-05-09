@@ -538,6 +538,7 @@ enum                           //  V  V
    STBVOX_UNIFORM_texgen,      //  Y  Y   table of texgen vectors, internal-only
    STBVOX_UNIFORM_ambient,     //  n      lighting & fog info, see above
    STBVOX_UNIFORM_camera_pos,  //  Y      camera position in global voxel space (for lighting & fog)
+   STBVOX_UNIFORM_texanim,     //  Y      animated texture by math hackery -- @TODO documentation
 
    STBVOX_UNIFORM_count,
 };
@@ -546,6 +547,7 @@ enum
 {
    STBVOX_UNIFORM_TYPE_none,
    STBVOX_UNIFORM_TYPE_sampler,
+   STBVOX_UNIFORM_TYPE_vec2i,
    STBVOX_UNIFORM_TYPE_vec2,
    STBVOX_UNIFORM_TYPE_vec3,
    STBVOX_UNIFORM_TYPE_vec4,
@@ -607,6 +609,9 @@ void setup_uniforms(GLuint shader, float camera_pos[4], GLuint tex1, GLuint tex2
                case STBVOX_UNIFORM_texgen:      // you never want to override this
                   glUniform3fv(loc, sui.array_length, sui.default_value);
                   break;
+
+               case STBVOX_UNIFORM_texanim:
+                  glUniform2iv(loc, sui.array_length, (int *) sui.default_value);
             }
          }
       }
@@ -1379,7 +1384,7 @@ static float stbvox_default_texgen[2][32][3] =
      { 0, 0,-1 }, {  0,-1,0 }, { 0, 0, 1 }, {  0, 1,0 },
      { 0, 0,-1 }, {  1, 0,0 }, { 0, 0, 1 }, { -1, 0,0 },
 
-     { 0,-1, 0 }, {  1, 0,0 }, { 0, 1, 0 }, { -1, 0,0 },
+     { 0,-1, 0 }, { -1, 0,0 }, { 0, 1, 0 }, {  1, 0,0 },
      { 0, 1, 0 }, { -1, 0,0 }, { 0,-1, 0 }, {  1, 0,0 },
      { 0,-1, 0 }, {  1, 0,0 }, { 0, 1, 0 }, { -1, 0,0 },
      { 0, 1, 0 }, { -1, 0,0 }, { 0,-1, 0 }, {  1, 0,0 },
@@ -1475,6 +1480,8 @@ static float stbvox_default_ambient[4][4] =
    { 0.5,0.5,0.5,0 }, // constant color
    { 0.5,0.5,0.5,1.0f/1000.0f/1000.0f }, // fog data for simple_fog
 };
+
+static int stbvox_default_texanim[2] = { 0,0 };
 
 static float stbvox_default_palette[64][4];
 
@@ -1607,6 +1614,9 @@ static const char *stbvox_fragment_program =
       // per-frame data
       "uniform vec4 camera_pos;\n"  // 4th value is used for arbitrary hacking
 
+      // texture animation
+      "uniform ivec2 texanim;\n"
+
       // probably constant data
       "uniform vec4 ambient[4];\n"
 
@@ -1645,6 +1655,9 @@ static const char *stbvox_fragment_program =
          "   uint tex2_id = facedata.y;\n"
          "   uint texprojid = facedata.w & 31u;\n"
          "   uint color_id  = facedata.z;\n"
+
+         "   if ((tex1_id & uint(texanim.x)) == 0u)\n"
+         "      tex1_id = (tex1_id + uint(texanim.y)) & 255u;"
 
          "   vec2 tex1_offset = vec2(0.0), tex2_offset = vec2(0.0);\n"
          #ifndef STBVOX_CONFIG_PREFER_TEXBUFFER
@@ -1948,6 +1961,7 @@ static stbvox_uniform_info stbvox_uniforms[] =
    { STBVOX_UNIFORM_TYPE_vec3     , 12,  64, (char*) "texgen"       , stbvox_default_texgen[0][0], STBVOX_TEXBUF },
    { STBVOX_UNIFORM_TYPE_vec4     , 16,   4, (char*) "ambient"      , stbvox_default_ambient[0]   },
    { STBVOX_UNIFORM_TYPE_vec4     , 16,   1, (char*) "camera_pos"   , stbvox_dummy_transform[0]   },
+   { STBVOX_UNIFORM_TYPE_vec2i    ,  8,   1, (char*) "texanim"      , (float *) stbvox_default_texanim },
 };
 
 STBVXDEC int stbvox_get_uniform_info(stbvox_uniform_info *info, int uniform)

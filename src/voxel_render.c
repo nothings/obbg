@@ -56,6 +56,7 @@ int view_distance=300;
 int view_distance=1800;
 #endif
 
+int tex_anim_offset;
 float texture_offsets[128][2];
 float logistics_texture_scroll;
 
@@ -80,6 +81,12 @@ void setup_uniforms(float pos[3])
          switch (i) {
             case STBVOX_UNIFORM_face_data:
                tablei[0] = 2;
+               data = tablei;
+               break;
+
+            case STBVOX_UNIFORM_texanim:
+               tablei[0] = 0x0f;
+               tablei[1] = tex_anim_offset;
                data = tablei;
                break;
 
@@ -160,6 +167,7 @@ void setup_uniforms(float pos[3])
 
          switch (ui->type) {
             case STBVOX_UNIFORM_TYPE_sampler: stbglUniform1iv(uniform_loc[i], ui->array_length, data); break;
+            case STBVOX_UNIFORM_TYPE_vec2i:   stbglUniform2iv(uniform_loc[i], ui->array_length, data); break;
             case STBVOX_UNIFORM_TYPE_vec2:    stbglUniform2fv(uniform_loc[i], ui->array_length, data); break;
             case STBVOX_UNIFORM_TYPE_vec3:    stbglUniform3fv(uniform_loc[i], ui->array_length, data); break;
             case STBVOX_UNIFORM_TYPE_vec4:    stbglUniform4fv(uniform_loc[i], ui->array_length, data); break;

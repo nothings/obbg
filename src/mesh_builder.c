@@ -73,7 +73,7 @@ void init_mesh_building(void)
    vheight_for_blocktype[BT_conveyor_ramp_down_high ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
    vheight_for_blocktype[BT_conveyor_ramp_down_low  ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
 
-   set_blocktype_texture(BT_sand, 0);
+   set_blocktype_texture(BT_sand, 25);
    set_blocktype_texture(BT_grass, 5);
    set_blocktype_texture(BT_gravel, 2);
    set_blocktype_texture(BT_asphalt, 9);
@@ -86,10 +86,14 @@ void init_mesh_building(void)
    set_blocktype_texture(BT_conveyor_ramp_up_high, 21);
    set_blocktype_texture(BT_conveyor_ramp_down_low, 21);
    set_blocktype_texture(BT_conveyor_ramp_down_high, 21);
+   set_blocktype_texture(BT_conveyor_90_left, 21);
+   set_blocktype_texture(BT_conveyor_90_right, 21);
 
-   for (i=0; i < 5; ++i) {
-      tex1_for_blocktype[BT_conveyor+i][FACE_up] = 22;
-   }
+   tex1_for_blocktype[BT_conveyor         ][FACE_up] = 22;
+   tex1_for_blocktype[BT_conveyor_90_right][FACE_up] = 0;
+   tex1_for_blocktype[BT_conveyor_90_left ][FACE_up] = 64;
+   for (i=0; i < 4; ++i)
+      tex1_for_blocktype[BT_conveyor_ramp_up_low+i][FACE_up] = 22;
 
    set_blocktype_texture(BT_ore_eater, 17); tex1_for_blocktype[BT_ore_eater][FACE_east] = 23;
    set_blocktype_texture(BT_ore_maker, 17); tex1_for_blocktype[BT_ore_maker][FACE_east] = 24;
@@ -101,13 +105,7 @@ void init_mesh_building(void)
    for (i=0; i < 256; ++i)
       texture_scales[i] = 1.0f/4;// textures[i].scale;
    texture_scales[21] = 1.0f;
-
-   #if 0
-   texture_scales[22] = 1.0f;
-   texture_scales[23] = 1.0f;
-   texture_scales[24] = 1.0f;
-   texture_scales[25] = 1.0f;
-   #endif
+   texture_scales[0] = texture_scales[16] = texture_scales[32] = texture_scales[48] = 1.0f;
 }
 
 

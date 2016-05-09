@@ -67,36 +67,59 @@ typedef struct
 
 texture_info textures[] =
 {
-   1.0/8,"ground/Beach_sand_pxr128",
+   1,"machinery/conveyor_90_00",
    1.0/4,"ground/Bowling_grass_pxr128",
    1,"ground/Dirt_and_gravel_pxr128",
    1,"ground/Fine_gravel_pxr128",
    1.0/2,"ground/Ivy_pxr128",
-
    1,"ground/Lawn_grass_pxr128",
    1,"ground/Pebbles_in_mortar_pxr128",
    1,"ground/Peetmoss_pxr128",
+
    1,"ground/Red_gravel_pxr128",
    1,"ground/Street_asphalt_pxr128",
-
    1,"floor/Wool_carpet_pxr128",
    1,"brick/Pink-brown_painted_pxr128",
    1,"brick/Building_block_pxr128",
    1,"brick/Standard_red_pxr128",
    1,"siding/Diagonal_cedar_pxr128",
-
    1,"siding/Vertical_redwood_pxr128",
-   1,"stone/Gray_marble_pxr128",
+
+   1,"machinery/conveyor_90_01",
    1,"stone/Buffed_marble_pxr128",
    1,"stone/Black_marble_pxr128",
    1,"stone/Blue_marble_pxr128",
-
    1,"stone/Gray_granite_pxr128",
    1,"metal/Round_mesh_pxr128",
    1,"machinery/conveyor",
-
    1,"machinery/ore_maker",
+
    1,"machinery/ore_eater",
+   1.0/8,"ground/Beach_sand_pxr128",
+   1,"stone/Gray_marble_pxr128",
+   0,0,
+   0,0,
+   0,0,
+   0,0,
+   0,0,
+
+   1,"machinery/conveyor_90_02", 0,0,  0,0,  0,0, 0,0,  0,0,   0,0,   0,0,
+   0,0,   0,0,   0,0, 0,0,   0,0,   0,0,   0,0,   0,0,
+
+   1,"machinery/conveyor_90_03", 0,0,  0,0,  0,0, 0,0,  0,0,   0,0,   0,0,
+   0,0,   0,0,   0,0, 0,0,   0,0,   0,0,   0,0,   0,0,
+
+   1,"machinery/conveyor_270_00", 0,0,  0,0,  0,0, 0,0,  0,0,   0,0,   0,0,
+   0,0,   0,0,   0,0, 0,0,   0,0,   0,0,   0,0,   0,0,
+
+   1,"machinery/conveyor_270_01", 0,0,  0,0,  0,0, 0,0,  0,0,   0,0,   0,0,
+   0,0,   0,0,   0,0, 0,0,   0,0,   0,0,   0,0,   0,0,
+
+   1,"machinery/conveyor_270_02", 0,0,  0,0,  0,0, 0,0,  0,0,   0,0,   0,0,
+   0,0,   0,0,   0,0, 0,0,   0,0,   0,0,   0,0,   0,0,
+
+   1,"machinery/conveyor_270_03", 0,0,  0,0,  0,0, 0,0,  0,0,   0,0,   0,0,
+   0,0,   0,0,   0,0, 0,0,   0,0,   0,0,   0,0,   0,0,
 };
 
 static float camera_bounds[2][3];
@@ -172,28 +195,28 @@ void render_init(void)
                          GL_RGBA,GL_UNSIGNED_BYTE,NULL);
    }
 
-   #if 1
    for (i=0; i < sizeof(textures)/sizeof(textures[0]); ++i) {
-      size_t len;
-      char *filename = stb_sprintf("data/pixar/crn/%s.crn", textures[i].filename);
-      uint8 *data = stb_file(filename, &len);
-      if (data == NULL) {
-         int w,h;
-         uint8 *pixels = stbi_load(stb_sprintf("data/%s.jpg", textures[i].filename), &w, &h, 0, 4);
-         if (!pixels)
-            pixels = stbi_load(stb_sprintf("data/%s.png", textures[i].filename), &w, &h, 0, 4);
+      if (textures[i].scale != 0) {
+         size_t len;
+         char *filename = stb_sprintf("data/pixar/crn/%s.crn", textures[i].filename);
+         uint8 *data = stb_file(filename, &len);
+         if (data == NULL) {
+            int w,h;
+            uint8 *pixels = stbi_load(stb_sprintf("data/%s.jpg", textures[i].filename), &w, &h, 0, 4);
+            if (!pixels)
+               pixels = stbi_load(stb_sprintf("data/%s.png", textures[i].filename), &w, &h, 0, 4);
             
-         if (pixels) {
-            load_bitmap_to_texture_array(i, pixels, w, h, 1, 0);
-            free(pixels);
-         } else
-            assert(0);
-      } else {
-         load_crn_to_texture_array(i, data, len);
-         free(data);
+            if (pixels) {
+               load_bitmap_to_texture_array(i, pixels, w, h, 1, 0);
+               free(pixels);
+            } else
+               assert(0);
+         } else {
+            load_crn_to_texture_array(i, data, len);
+            free(data);
+         }
       }
    }
-   #endif
 
    // temporary hack:
    voxel_tex[1] = voxel_tex[0];
@@ -885,6 +908,7 @@ void process_event(SDL_Event *e)
          if (k == '6') block_base = BT_ore_maker;
          if (k == '7') block_base = BT_ore_eater;
          if (k == '8') block_base = BT_picker;
+         if (k == '9') block_base = BT_conveyor_90_left;
          if (k == '0') block_base = BT_stone;
          //if (k == '6') block_base = BT_conveyor_up_east_low;
          if (s == SDL_SCANCODE_H) global_hack = !global_hack;
@@ -1080,7 +1104,7 @@ int SDL_main(int argc, char **argv)
 
    //mesh_init();
    world_init();
-   //load_edits();
+   load_edits();
 
    initialized = 1;
 

@@ -92,6 +92,8 @@ enum
    BT_conveyor_ramp_up_high,
    BT_conveyor_ramp_down_high,
    BT_conveyor_ramp_down_low,
+   BT_conveyor_90_left,
+   BT_conveyor_90_right,
 
    BT_picker = 49,
    BT_machines=50,
