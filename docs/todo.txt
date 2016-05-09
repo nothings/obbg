@@ -1,6 +1,6 @@
 Possible tasks to work on next:
 
-   -  conveyor belts use voxel rotation instead of 4 block types
+   *  conveyor belts use voxel rotation instead of 4 block types
    -  90-degree turns
       - animated blocks
    -  store 'promises' on conveyor belts
@@ -13,6 +13,8 @@ Possible tasks to work on next:
    -  liquid - factorio & minecraft
    -  power - factorio 
    -  enemies & tower defense-ish gameplay - factorio?
+   -  passive splitter (split sides in opposite directions)
+   -  balancer
 
 
    Factorio-esque:

@@ -9,6 +9,8 @@ obbg:
   - networking
 
 Done in today's stream (26.1,26.2,26.3)
+  - pickers feed to machines
+  - machines don't feed from belts
   - initial implementation of pickers
   - fix conveyor animation glitch 
   - simple test machines

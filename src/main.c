@@ -717,7 +717,7 @@ void mouse_down(int button)
 void rotate_block(void)
 {
    int block = get_block(selected_block[0], selected_block[1], selected_block[2]);
-   if ((block >= BT_conveyor && block <= BT_conveyor_ramp_down_low) || block >= BT_machines) {
+   if (block >= BT_placeable) {
       int rot = get_block_rot(selected_block[0], selected_block[1], selected_block[2]);
       rot = (rot+1) & 3;
       block_rotation = rot;

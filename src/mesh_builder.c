@@ -34,49 +34,14 @@
 #define STB_VOXEL_RENDER_IMPLEMENTATION
 #include "stb_voxel_render.h"
 
-extern void ods(char *fmt, ...);
-
-unsigned char geom_for_blocktype[256] =
+static unsigned char geom_for_blocktype[256] =
 {
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_empty, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-
-   #if 1
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-   #else
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_upper, 0, 0),
-   #endif
-
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
-
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
-
-   STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0),
 };
 
-unsigned char vheight_for_blocktype[256] =
-{
-   0,0,0,0,
-   0,
+static unsigned char vheight_for_blocktype[256];
 
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
-   STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
-
-   0,0,0,0,0,
-   // Encode with STBVOX_MAKE_VHEIGHT(sw_height, se_height, nw_height, ne_height)
-};
-
-unsigned char tex1_for_blocktype[256][6];
+static unsigned char tex1_for_blocktype[256][6];
 static unsigned char tex2_for_blocktype[256][6];
 static unsigned char color_for_blocktype[256][6];
 
@@ -92,6 +57,21 @@ float texture_scales[256];
 void init_mesh_building(void)
 {
    int i;
+
+   for (i=1; i < 256; ++i)
+      geom_for_blocktype[i] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid,0,0);
+      
+   //geom_for_blocktype[BT_conveyor] = STBVOX_GEOM_slab_upper;
+
+   geom_for_blocktype[BT_conveyor_ramp_up_low    ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
+   geom_for_blocktype[BT_conveyor_ramp_up_high   ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
+   geom_for_blocktype[BT_conveyor_ramp_down_high ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
+   geom_for_blocktype[BT_conveyor_ramp_down_low  ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
+
+   vheight_for_blocktype[BT_conveyor_ramp_up_low    ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
+   vheight_for_blocktype[BT_conveyor_ramp_up_high   ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
+   vheight_for_blocktype[BT_conveyor_ramp_down_high ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
+   vheight_for_blocktype[BT_conveyor_ramp_down_low  ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
 
    set_blocktype_texture(BT_sand, 0);
    set_blocktype_texture(BT_grass, 5);
