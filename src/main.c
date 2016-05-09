@@ -908,7 +908,7 @@ void process_event(SDL_Event *e)
          if (k == '6') block_base = BT_ore_maker;
          if (k == '7') block_base = BT_ore_eater;
          if (k == '8') block_base = BT_picker;
-         if (k == '9') block_base = BT_conveyor_90_left;
+         if (k == '9') block_base = BT_conveyor_90_right;
          if (k == '0') block_base = BT_stone;
          //if (k == '6') block_base = BT_conveyor_up_east_low;
          if (s == SDL_SCANCODE_H) global_hack = !global_hack;
