@@ -14,12 +14,12 @@
 
 #include "stb_voxel_render.h"
 
+GLuint picker_prog;
 GLuint main_prog;
 static GLuint vox_tex[2];
 
 void init_voxel_render(int voxel_tex[2])
 {
-   char *binds[] = { "attr_vertex", "attr_face", NULL };
    char *vertex;
    char *fragment;
 
@@ -27,6 +27,7 @@ void init_voxel_render(int voxel_tex[2])
    fragment = stbvox_get_fragment_shader();
 
    {
+      char *binds[] = { "attr_vertex", "attr_face", NULL };
       char error_buffer[1024];
       char *main_vertex[] = { vertex, NULL };
       char *main_fragment[] = { fragment, NULL };
@@ -43,18 +44,178 @@ void init_voxel_render(int voxel_tex[2])
 
    vox_tex[0] = voxel_tex[0];
    vox_tex[1] = voxel_tex[1];
+
+   vertex = stb_file("data/picker_vertex_shader.txt", NULL);
+   fragment = stb_file("data/picker_fragment_shader.txt", NULL);
+   {
+      char *binds[] = { "position", "normal", "bone1", "bone2", NULL };
+      char error_buffer[1024];
+      char *main_vertex[] = { vertex, NULL };
+      char *main_fragment[] = { fragment, NULL };
+      int which_failed;
+      picker_prog = stbgl_create_program(main_vertex, main_fragment, binds, error_buffer, sizeof(error_buffer), &which_failed);
+      if (picker_prog == 0) {
+         char *prog = which_failed == STBGL_FAILURE_STAGE_VERTEX ? vertex : fragment;
+         stb_filewrite("obbg_failed_shader.txt", prog, strlen(prog));
+         ods("Compile error for picker shader: %s\n", error_buffer);
+         assert(0);
+         exit(1);
+      }
+   }
 }
 
-float table3[128][3];
-float table4[128][4];
-GLint tablei[2];
-GLuint uniform_loc[STBVOX_UNIFORM_count];
 
 #if VIEW_DIST_LOG2 < 11
 int view_distance=300;
 #else
 int view_distance=1800;
 #endif
+
+static float bone_data[4] = { 0,0,0,0 };
+
+typedef struct
+{
+   float pos[3];
+   float norm[3];
+   unsigned char boneweights[8];
+} picker_vertex;
+
+static void set_vertex(picker_vertex *pv, float nx, float ny, float nz, float px, float py, float pz, unsigned char boneweights[8])
+{
+   pv->pos [0] = px, pv->pos [1] = py, pv->pos [2] = pz;
+   pv->norm[0] = nx, pv->norm[1] = ny, pv->norm[2] = nz;
+   memcpy(pv->boneweights, boneweights, sizeof(pv->boneweights));
+}
+
+static int build_picker_box(picker_vertex *pv, float x, float y, float z, float sx, float sy, float sz, unsigned char boneweights[8])
+{
+   float x0,y0,z0,x1,y1,z1;
+   sx /=2, sy/=2, sz/=2;
+   x0 = x-sx; y0 = y-sy; z0 = z-sz;
+   x1 = x+sx; y1 = y+sy; z1 = z+sz;
+
+   set_vertex(pv++, 0,0,-1, x0,y0,z0, boneweights);
+   set_vertex(pv++, 0,0,-1, x1,y0,z0, boneweights);
+   set_vertex(pv++, 0,0,-1, x1,y1,z0, boneweights);
+   set_vertex(pv++, 0,0,-1, x0,y1,z0, boneweights);
+
+   set_vertex(pv++, 0,0,1, x1,y0,z1, boneweights);
+   set_vertex(pv++, 0,0,1, x0,y0,z1, boneweights);
+   set_vertex(pv++, 0,0,1, x0,y1,z1, boneweights);
+   set_vertex(pv++, 0,0,1, x1,y1,z1, boneweights);
+
+   set_vertex(pv++, -1,0,0, x0,y1,z1, boneweights);
+   set_vertex(pv++, -1,0,0, x0,y0,z1, boneweights);
+   set_vertex(pv++, -1,0,0, x0,y0,z0, boneweights);
+   set_vertex(pv++, -1,0,0, x0,y1,z0, boneweights);
+
+   set_vertex(pv++, 1,0,0, x1,y0,z1, boneweights);
+   set_vertex(pv++, 1,0,0, x1,y1,z1, boneweights);
+   set_vertex(pv++, 1,0,0, x1,y1,z0, boneweights);
+   set_vertex(pv++, 1,0,0, x1,y0,z0, boneweights);
+
+   set_vertex(pv++, 0,-1,0, x0,y0,z1, boneweights);
+   set_vertex(pv++, 0,-1,0, x1,y0,z1, boneweights);
+   set_vertex(pv++, 0,-1,0, x1,y0,z0, boneweights);
+   set_vertex(pv++, 0,-1,0, x0,y0,z0, boneweights);
+
+   set_vertex(pv++, 0,1,0, x1,y1,z1, boneweights);
+   set_vertex(pv++, 0,1,0, x0,y1,z1, boneweights);
+   set_vertex(pv++, 0,1,0, x0,y1,z0, boneweights);
+   set_vertex(pv++, 0,1,0, x1,y1,z0, boneweights);
+
+   return 24;
+}
+
+static GLuint picker_vbuf;
+
+#pragma warning(disable:4305)
+static int picker_vertices=0;
+void build_picker(void)
+{
+   static picker_vertex picker_mesh_storage[1024];
+   signed char boneweights[8] = { 0,0,0,0, 0,0,0,0 };
+
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.5, 1.5,0.125,0.125, boneweights);
+   boneweights[3] = 127;
+   boneweights[7] = 127;
+
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375, 0.25,0.25,0.25, boneweights);
+
+   boneweights[0] = 127, boneweights[1] = 127;
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   boneweights[0] = 127, boneweights[1] = -127;
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   boneweights[0] = -127, boneweights[1] = -127;
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   boneweights[0] = -127, boneweights[1] = 127;
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+
+   glGenBuffersARB(1, &picker_vbuf);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, picker_vbuf);
+   glBufferDataARB(GL_ARRAY_BUFFER_ARB, picker_vertices * sizeof(picker_vertex), picker_mesh_storage, GL_STATIC_DRAW_ARB);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+}
+
+float t;
+void draw_picker(void)
+{
+   int bone_value = stbgl_find_uniform(picker_prog, "bone_value");   
+   int transform  = stbgl_find_uniform(picker_prog, "transform");
+   int fogdata    = stbgl_find_uniform(picker_prog, "fogdata");
+
+   float fog_table[4];
+   float xform_data[4] = { 0,0,0,0 };
+
+   t += 0.01f;
+
+   bone_data[0] = (float) (fabs(sin(t*7))*0.05+0.08);
+   bone_data[1] = (float) fmod(bone_data[1] + 0.01, 1);
+   bone_data[3] = (float) (-fabs(sin(t*3))*0.08f + 0.02f);
+
+   fog_table[0] = 0.6f, fog_table[1] = 0.7f, fog_table[2] = 0.9f;
+   fog_table[3] = 1.0f / (view_distance - MESH_CHUNK_SIZE_X);
+   fog_table[3] *= fog_table[3];
+
+   glDisable(GL_LIGHTING);
+   glDisable(GL_TEXTURE_2D);
+   stbglUseProgram(picker_prog);
+
+   glMatrixMode(GL_MODELVIEW);
+   glPushMatrix();
+   glTranslatef(0,0,80);
+
+   stbglUniform4fv(bone_value, 1, bone_data);
+   stbglUniform4fv(transform , 1, xform_data);
+   stbglUniform4fv(fogdata   , 1, fog_table);
+
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, picker_vbuf);
+   stbglVertexAttribPointer(0, 3, GL_FLOAT, 0, sizeof(picker_vertex), (void*) 0);
+   stbglVertexAttribPointer(1, 3, GL_FLOAT, 0, sizeof(picker_vertex), (void*) 12);
+   stbglVertexAttribPointer(2, 4, GL_BYTE, GL_TRUE, sizeof(picker_vertex), (void*) 24);
+   stbglVertexAttribPointer(3, 4, GL_BYTE, GL_TRUE, sizeof(picker_vertex), (void*) 28);
+
+   stbglEnableVertexAttribArray(0);
+   stbglEnableVertexAttribArray(1);
+   stbglEnableVertexAttribArray(2);
+   stbglEnableVertexAttribArray(3);
+
+   glDrawArrays(GL_QUADS, 0, picker_vertices);
+
+   stbglDisableVertexAttribArray(0);
+   stbglDisableVertexAttribArray(1);
+   stbglDisableVertexAttribArray(2);
+   stbglDisableVertexAttribArray(3);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+   glPopMatrix();
+   stbglUseProgram(0);
+}
+
+
+float table3[128][3];
+float table4[128][4];
+GLint tablei[2];
+GLuint uniform_loc[STBVOX_UNIFORM_count];
 
 int tex_anim_offset;
 float texture_offsets[128][2];
