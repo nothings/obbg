@@ -98,42 +98,42 @@ static void set_vertex(picker_vertex *pv, float nx, float ny, float nz, float px
    memcpy(pv->boneweights, boneweights, sizeof(pv->boneweights));
 }
 
-static int build_picker_box(picker_vertex *pv, float x, float y, float z, float sx, float sy, float sz, unsigned char boneweights[8])
+static int build_picker_box(picker_vertex *pv, float x, float y, float z, float sx, float sy, float sz, unsigned char boneweights1[8], unsigned char boneweights2[8])
 {
    float x0,y0,z0,x1,y1,z1;
    sx /=2, sy/=2, sz/=2;
    x0 = x-sx; y0 = y-sy; z0 = z-sz;
    x1 = x+sx; y1 = y+sy; z1 = z+sz;
 
-   set_vertex(pv++, 0,0,-1, x0,y0,z0, boneweights);
-   set_vertex(pv++, 0,0,-1, x1,y0,z0, boneweights);
-   set_vertex(pv++, 0,0,-1, x1,y1,z0, boneweights);
-   set_vertex(pv++, 0,0,-1, x0,y1,z0, boneweights);
+   set_vertex(pv++, 0,0,-1, x0,y0,z0, boneweights1);
+   set_vertex(pv++, 0,0,-1, x1,y0,z0, boneweights1);
+   set_vertex(pv++, 0,0,-1, x1,y1,z0, boneweights1);
+   set_vertex(pv++, 0,0,-1, x0,y1,z0, boneweights1);
 
-   set_vertex(pv++, 0,0,1, x1,y0,z1, boneweights);
-   set_vertex(pv++, 0,0,1, x0,y0,z1, boneweights);
-   set_vertex(pv++, 0,0,1, x0,y1,z1, boneweights);
-   set_vertex(pv++, 0,0,1, x1,y1,z1, boneweights);
+   set_vertex(pv++, 0,0,1, x1,y0,z1, boneweights2);
+   set_vertex(pv++, 0,0,1, x0,y0,z1, boneweights2);
+   set_vertex(pv++, 0,0,1, x0,y1,z1, boneweights2);
+   set_vertex(pv++, 0,0,1, x1,y1,z1, boneweights2);
 
-   set_vertex(pv++, -1,0,0, x0,y1,z1, boneweights);
-   set_vertex(pv++, -1,0,0, x0,y0,z1, boneweights);
-   set_vertex(pv++, -1,0,0, x0,y0,z0, boneweights);
-   set_vertex(pv++, -1,0,0, x0,y1,z0, boneweights);
+   set_vertex(pv++, -1,0,0, x0,y1,z1, boneweights2);
+   set_vertex(pv++, -1,0,0, x0,y0,z1, boneweights2);
+   set_vertex(pv++, -1,0,0, x0,y0,z0, boneweights1);
+   set_vertex(pv++, -1,0,0, x0,y1,z0, boneweights1);
 
-   set_vertex(pv++, 1,0,0, x1,y0,z1, boneweights);
-   set_vertex(pv++, 1,0,0, x1,y1,z1, boneweights);
-   set_vertex(pv++, 1,0,0, x1,y1,z0, boneweights);
-   set_vertex(pv++, 1,0,0, x1,y0,z0, boneweights);
+   set_vertex(pv++, 1,0,0, x1,y0,z1, boneweights2);
+   set_vertex(pv++, 1,0,0, x1,y1,z1, boneweights2);
+   set_vertex(pv++, 1,0,0, x1,y1,z0, boneweights1);
+   set_vertex(pv++, 1,0,0, x1,y0,z0, boneweights1);
 
-   set_vertex(pv++, 0,-1,0, x0,y0,z1, boneweights);
-   set_vertex(pv++, 0,-1,0, x1,y0,z1, boneweights);
-   set_vertex(pv++, 0,-1,0, x1,y0,z0, boneweights);
-   set_vertex(pv++, 0,-1,0, x0,y0,z0, boneweights);
+   set_vertex(pv++, 0,-1,0, x0,y0,z1, boneweights2);
+   set_vertex(pv++, 0,-1,0, x1,y0,z1, boneweights2);
+   set_vertex(pv++, 0,-1,0, x1,y0,z0, boneweights1);
+   set_vertex(pv++, 0,-1,0, x0,y0,z0, boneweights1);
 
-   set_vertex(pv++, 0,1,0, x1,y1,z1, boneweights);
-   set_vertex(pv++, 0,1,0, x0,y1,z1, boneweights);
-   set_vertex(pv++, 0,1,0, x0,y1,z0, boneweights);
-   set_vertex(pv++, 0,1,0, x1,y1,z0, boneweights);
+   set_vertex(pv++, 0,1,0, x1,y1,z1, boneweights2);
+   set_vertex(pv++, 0,1,0, x0,y1,z1, boneweights2);
+   set_vertex(pv++, 0,1,0, x0,y1,z0, boneweights1);
+   set_vertex(pv++, 0,1,0, x1,y1,z0, boneweights1);
 
    return 24;
 }
@@ -146,21 +146,41 @@ void build_picker(void)
 {
    static picker_vertex picker_mesh_storage[1024];
    signed char boneweights[8] = { 0,0,0,0, 0,0,0,0 };
+   signed char boneweights2[8] = { 0,0,0,0, 0,0,0,0 };
 
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.7, 1.5,0.125,0.125, boneweights);
+#if 1
+   // bone 1: z coord of joint    (0,1,<2>)
+   // bone 2: x coord of grabber  (<3>)
+   // bone 3: y coord of grabber  (4,<5>,6)
+   // bone 4: z coord of grabber  (<7>)
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0.35,0.35,0.35, 0.15,0.15,0.15, boneweights, boneweights);
+   boneweights2[2] = 127;
+   boneweights2[3] = 63;
+   boneweights2[5] = 63;
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0.5-0.15-0.05,0.35,0.35, 0.05,0.05,0.05, boneweights, boneweights2);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0.5-0.15,0.35,0.35, 0.15,0.15,0.15, boneweights2, boneweights2);
+   boneweights[3] = 127;
+   boneweights[5] = 127;
+   boneweights[7] = 127;
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0.5-0.15,0.35,0.35, 0.05,0.05,0.05, boneweights, boneweights2);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0.5-0.15,0.35,0.35, 0.25,0.25,0.05, boneweights, boneweights);
+
+#else
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.7, 1.5,0.125,0.125, boneweights, boneweights);
    boneweights[3] = 127;
    boneweights[7] = 127;
 
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575, 0.2,0.2,0.2, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575, 0.2,0.2,0.2, boneweights, boneweights);
 
    boneweights[0] = 127, boneweights[1] = 127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights, boneweights);
    boneweights[0] = 127, boneweights[1] = -127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights, boneweights);
    boneweights[0] = -127, boneweights[1] = -127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights, boneweights);
    boneweights[0] = -127, boneweights[1] = 127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights, boneweights);
+#endif
 
    glGenBuffersARB(1, &picker_vbuf);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, picker_vbuf);
