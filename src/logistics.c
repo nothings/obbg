@@ -1529,23 +1529,75 @@ void logistics_render(void)
                   for (a=0; a < stb_arr_len(c->pickers); ++a) {
                      picker_info *pi = &c->pickers[a];
                      float pos=0;
+                     float bone_state[4]= {0,0,0,0};
+                     int state = pi->state;
+                     int rot = pi->rot;
+                     float drop_on_pickup;
+                     
+
+                     if (pi->input_is_belt) {
+                        state = state^2;
+                        rot = rot^2;
+                     }
 
                      // state = 0 -> immobile at pickup
                      // state = 1 -> animating towards pickup
                      // state = 2 -> immobile at dropoff
                      // state = 3 -> animating towards dropoff
 
-                     if (pi->state == 0) pos = 0;
-                     if (pi->state == 1) pos = 1-offset - 1.0/LONG_TICK_LENGTH;
-                     if (pi->state == 2) pos = 1;
-                     if (pi->state == 3) pos = offset;
+                     if (state == 0) pos = 0;
+                     if (state == 1) pos = 1-offset - 1.0/LONG_TICK_LENGTH;
+                     if (state == 2) pos = 1;
+                     if (state == 3) pos = offset;
 
+                     if ((state == 1 || state == 3) && offset < 0.125)
+                        drop_on_pickup = stb_linear_remap(offset, 0,0.125, -0.15, 0);
+                     else
+                        drop_on_pickup = 0.0f;
+
+                     #if 1
+                     {
+                        vec base = { 0.35f,0.35f,0.35f };
+                        float len;
+
+                        bone_state[1] = stb_lerp(pos, 0.5, -0.75) - base.x;
+                        bone_state[2] = 0 - base.y;
+                        bone_state[3] = stb_lerp(pos, 0.30, 0.50) - base.z + drop_on_pickup;
+
+                        len = sqrt(bone_state[1]*bone_state[1] + bone_state[2]*bone_state[2])/2;
+                        len = sqrt(1*1 - len);
+                        bone_state[0] = len - base.z;
+                     }
+
+                     //0,0.25,0.20
+
+                     #else
+                     bone_state[0] = (state >= 2 ? 0.06f : 0.08f);
+                     bone_state[1] = stb_lerp(pos, 0.75, -0.75);
+                     bone_state[3] = 0.05f + drop_on_pickup;
+                     //bone_state[3] = (pi->state >= 2 ? 0.05f : -0.05f);
+                     #endif
+
+
+                     add_draw_picker(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z,
+                                     rot, bone_state);
+                     #if 0
+                     for (b=1; b < 500; ++b) {
+                        bone_state[0] = fmod(b*0.237,0.2);
+                        add_draw_picker(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z+b,
+                                        pi->rot, bone_state);
+                     }
+                     #endif
+
+                     #if 0
                      glPushMatrix();
-                     glTranslatef(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z);
+                     glTranslatef();
                      glRotatef(90*pi->rot, 0,0,1);
                      stbgl_drawBox(0,0,0.5, 1.5,0.125,0.125, 1);
                      stbgl_drawBox(stb_lerp(pos, 0.75, -0.75),0,0.5-0.125, 0.25,0.25,0.125, 1);
                      glPopMatrix();
+                     #endif
+
                      {
                         float mrot[4][2][2] = {
                            {{ 1,0,},{0,1}},
@@ -1553,7 +1605,7 @@ void logistics_render(void)
                            {{-1,0,},{0,-1}},
                            {{ 0,1,},{-1,0}},
                         };
-                        float x = stb_lerp(pos, 0.75, -0.75);
+                        float x = stb_lerp(pi->input_is_belt ? 1-pos : pos, 0.75, -0.75);
                         float y = 0;
                         float az = 0.25;
                         float ax,ay;
@@ -1561,7 +1613,7 @@ void logistics_render(void)
                         ay = mrot[pi->rot][1][0]*x + mrot[pi->rot][1][1]*y;
                         ax += base_x+pi->pos.unpacked.x+0.5;
                         ay += base_y+pi->pos.unpacked.y+0.5;
-                        az += base_z+pi->pos.unpacked.z;
+                        az += base_z+pi->pos.unpacked.z+0.175;
                         if (pi->item != 0)
                            add_sprite(ax, ay, az, pi->item);
                      }

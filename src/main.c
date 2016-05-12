@@ -203,6 +203,8 @@ void render_init(void)
          size_t len;
          char *filename = stb_sprintf("data/pixar/crn/%s.crn", textures[i].filename);
          uint8 *data = stb_file(filename, &len);
+         if (data == NULL)
+            data = stb_file(stb_sprintf("data/%s.crn", textures[i].filename), &len);
          if (data == NULL) {
             int w,h;
             uint8 *pixels = stbi_load(stb_sprintf("data/%s.jpg", textures[i].filename), &w, &h, 0, 4);
@@ -291,6 +293,8 @@ void render_init(void)
       s->size = stb_rand() & 1 ? 0.5 : 0.125;
    }                
    #endif
+
+   build_picker();
 }
 
 
@@ -539,6 +543,8 @@ void render_sprites(void)
    stbglUseProgram(0);
 }
 
+extern void draw_picker(void);
+
 void render_objects(void)
 {
    int i;
@@ -546,6 +552,7 @@ void render_objects(void)
    vec pos;
    glColor3f(1,1,1);
    glDisable(GL_TEXTURE_2D);
+   glDisable(GL_BLEND);
    stbgl_drawBox(light_pos[0], light_pos[1], light_pos[2], 3,3,3, 1);
 
    num_sprites = 0;
@@ -563,6 +570,8 @@ void render_objects(void)
    }
 
    logistics_render();
+
+   draw_picker();
 
    render_sprites();
 }

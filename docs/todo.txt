@@ -9,13 +9,52 @@ Possible tasks to work on next:
    -  correct picker logic for machine sides
    -  real driller machines (attached to specific block types that have ore)
    -  furnaces - factorio & minecraft
- ===> assemblers - factorio
+   -  assemblers - factorio
    -  liquid - factorio & minecraft
    -  power - factorio 
    -  enemies & tower defense-ish gameplay - factorio?
    -  passive splitter (split sides in opposite directions)
    -  balancer
 
+
+Ideas:
+   -  iron initially, but need steel for higher-speed things? (i.e. more exact gears)
+   -  copper + iron => bronze (and brass)
+   -  can animate pickers like current pickers but w/ lowering grabbers w/ skinned animation system
+      - animation implementation:
+        - bones are compact, 4 floats per object:
+           bone #1: position of grab module along pole --> 1 float (x coord)
+           bone #2: position of lower/raise grab module --> 1 float (z coord)
+           bone #3: grab teeth x axis --> 1 float
+           bone #4: grab teeth y axis --> 1 float
+        - each vertex gets 4 *signed* bone weights
+           - four diagonal teeth use bone #3 & #4 in all combinations of signs
+      - above implementation can almost be used for 'flexible pickers'
+        - flexible picker uses two-joint fake IK 
+          - we don't bother will angling a joint
+          - just draw two rods, one from base to midpoint, one from midpoint to endpoint
+          - bone #1, #2, #3: position of grabber x/y/z
+            - midpoint uses 50% weight x/z bones; maybe 50% for y also makes sense, but:
+          - bone #4
+            - vertical offset of midpoint; as grabber extends out, this decreases to keep rods roughly same length
+          - note this picker doesn't have grabber teeth
+        - first requires bones: x,x,y,z; seconds requires: x,y,z,z
+          - can use *5* bone weights; 3 bones are x,y,z, 4th & 5th weight apply 4th bone value to x & z. but 5 bone weights sub-ideal!
+          - 8 bone weights, 4 translate values
+          -  #1: x,y,z
+          -  #2: x,y,z
+          -  #3: x
+          -  #4: z
+      - use instanced rendering with 2 vertex attributes:
+        - vec4 with 3 position values & 1 rotation (rotation is in 90-degree steps; convert to int and look up table, don't use sin/cos)
+        - vec4 with four 1D bone values described above
+   -  never recompute belt mobility in-between ticks (will cause belt objects to teleport between non-anim and anim states)
+      - need to recompute belt mobility after all pickers run (never hit this case in testing because I didn't allow things to get full-ish?)
+        - maybe just run pickers *before* belts? may need to adjust where they pick from
+   -  do fast belts soon, run everything but slow belts on fast tick
+   -  maybe don't allow destroying the procgen blocks (i.e 'natural blocks')
+      initially, and make the world gen very 3d, so you have to work a lot to
+      deal with the verticality and do sub-ideal placement initially
 
    Factorio-esque:
    +  player block placement
@@ -56,6 +95,7 @@ Possible tasks to work on next:
    -  rendering
       * 1M blocks
       * 10,000 sprites
+      * 1000 picker-like things with animation
       - ?1,000 block-like things with animation
       - ?1,000 block surface decals
       - 500 polygonal objects
