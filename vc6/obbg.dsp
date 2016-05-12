@@ -160,6 +160,18 @@ SOURCE=..\src\obbg_data.h
 SOURCE=..\src\obbg_funcs.h
 # End Source File
 # End Group
+# Begin Group "shaders"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=..\data\picker_fragment_shader.txt
+# End Source File
+# Begin Source File
+
+SOURCE=..\data\picker_vertex_shader.txt
+# End Source File
+# End Group
 # Begin Source File
 
 SOURCE=..\src\logistics.c

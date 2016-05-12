@@ -18,6 +18,15 @@ GLuint picker_prog;
 GLuint main_prog;
 static GLuint vox_tex[2];
 
+GLuint instance_data_buf;
+GLuint instance_data_tex;
+
+void create_picker_buffers(void)
+{
+   glGenBuffersARB(1, &instance_data_buf);
+   glGenTextures(1, &instance_data_tex);
+}
+
 void init_voxel_render(int voxel_tex[2])
 {
    char *vertex;
@@ -62,6 +71,8 @@ void init_voxel_render(int voxel_tex[2])
          exit(1);
       }
    }
+
+   create_picker_buffers();
 }
 
 
@@ -140,16 +151,16 @@ void build_picker(void)
    boneweights[3] = 127;
    boneweights[7] = 127;
 
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375, 0.25,0.25,0.25, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375, 0.25,0.25,0.25, boneweights);
 
    boneweights[0] = 127, boneweights[1] = 127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
    boneweights[0] = 127, boneweights[1] = -127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
    boneweights[0] = -127, boneweights[1] = -127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
    boneweights[0] = -127, boneweights[1] = 127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, -0.75,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
 
    glGenBuffersARB(1, &picker_vbuf);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, picker_vbuf);
@@ -157,21 +168,51 @@ void build_picker(void)
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
 }
 
-float t;
+typedef struct
+{
+   float transform[4];
+   float bone_weights[4];
+} picker_data;
+
+#define MAX_DRAW_PICKERS  20000
+static picker_data pickers[MAX_DRAW_PICKERS];
+static int num_drawn_pickers;
+
+void upload_picker_buffer(picker_data *pd, int num_picker)
+{
+   static int first=1;
+
+   glBindBufferARB(GL_TEXTURE_BUFFER_ARB, instance_data_buf);
+   glBufferDataARB(GL_TEXTURE_BUFFER_ARB, num_picker*sizeof(*pd), pd, GL_STREAM_DRAW_ARB);
+   glBindBufferARB(GL_TEXTURE_BUFFER_ARB, 0);
+
+   if (first) {
+      glBindTexture(GL_TEXTURE_BUFFER_ARB, instance_data_tex);
+      glTexBufferARB(GL_TEXTURE_BUFFER_ARB, GL_RGBA32F, instance_data_buf);
+      glBindTexture(GL_TEXTURE_BUFFER_ARB, 0);
+      first=0;
+   }
+}
+
+void add_draw_picker(float x, float y, float z, int rot, float states[4])
+{
+   if (num_drawn_pickers < MAX_DRAW_PICKERS) {
+      picker_data *pd = &pickers[num_drawn_pickers++];
+      pd->transform[0] = x;
+      pd->transform[1] = y;
+      pd->transform[2] = z;
+      pd->transform[3] = (float) rot;
+      memcpy(pd->bone_weights, states, sizeof(pd->bone_weights));
+   }
+}
+
 void draw_picker(void)
 {
-   int bone_value = stbgl_find_uniform(picker_prog, "bone_value");   
-   int transform  = stbgl_find_uniform(picker_prog, "transform");
+   int xform_loc  = stbgl_find_uniform(picker_prog, "xform_data");   
    int fogdata    = stbgl_find_uniform(picker_prog, "fogdata");
+   int camera_pos = stbgl_find_uniform(picker_prog, "camera_pos");
 
    float fog_table[4];
-   float xform_data[4] = { 0,0,0,0 };
-
-   t += 0.01f;
-
-   bone_data[0] = (float) (fabs(sin(t*7))*0.05+0.08);
-   bone_data[1] = (float) fmod(bone_data[1] + 0.01, 1);
-   bone_data[3] = (float) (-fabs(sin(t*3))*0.08f + 0.02f);
 
    fog_table[0] = 0.6f, fog_table[1] = 0.7f, fog_table[2] = 0.9f;
    fog_table[3] = 1.0f / (view_distance - MESH_CHUNK_SIZE_X);
@@ -181,13 +222,15 @@ void draw_picker(void)
    glDisable(GL_TEXTURE_2D);
    stbglUseProgram(picker_prog);
 
-   glMatrixMode(GL_MODELVIEW);
-   glPushMatrix();
-   glTranslatef(0,0,80);
+   upload_picker_buffer(pickers, num_drawn_pickers);
+      
+   stbglUniform1i(xform_loc, 4);
+   glActiveTextureARB(GL_TEXTURE4_ARB);
+   glBindTexture(GL_TEXTURE_BUFFER_ARB, instance_data_tex);
+   glActiveTextureARB(GL_TEXTURE0_ARB);
 
-   stbglUniform4fv(bone_value, 1, bone_data);
-   stbglUniform4fv(transform , 1, xform_data);
    stbglUniform4fv(fogdata   , 1, fog_table);
+   stbglUniform3fv(camera_pos, 1, camloc);
 
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, picker_vbuf);
    stbglVertexAttribPointer(0, 3, GL_FLOAT, 0, sizeof(picker_vertex), (void*) 0);
@@ -200,15 +243,19 @@ void draw_picker(void)
    stbglEnableVertexAttribArray(2);
    stbglEnableVertexAttribArray(3);
 
-   glDrawArrays(GL_QUADS, 0, picker_vertices);
+   glDrawArraysInstancedARB(GL_QUADS, 0, picker_vertices, num_drawn_pickers);
+   num_drawn_pickers = 0;
 
    stbglDisableVertexAttribArray(0);
    stbglDisableVertexAttribArray(1);
    stbglDisableVertexAttribArray(2);
    stbglDisableVertexAttribArray(3);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
-   glPopMatrix();
    stbglUseProgram(0);
+   glActiveTextureARB(GL_TEXTURE4_ARB);
+   glBindTexture(GL_TEXTURE_BUFFER_ARB, 0);
+
+   glActiveTextureARB(GL_TEXTURE0_ARB);
 }
 
 

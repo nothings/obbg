@@ -245,6 +245,7 @@ typedef struct
 } requested_mesh;
 
 extern int face_dir[6][3];
+extern float camloc[3];
 
 extern int chunk_locations, chunks_considered, chunks_in_frustum;
 extern int quads_considered, quads_rendered;

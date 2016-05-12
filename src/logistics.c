@@ -1528,7 +1528,9 @@ void logistics_render(void)
                   glColor3f(1,1,1);
                   for (a=0; a < stb_arr_len(c->pickers); ++a) {
                      picker_info *pi = &c->pickers[a];
+                     int b;
                      float pos=0;
+                     float bone_state[4]= {0,0,0,0};
 
                      // state = 0 -> immobile at pickup
                      // state = 1 -> animating towards pickup
@@ -1540,12 +1542,22 @@ void logistics_render(void)
                      if (pi->state == 2) pos = 1;
                      if (pi->state == 3) pos = offset;
 
+                     bone_state[0] = 0.1f;
+                     bone_state[1] = stb_lerp(pos, 0.75, -0.75);
+                     for (b=0; b < 500; ++b) {
+                        add_draw_picker(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z+b,
+                                        pi->rot, bone_state);
+                        bone_state[0] = fmod(b*0.237,0.2);
+                     }
+                     #if 0
                      glPushMatrix();
-                     glTranslatef(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z);
+                     glTranslatef();
                      glRotatef(90*pi->rot, 0,0,1);
                      stbgl_drawBox(0,0,0.5, 1.5,0.125,0.125, 1);
                      stbgl_drawBox(stb_lerp(pos, 0.75, -0.75),0,0.5-0.125, 0.25,0.25,0.125, 1);
                      glPopMatrix();
+                     #endif
+
                      {
                         float mrot[4][2][2] = {
                            {{ 1,0,},{0,1}},
