@@ -147,20 +147,20 @@ void build_picker(void)
    static picker_vertex picker_mesh_storage[1024];
    signed char boneweights[8] = { 0,0,0,0, 0,0,0,0 };
 
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.5, 1.5,0.125,0.125, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.7, 1.5,0.125,0.125, boneweights);
    boneweights[3] = 127;
    boneweights[7] = 127;
 
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375, 0.25,0.25,0.25, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575, 0.2,0.2,0.2, boneweights);
 
    boneweights[0] = 127, boneweights[1] = 127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights);
    boneweights[0] = 127, boneweights[1] = -127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights);
    boneweights[0] = -127, boneweights[1] = -127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights);
    boneweights[0] = -127, boneweights[1] = 127;
-   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.375-0.175, 0.03f,0.03f,0.10f, boneweights);
+   picker_vertices += build_picker_box(picker_mesh_storage+picker_vertices, 0,0,0.575-0.175, 0.03f,0.03f,0.15f, boneweights);
 
    glGenBuffersARB(1, &picker_vbuf);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, picker_vbuf);

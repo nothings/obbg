@@ -1542,8 +1542,14 @@ void logistics_render(void)
                      if (pi->state == 2) pos = 1;
                      if (pi->state == 3) pos = offset;
 
-                     bone_state[0] = 0.1f;
+                     bone_state[0] = (pi->state >= 2 ? 0.06f : 0.08f);
                      bone_state[1] = stb_lerp(pos, 0.75, -0.75);
+                     if ((pi->state == 1 || pi->state == 3) && offset < 0.125)
+                        bone_state[3] = stb_linear_remap(offset, 0,0.125, -0.10, 0.05);
+                     else
+                        bone_state[3] = 0.05f;
+                     //bone_state[3] = (pi->state >= 2 ? 0.05f : -0.05f);
+
                      for (b=0; b < 500; ++b) {
                         add_draw_picker(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z+b,
                                         pi->rot, bone_state);
@@ -1573,7 +1579,7 @@ void logistics_render(void)
                         ay = mrot[pi->rot][1][0]*x + mrot[pi->rot][1][1]*y;
                         ax += base_x+pi->pos.unpacked.x+0.5;
                         ay += base_y+pi->pos.unpacked.y+0.5;
-                        az += base_z+pi->pos.unpacked.z;
+                        az += base_z+pi->pos.unpacked.z+0.175;
                         if (pi->item != 0)
                            add_sprite(ax, ay, az, pi->item);
                      }
