@@ -1856,7 +1856,7 @@ void swap_requested_meshes(void)
       SDL_LockMutex(requested_mesh_mutex);
       locked = True;
    } else
-      locked = (SDL_TryLockMutex(requested_mesh_mutex) == SDL_MUTEX_TIMEDOUT);
+      locked = (SDL_TryLockMutex(requested_mesh_mutex) != SDL_MUTEX_TIMEDOUT);
    
    if (locked) {
       int i=0, n=0;
@@ -1879,7 +1879,6 @@ void swap_requested_meshes(void)
       }
       if (n < MAX_BUILT_MESHES)
          requested_meshes_alternate[n].state = RMS_invalid;
-
 
       for (i=0; i < MAX_BUILT_MESHES; ++i) {
          requested_mesh *rm = &requested_meshes_alternate[i];

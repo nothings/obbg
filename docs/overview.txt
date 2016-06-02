@@ -8,7 +8,13 @@ obbg:
   - save/load to disk
   - networking
 
-Done in today's stream
+Done in today's stream (30)
+
+Previous stream (29)
+  - articulated arm pickers
+
+Previous stream (28)
+  - non-articulated pickers
 
 Previous stream (27)
   - 90-degree turn conveyors
