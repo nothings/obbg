@@ -190,6 +190,10 @@ Parenthesized items have since been removed.
 #include <stdio.h>      // need FILE
 #include <string.h>     // stb_define_hash needs memcpy/memset
 #include <time.h>       // stb_dirtree
+#include <malloc.h>
+
+#define _CRTDBG_MAP_ALLOC
+#include "crtdbg.h"
 
 #ifdef STB_PERSONAL
    typedef int Bool;

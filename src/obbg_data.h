@@ -3,12 +3,15 @@
 
 //#define MINIMIZE_MEMORY
 
+//#define STB_LEAKCHECK_ENABLE
+//#include "stb_leakcheck_sdl.h"
+
 #include "stb.h"
 
 #include <stdlib.h>
-#include <malloc.h>
-
-#include "stb_leakcheck_sdl.h"
+//#include <malloc.h>
+//#define _CRTDBG_MAP_ALLOC
+//#include "crtdbg.h"
 
 #include <assert.h>
 
@@ -97,7 +100,7 @@ enum
 
    BT_picker = 49,
    BT_machines=50,
-   BT_ore_maker,
+   BT_ore_drill,
    BT_ore_eater,
 
    BT_down_marker=255,

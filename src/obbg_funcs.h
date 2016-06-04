@@ -13,6 +13,7 @@ extern void s_init_physics_cache(void);
 extern void free_mesh_chunk(mesh_chunk *mc);
 extern void free_mesh_chunk_physics(mesh_chunk *mc);
 extern void world_init(void);
+extern void free_physics_cache(void);
 
 extern void process_tick_raw(float dt);
 extern int get_next_built_mesh(built_mesh *bm);
@@ -33,6 +34,7 @@ extern mesh_chunk *get_physics_chunk_for_coord(int x, int y);
 extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3]);
 extern void build_picker(void);
 extern void add_draw_picker(float x, float y, float z, int rot, float states[4]);
+extern void logistics_record_ore(int x, int y, int z1, int z2, int type);
 
 extern void physics_process_mesh_chunk(mesh_chunk *mc);
 extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py);
@@ -40,6 +42,7 @@ extern void player_physics(objid oid, player_controls *con, float dt);
 extern void force_update_for_block(int x, int y, int z);
 extern void change_block(int x, int y, int z, int type, int rot);
 extern void update_phys_chunk(mesh_chunk *mc, int x, int y, int z, int type);
+extern void free_phys_chunk(mesh_chunk *mc);
 extern void update_physics_cache(int x, int y, int z, int type, int rot);
 extern void logistics_update_block(int x, int y, int z, int type, int rot);
 extern void logistics_init(void);
@@ -47,6 +50,7 @@ extern void logistics_tick(void);
 extern void logistics_debug_render(void);
 extern void logistics_render(void);
 extern void add_sprite(float x, float y, float z, int id);
+extern void stop_manager(void);
 
 typedef struct
 {

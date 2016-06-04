@@ -1,5 +1,5 @@
-#define STB_LEAKCHECK_IMPLEMENTATION
-#include "stb_leakcheck_sdl.h"
+//#define STB_LEAKCHECK_IMPLEMENTATION
+//#include "stb_leakcheck_sdl.h"
 
 #include "obbg_data.h"
 

@@ -34,6 +34,8 @@
 #define STB_VOXEL_RENDER_IMPLEMENTATION
 #include "stb_voxel_render.h"
 
+SDL_mutex *ref_count_mutex;
+
 static unsigned char geom_for_blocktype[256] =
 {
    STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_empty, 0, 0),
@@ -78,7 +80,7 @@ void init_mesh_building(void)
    set_blocktype_texture(BT_gravel, 2);
    set_blocktype_texture(BT_asphalt, 9);
    set_blocktype_texture(BT_wood, 15);
-   set_blocktype_texture(BT_marble, 16);
+   set_blocktype_texture(BT_marble, 17);
    set_blocktype_texture(BT_stone, 20);
    set_blocktype_texture(BT_leaves, 1);
    set_blocktype_texture(BT_conveyor, 21);
@@ -96,9 +98,9 @@ void init_mesh_building(void)
       tex1_for_blocktype[BT_conveyor_ramp_up_low+i][FACE_up] = 22;
 
    set_blocktype_texture(BT_ore_eater, 17); tex1_for_blocktype[BT_ore_eater][FACE_east] = 23;
-   set_blocktype_texture(BT_ore_maker, 17); tex1_for_blocktype[BT_ore_maker][FACE_east] = 24;
+   set_blocktype_texture(BT_ore_drill, 17); tex1_for_blocktype[BT_ore_drill][FACE_east] = 24;
 
-   geom_for_blocktype[BT_ore_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
+   geom_for_blocktype[BT_ore_drill] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_ore_eater] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_picker   ] = 0;
 
@@ -135,11 +137,23 @@ typedef struct
    uint8 rotate  [GEN_CHUNK_SIZE_Y][GEN_CHUNK_SIZE_X][Z_SEGMENT_SIZE];
 } gen_chunk_partial;
 
+enum
+{
+   REF_queue,
+   REF_cache,
+   REF_creation,
+   REF_mesh_chunk_status,
+
+   REF__count
+};
+
 struct st_gen_chunk
 {
    int ref_count;
    gen_chunk_partial partial  [NUM_Z_SEGMENTS];
    unsigned char     non_empty[NUM_Z_SEGMENTS];
+
+   int augmented_ref_count[REF__count];
 };
 
 typedef struct
@@ -148,23 +162,23 @@ typedef struct
    gen_chunk *chunk;
 } gen_chunk_cache;
 
-typedef struct
-{
-   int chunk_x, chunk_y;
-   int in_new_list;
-   int status;
-   Bool rebuild_chunks;
-   chunk_set cs;
-   int chunk_set_valid[4][4];
-} mesh_chunk_status;
-
-enum
+enum estatus
 {
    CHUNK_STATUS_invalid,
    CHUNK_STATUS_empty_chunk_set,
    CHUNK_STATUS_nonempty_chunk_set,
    CHUNK_STATUS_processing
 };
+
+typedef struct
+{
+   int chunk_x, chunk_y;
+   int in_new_list;
+   enum estatus status;
+   Bool rebuild_chunks;
+   chunk_set cs;
+   int chunk_set_valid[4][4];
+} mesh_chunk_status;
 
 #define MESH_STATUS_X   64
 #define MESH_STATUS_Y   64
@@ -184,7 +198,7 @@ static mesh_chunk_status *get_chunk_status(int x, int y, Bool needs_triangles)
    return NULL;
 }
 
-void release_gen_chunk(gen_chunk *gc);
+void release_gen_chunk(gen_chunk *gc, int type);
 
 static void abandon_mesh_chunk_status(mesh_chunk_status *mcs)
 {
@@ -192,7 +206,9 @@ static void abandon_mesh_chunk_status(mesh_chunk_status *mcs)
    for (j=0; j < 4; ++j)
       for (i=0; i < 4; ++i)
          if (mcs->chunk_set_valid[j][i])
-            release_gen_chunk(mcs->cs.chunk[j][i]);
+            release_gen_chunk(mcs->cs.chunk[j][i], REF_mesh_chunk_status);
+         else
+            assert(mcs->cs.chunk[j][i] == 0);
    mcs->status = CHUNK_STATUS_invalid;
    memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
    memset(&mcs->cs, 0, sizeof(mcs->cs));
@@ -258,6 +274,7 @@ void free_mesh_chunk(mesh_chunk *mc)
    free(mc);
 }
 
+
 gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
 {
    int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
@@ -287,36 +304,109 @@ void init_chunk_caches(void)
          gen_cache[j][i].chunk_x = i+1;
       }
    }
+
+   free_physics_cache();
 }
 
+#if 0
+#define MAX_GENCHUNK   16000
 
-SDL_mutex *ref_count_mutex;
+gen_chunk *gen_chunk_table[MAX_GENCHUNK];
+int num_gen_chunk;
 
-void release_gen_chunk(gen_chunk *gc)
+static void monitor_create_gen_chunk(gen_chunk *gc)
+{
+   int i;
+   SDL_LockMutex(ref_count_mutex);
+   assert(num_gen_chunk < MAX_GENCHUNK);
+   for (i=0; i < num_gen_chunk; ++i)
+      assert(gen_chunk_table[i] != gc);
+   gen_chunk_table[num_gen_chunk++] = gc;
+   SDL_UnlockMutex(ref_count_mutex);
+}
+
+static void monitor_delete_gen_chunk(gen_chunk *gc)
+{
+   int i;
+   SDL_LockMutex(ref_count_mutex);
+   for (i=0; i < num_gen_chunk; ++i)
+      if (gen_chunk_table[i] == gc)
+         break;
+   assert(i < num_gen_chunk);
+   gen_chunk_table[i] = gen_chunk_table[--num_gen_chunk]; // delete by swapping down last
+   SDL_UnlockMutex(ref_count_mutex);
+}
+
+static void monitor_refcount_gen_chunk(gen_chunk *gc)
+{
+   int i;
+   SDL_LockMutex(ref_count_mutex);
+   for (i=0; i < num_gen_chunk; ++i)
+      if (gen_chunk_table[i] == gc)
+         break;
+   assert(i < num_gen_chunk);
+   SDL_UnlockMutex(ref_count_mutex);
+}
+#else
+#define monitor_delete_gen_chunk(gc)
+#define monitor_create_gen_chunk(gc)
+#define monitor_refcount_gen_chunk(gc)
+#endif
+
+
+int num_gen_chunk_alloc;
+
+void release_gen_chunk(gen_chunk *gc, int type)
 {
    assert(gc->ref_count > 0);
+   monitor_refcount_gen_chunk(gc);
    SDL_LockMutex(ref_count_mutex);
    --gc->ref_count;
+   --gc->augmented_ref_count[type];
    if (gc->ref_count == 0) {
       SDL_UnlockMutex(ref_count_mutex);
+      monitor_delete_gen_chunk(gc);
       free(gc);
+      --num_gen_chunk_alloc;
    } else
       SDL_UnlockMutex(ref_count_mutex);
 }
 
-void add_ref_count(gen_chunk *gc)
+void add_ref_count(gen_chunk *gc, int type)
 {
+   monitor_refcount_gen_chunk(gc);
    SDL_LockMutex(ref_count_mutex);
-   if (gc == NULL) __asm int 3;
    ++gc->ref_count;
+   ++gc->augmented_ref_count[type];
    SDL_UnlockMutex(ref_count_mutex);
 }
 
-void free_gen_chunk(gen_chunk_cache *gcc)
+void free_gen_chunk(gen_chunk_cache *gcc, int type)
 {
-   release_gen_chunk(gcc->chunk);
+   release_gen_chunk(gcc->chunk, type);
    gcc->chunk = NULL;
 }
+
+void free_chunk_caches(void)
+{
+   int i,j;
+   for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j) {
+      for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i) {
+         if (c_mesh_cache[j][i] != NULL)
+            free_mesh_chunk(c_mesh_cache[j][i]);
+      }
+   }
+
+   for (j=0; j < GEN_CHUNK_CACHE_Y; ++j) {
+      for (i=0; i < GEN_CHUNK_CACHE_X; ++i) {
+         if (gen_cache[j][i].chunk != NULL)
+            release_gen_chunk(gen_cache[j][i].chunk, REF_cache);
+      }
+   }
+
+   free_physics_cache();
+}
+
 
 #define MIN_GROUND 32
 #define AVG_GROUND 72
@@ -749,8 +839,11 @@ gen_chunk *generate_chunk(int x, int y)
    tree_location trees[MAX_TREES_PER_CHUNK];
    float height_lerp[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    float height_field[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
+   float height_ore[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    int height_field_int[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    assert(gc);
+
+   ++num_gen_chunk_alloc;
 
    memset(gc->non_empty, 0, sizeof(gc->non_empty));
    memset(gc->non_empty, 1, (ground_top+Z_SEGMENT_SIZE-1)>>Z_SEGMENT_SIZE_LOG2);
@@ -769,6 +862,7 @@ gen_chunk *generate_chunk(int x, int y)
          height_field[j+4][i+4] = ht;
          height_field_int[j+4][i+4] = (int) height_field[j+4][i+4];
          ground_top = stb_max(ground_top, height_field_int[j+4][i+4]);
+         height_ore[j+4][i+4] = stb_perlin_noise3((float)(x+i)+0.5f,(float)(y+j)+0.5f,(float)(x*77+y*31)+0.5f,256,256,256);
       }
 
    for (z_seg=0; z_seg < NUM_Z_SEGMENTS; ++z_seg) {
@@ -786,8 +880,12 @@ gen_chunk *generate_chunk(int x, int y)
                bt = BT_grass;
             else
                bt = BT_sand;
-            if (ht > AVG_GROUND+8)
+            if (ht > AVG_GROUND+14)
+               bt = BT_gravel;
+
+            if (height_ore[j+4][i+4] < -0.5)
                bt = BT_stone;
+
             //bt = (int) stb_lerp(height_lerp[j][i], BT_sand, BT_marble+0.99f);
             assert(z_limit >= 0 && Z_SEGMENT_SIZE - z_limit >= 0);
 
@@ -797,6 +895,9 @@ gen_chunk *generate_chunk(int x, int y)
                memset(&gcp->block[j][i][z_stone],  bt     , z_limit-z_stone);
             }
             memset(&gcp->block[j][i][z_limit],     BT_empty    , Z_SEGMENT_SIZE - z_limit);
+
+            if (z_seg == 0 && bt == BT_stone)
+               logistics_record_ore(x+i,y+j,z_stone,z_limit,bt);
          }
       }
    }
@@ -928,6 +1029,8 @@ gen_chunk *generate_chunk(int x, int y)
    }
 
    gc->ref_count = 0;
+   memset(gc->augmented_ref_count, 0, sizeof(gc->augmented_ref_count));
+   monitor_create_gen_chunk(gc);
 
    return gc;
 }
@@ -941,11 +1044,11 @@ gen_chunk_cache * put_chunk_in_cache(int x, int y, gen_chunk *gc)
    gen_chunk_cache *gcc = &gen_cache[slot_y][slot_x];
    assert(gcc->chunk_x != cx || gcc->chunk_y != cy || gcc->chunk == NULL);
    if (gcc->chunk != NULL)
-      free_gen_chunk(gcc);
+      free_gen_chunk(gcc, REF_cache);
    gcc->chunk_x = cx;
    gcc->chunk_y = cy;
    gcc->chunk = gc;
-   add_ref_count(gc);
+   add_ref_count(gc, REF_cache);
    return gcc;
 }
 
@@ -958,9 +1061,10 @@ void invalidate_gen_chunk_cache(int x, int y)
    gen_chunk_cache *gcc = &gen_cache[slot_y][slot_x];
    if (gcc->chunk_x == cx && gcc->chunk_y == cy) {
       if (gcc->chunk != NULL) {
-         free_gen_chunk(gcc);
+         free_gen_chunk(gcc, REF_cache);
          gcc->chunk_x = cx+1;
          gcc->chunk_y = 0;
+         gcc->chunk = NULL;
       }
    }
 }
@@ -1180,8 +1284,6 @@ void update_phys_chunk(mesh_chunk *mc, int ex, int ey, int ez, int type)
    arena_free_all(mc->allocs);
    mc->allocs = new_chunks;
 }
-
-
 
 void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i world_coord, chunk_set *chunks, size_t build_size, build_data *bd)
 {
@@ -1504,9 +1606,14 @@ int add_gen_task(task *t)
    return retval;
 }
 
+volatile int stop_worker_flag;
+
 int get_pending_task(task *t)
 {
    SDL_SemWait(pending_task_count);
+
+   if (stop_worker_flag)
+      return False;
 
    if (get_from_queue(&pending_meshes, t))
       return True;
@@ -1579,15 +1686,27 @@ void validate(gen_chunk *chunk)
    }
 }
 
+volatile int num_workers_running;
+
 int mesh_worker_handler(void *data)
 {
    build_data *bd = malloc(sizeof(*bd));
    size_t vert_buf_size = 16*1024*1024;
    bd->vertex_build_buffer = malloc(vert_buf_size);
    bd->face_buffer = malloc(4*1024*1024);
+
+   SDL_LockMutex(ref_count_mutex);
+   ++num_workers_running;
+   SDL_UnlockMutex(ref_count_mutex);
+
    for(;;) {
       task t;
-      if (get_pending_task(&t)) {
+      if (!get_pending_task(&t)) {
+         SDL_LockMutex(ref_count_mutex);
+         --num_workers_running;
+         SDL_UnlockMutex(ref_count_mutex);
+         return 0;
+      } else {
          switch (t.task_type) {
             case JOB_build_mesh: {
                stbvox_mesh_maker mm;
@@ -1617,7 +1736,7 @@ int mesh_worker_handler(void *data)
                {
                   int i;
                   for (i=0; i < 16; ++i)
-                     release_gen_chunk(t.cs.chunk[0][i]);
+                     release_gen_chunk(t.cs.chunk[0][i], REF_mesh_chunk_status);
                }
                out_mesh.mc = mc;
                out_mesh.mc->has_triangles = True;
@@ -1634,9 +1753,10 @@ int mesh_worker_handler(void *data)
                fgc.world_x = t.world_x;
                fgc.world_y = t.world_y;
                fgc.gc = generate_chunk(t.world_x, t.world_y);
-               add_ref_count(fgc.gc);
+               assert(fgc.gc->ref_count == 0);
+               add_ref_count(fgc.gc, REF_queue);
                if (!add_to_queue(&finished_gen, &fgc))
-                  release_gen_chunk(fgc.gc);
+                  release_gen_chunk(fgc.gc, REF_queue);
                else
                   waiter_wake(&manager_monitor);
                break;
@@ -1648,6 +1768,7 @@ int mesh_worker_handler(void *data)
 
 #define MAX_PROC_GEN 16
 
+SDL_mutex *ore_update_mutex;
 SDL_mutex *requested_mesh_mutex;
 requested_mesh rm_list1[MAX_BUILT_MESHES], rm_list2[MAX_BUILT_MESHES];
 requested_mesh *renderer_requested_meshes = rm_list1, *requested_meshes_alternate = rm_list2;
@@ -1675,12 +1796,47 @@ void check_chunk_sets(void)
    }
 }
 
+static volatile int stop_manager_flag;
+
+void stop_manager(void)
+{
+   int i;
+
+   // wake the manager and stop it
+   stop_manager_flag = 1;
+   waiter_wake(&manager_monitor);
+
+   // create a fictional work item for the workers
+   stop_worker_flag = 1;
+   SDL_SemPost(pending_task_count);
+
+   while (stop_manager_flag != 2 || num_workers_running != 0)
+      SDL_Delay(10);
+
+   for (i=0; i < MESH_STATUS_X*MESH_STATUS_Y*2; ++i) {
+      if (mesh_status[0][0][i].status != CHUNK_STATUS_invalid)
+         abandon_mesh_chunk_status(&mesh_status[0][0][i]);
+   }
+
+   while (finished_gen.head != finished_gen.tail) {
+      int t = finished_gen.tail;
+      finished_gen_chunk *fgc = (finished_gen_chunk *) (finished_gen.data + finished_gen.itemsize * t);
+      release_gen_chunk(fgc->gc, REF_queue);
+      finished_gen.tail = (t+1) % finished_gen.count;
+   }
+
+   stop_manager_flag = 3;
+}
+
 int worker_manager(void *data)
 {
    int outstanding_proc_gen = 0;
    for(;;) {
       int i,j,k;
       waiter_wait(&manager_monitor);
+
+      if (stop_manager_flag)
+         break;
 
       //check_chunk_sets();
 
@@ -1691,7 +1847,7 @@ int worker_manager(void *data)
          end_procgen(fgc->world_x, fgc->world_y);
          --outstanding_proc_gen;
          put_chunk_in_cache(fgc->world_x, fgc->world_y, fgc->gc);
-         release_gen_chunk(fgc->gc);
+         release_gen_chunk(fgc->gc, REF_queue);
          finished_gen.tail = (t+1) % finished_gen.count;
       }
       SDL_UnlockMutex(finished_gen.mutex);
@@ -1724,7 +1880,7 @@ int worker_manager(void *data)
                         mcs->cs.chunk[k][j] = gcc->chunk;
                         mcs->chunk_set_valid[k][j] = True;
                         assert(gcc->chunk != 0);
-                        add_ref_count(gcc->chunk);
+                        add_ref_count(gcc->chunk, REF_mesh_chunk_status);
                      } else {
                         if (outstanding_proc_gen >= MAX_PROC_GEN)
                            continue;
@@ -1773,7 +1929,7 @@ int worker_manager(void *data)
 
                   memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
                   for (i=0; i < 16; ++i)
-                     release_gen_chunk(mcs->cs.chunk[0][i]);
+                     release_gen_chunk(mcs->cs.chunk[0][i], REF_mesh_chunk_status);
                   memset(&mcs->cs, 0, sizeof(mcs->cs));
 
                   mcs->status = CHUNK_STATUS_processing;
@@ -1793,6 +1949,12 @@ int worker_manager(void *data)
       }
       SDL_UnlockMutex(requested_mesh_mutex);
    }
+
+   SDL_Delay(500);
+
+   free_chunk_caches();
+   stop_manager_flag = 2;
+   return 0;
 }
 
 int num_mesh_workers;
@@ -1810,6 +1972,8 @@ void init_mesh_build_threads(void)
    init_threadsafe_queue(&finished_gen  , MAX_GEN_CHUNKS  , sizeof(finished_gen_chunk));
    pending_task_count = SDL_CreateSemaphore(0);
    ref_count_mutex = SDL_CreateMutex();
+   requested_mesh_mutex = SDL_CreateMutex();
+   ore_update_mutex = SDL_CreateMutex();
 
    if (num_proc > 6)
       num_mesh_workers = num_proc-3;
