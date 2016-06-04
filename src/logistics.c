@@ -122,10 +122,13 @@ stb_uidict *uidict;
 typedef struct
 {
    uint8 z1,z2,type,padding;
+   int x,y;
 } ore_hack_info;
 
 ore_hack_info ore_hack[500000];
 ore_hack_info *next_ohi = ore_hack;
+
+int ore_processed, ore_pending;
 
 extern SDL_mutex *ore_update_mutex;
 void logistics_record_ore(int x, int y, int z1, int z2, int type)
@@ -136,13 +139,17 @@ void logistics_record_ore(int x, int y, int z1, int z2, int type)
 
    ohi = stb_uidict_get(uidict, y*65536+x);
    if (ohi == NULL) {
+      ++ore_pending;
       ohi = next_ohi++;//malloc(sizeof(*ohi));
+      ohi->x = x;
+      ohi->y = y;
       ohi->z1 = z1;
       ohi->z2 = z2;
       ohi->type = type;
       ohi->padding = 0;
       stb_uidict_add(uidict, y*65536+x, ohi);
    }
+
    SDL_UnlockMutex(ore_update_mutex);
 }
 
@@ -608,7 +615,7 @@ void create_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot, in
 
    d = logistics_get_chunk_alloc(bx+ox,by+oy,bz+oz-1);
    ore_z = (oz-1) & (LOGI_CHUNK_SIZE_Z-1);
-   if (d->type[ore_z][oy][ox] == BT_marble) {
+   if (d->type[ore_z][oy][ox] == BT_stone) {
       int id = find_ore(d, ox,oy,ore_z);
       if (id < 0) {
          ore_info ore;
@@ -756,8 +763,8 @@ void logistics_update_chunk(int x, int y, int z)
          machine_info *m = &c->machine[i];
          if (m->type == BT_ore_drill) {
             int ore_z = base_z + m->pos.unpacked.z - 1;
-            logi_chunk *d = logistics_get_chunk(base_x - m->pos.unpacked.x, base_y + m->pos.unpacked.y, ore_z, NULL);
-            if (d && d->type[ore_z & (LOGI_CHUNK_SIZE_Z-1)][m->pos.unpacked.y][m->pos.unpacked.x] == BT_marble) {
+            logi_chunk *d = logistics_get_chunk_alloc(base_x + m->pos.unpacked.x, base_y + m->pos.unpacked.y, ore_z);
+            if (d->type[ore_z & (LOGI_CHUNK_SIZE_Z-1)][m->pos.unpacked.y][m->pos.unpacked.x] == BT_stone) {
                m->input_flags = 1;
             } else
                m->input_flags = 0;
@@ -774,13 +781,18 @@ void logistics_update_chunk(int x, int y, int z)
 //  
 //  /
 
-void logistics_update_block_core(int x, int y, int z, int type, int rot)
+void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool alloc)
 {
-   logi_chunk *c = logistics_get_chunk_alloc(x,y,z);
+   logi_chunk *c = alloc ? logistics_get_chunk_alloc(x,y,z) : logistics_get_chunk(x,y,z,0);
    int ox = LOGI_CHUNK_MASK_X(x);
    int oy = LOGI_CHUNK_MASK_Y(y);
    int oz = LOGI_CHUNK_MASK_Z(z);
-   int oldtype = c->type[oz][oy][ox];
+   int oldtype;
+
+   if (c == NULL)
+      return;
+
+   oldtype = c->type[oz][oy][ox];
 
    if (oldtype == BT_conveyor)
       split_belt(c, ox,oy,oz, c->rot[oz][oy][ox]);
@@ -802,6 +814,7 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot)
       create_picker(c, ox,oy,oz, type,rot);
    else if (type >= BT_machines)
       create_machine(c, ox,oy,oz, type, rot, x-ox,y-oy,z-oz);
+
 
    if (type == BT_conveyor_90_left || type == BT_conveyor_90_right) {
       if (oldtype == BT_conveyor_90_left || oldtype == BT_conveyor_90_right) {
@@ -845,16 +858,16 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot)
    logistics_update_chunk(x, y + LOGI_CHUNK_SIZE_Y, z + LOGI_CHUNK_SIZE_Z);
 
    if (oldtype == BT_down_marker)
-      logistics_update_block_core(x,y,z-1,BT_empty,0);
+      logistics_update_block_core(x,y,z-1,BT_empty,0,True);
 }
 
 void logistics_update_block(int x, int y, int z, int type, int rot)
 {
    if (type == BT_conveyor_ramp_up_low) {
-      logistics_update_block_core(x,y,z, BT_down_marker, 0);
-      logistics_update_block_core(x,y,z-1,type,rot);
+      logistics_update_block_core(x,y,z, BT_down_marker, 0, True);
+      logistics_update_block_core(x,y,z-1,type,rot, True);
    } else
-      logistics_update_block_core(x,y,z,type,rot);
+      logistics_update_block_core(x,y,z,type,rot, True);
 }
 
 int face_orig[4][2] = {
@@ -1461,11 +1474,11 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
             x->timer = 7;
       }
       if (x->type == BT_ore_drill) {
-         if (went_to_zero) {
+         if (went_to_zero && x->input_flags) {
             assert(x->output == 0);
             x->output = 1 + (stb_rand() % 2);
          }
-         if (x->timer == 0 && x->output == 0) {
+         if (x->timer == 0 && x->output == 0 && x->input_flags) {
             x->timer = 7; // start drilling
          }
       }
@@ -1611,6 +1624,14 @@ void logistics_do_long_tick(void)
 extern int tex_anim_offset;
 void logistics_tick(void)
 {
+   while (ore_pending != ore_processed) {
+      int i;
+      for (i=ore_hack[ore_processed].z1; i < ore_hack[ore_processed].z2; ++i)
+         logistics_update_block_core(ore_hack[ore_processed].x, ore_hack[ore_processed].y, i, ore_hack[ore_processed].type, 0, False);
+
+      ++ore_processed;
+   }
+
    logistics_texture_scroll += (1.0f / LONG_TICK_LENGTH / ITEMS_PER_BELT_SIDE) / 4.0f; // texture repeats = 4
    if (logistics_texture_scroll >= 1.0)
       logistics_texture_scroll -= 1.0;

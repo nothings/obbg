@@ -9,7 +9,12 @@ obbg:
   - save/load to disk
   - networking
 
-Done in today's stream (30)
+Done in today's stream (31)
+   - fix placing blocks updating in renderer, only ever worked in MINIMIZE_MEMORY
+   - ore drills only work if they're on marble 'ore'
+
+Previous stream (30)
+   - start tracking ore deposits for logistics
 
 Previous stream (29)
   - articulated arm pickers

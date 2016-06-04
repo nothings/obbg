@@ -686,8 +686,8 @@ void render_voxel_world(float campos[3])
             physics_process_mesh_chunk(bm.mc);
             // don't free the physics data below, because the above call copies them
             bm.mc->allocs = NULL;
-            free_mesh_chunk(bm.mc);
             finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, False);
+            free_mesh_chunk(bm.mc);
          } else {
             //s_process_mesh_chunk(bm.mc);
             // client:

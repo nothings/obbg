@@ -953,8 +953,10 @@ gen_chunk *generate_chunk(int x, int y)
             if (ht > AVG_GROUND+14)
                bt = BT_gravel;
 
-            if (height_ore[j+4][i+4] < -0.5)
+            if (height_ore[j+4][i+4] < -0.5) {
                bt = BT_stone;
+               z_limit = stb_clamp(ht+1-z0, 0, Z_SEGMENT_SIZE);
+            }
 
             //bt = (int) stb_lerp(height_lerp[j][i], BT_sand, BT_marble+0.99f);
             assert(z_limit >= 0 && Z_SEGMENT_SIZE - z_limit >= 0);
@@ -965,9 +967,15 @@ gen_chunk *generate_chunk(int x, int y)
                memset(&gcp->block[j][i][z_stone],  bt     , z_limit-z_stone);
             }
             memset(&gcp->block[j][i][z_limit],     BT_empty    , Z_SEGMENT_SIZE - z_limit);
+         }
+      }
+   }
 
-            if (z_seg == 0 && bt == BT_stone)
-               logistics_record_ore(x+i,y+j,z_stone,z_limit,bt);
+   for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
+      for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+         int ht = height_field_int[j+4][i+4];
+         if (height_ore[j+4][i+4] < -0.5) {
+            logistics_record_ore(x+i,y+j, ht-2, ht+1, BT_stone);
          }
       }
    }
