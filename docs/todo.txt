@@ -1,3 +1,5 @@
+   -  do you need the diagonal gen_chunk neighbors to the mesh chunks?!???
+
 Possible tasks to work on next:
    -  store 'promises' on conveyor belts
    -  real driller machines (attached to specific block types that have ore)

@@ -518,6 +518,7 @@ void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
                consider_mesh[n].y = wy;  
                consider_mesh[n].priority = (float) (i*i + j*j);
                consider_mesh[n].dirty = mc && mc->dirty;
+               assert(n < MAX_CONSIDER_MESHES);
                ++n;
             }
          }
