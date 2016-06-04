@@ -2,6 +2,8 @@
 //
 //    Both server & client are customers of this process
 
+#define TRACK_ALLOCATED_GEN_CHUNKS_IN_GLOBAL_TABLE
+
 #include "obbg_data.h"
 
 #define STB_GLEXT_DECLARE "glext_list.h"
@@ -1780,6 +1782,7 @@ Bool get_next_task(task *t)
                }
             }
          }
+
          if (valid_chunks == 16) {
             int i,j;
             mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
@@ -1838,20 +1841,47 @@ int num_mesh_workers;
 volatile int num_workers_running;
 volatile Bool stop_worker_flag;
 
+enum
+{
+   PROF_waiting,
+   PROF_managing,
+   PROF_processing,
+
+   PROF__count
+};
+
+typedef struct
+{
+   double time_spent[PROF__count];
+   int times_executed[PROF__count];
+} thread_timing_data;
+
+thread_timing_data thread_prof[MAX_MESH_WORKERS];
+
+void add_time(int thread_id, Uint64 time, int mode)
+{
+   assert(thread_id >= 0 && thread_id < MAX_MESH_WORKERS);
+   thread_prof[thread_id].time_spent[mode]     += time / (double) SDL_GetPerformanceFrequency();
+   thread_prof[thread_id].times_executed[mode] += 1;
+}
+
 int mesh_worker_handler(void *data)
 {
+   int thread_id;
    build_data *bd = malloc(sizeof(*bd));
    size_t vert_buf_size = 16*1024*1024;
    bd->vertex_build_buffer = malloc(vert_buf_size);
    bd->face_buffer = malloc(4*1024*1024);
 
    SDL_LockMutex(ref_count_mutex);
-   ++num_workers_running;
+   thread_id = num_workers_running++;
    SDL_UnlockMutex(ref_count_mutex);
 
    for(;;) {
+      Uint64 start, end;
       Bool did_wait = False;
       task t;
+
       while (!get_next_task(&t)) {
          if (stop_worker_flag) {
             SDL_LockMutex(ref_count_mutex);
@@ -1864,10 +1894,17 @@ int mesh_worker_handler(void *data)
          did_wait = True;
       }
 
+      start = SDL_GetPerformanceCounter();
+
       // if we got some work, but we HAD been idle, then wake up the
       // next thread so it can see if it also has work to do
-      if (did_wait)
-         waiter_wake(&manager_monitor);
+      waiter_wake(&manager_monitor);
+
+      #if 0
+      if ((int) data == 2) {
+         ods("Task %d\n", t.task_type);
+      }
+      #endif
 
       switch (t.task_type) {
          case JOB_build_mesh: {
@@ -1890,11 +1927,13 @@ int mesh_worker_handler(void *data)
 
             memcpy(out_mesh.vertex_build_buffer, bd->vertex_build_buffer, mc->num_quads * 16);
             memcpy(out_mesh.face_buffer, bd->face_buffer, mc->num_quads * 4);
+            SDL_LockMutex(manager_mutex);
             {
                int i;
                for (i=0; i < 16; ++i)
                   release_gen_chunk(t.cs.chunk[0][i], REF_mesh_chunk_status);
             }
+            SDL_UnlockMutex(manager_mutex);
             out_mesh.mc = mc;
             out_mesh.mc->has_triangles = True;
             if (!add_to_queue(&built_meshes, &out_mesh)) {
@@ -1908,40 +1947,34 @@ int mesh_worker_handler(void *data)
             gen_chunk *gc;
             gc = generate_chunk(t.world_x, t.world_y);
             assert(gc->ref_count == 0);
+            SDL_LockMutex(manager_mutex);
             put_chunk_in_cache(t.world_x, t.world_y, gc);
             end_procgen(t.world_x, t.world_y);
+            SDL_UnlockMutex(manager_mutex);
             break;
          }
       }
+      end = SDL_GetPerformanceCounter();
+      add_time(thread_id, end-start, PROF_processing);
    }
 }
 
-void stop_manager(void)
-{
-   stop_worker_flag = True;
-}
-
-#if 0
-static volatile int stop_manager_flag;
+Uint64 sim_start;
 
 void stop_manager(void)
 {
+   double time;
+   Uint64 sim_end;
    int i;
 
-   // wake the manager and stop it
-   stop_manager_flag = 1;
-   waiter_wake(&manager_monitor);
+   stop_worker_flag = True;
 
-   // create a fictional work item for the workers
-   stop_worker_flag = 1;
-   i = num_workers_running;
-   while (i >= 0) {
-      SDL_SemPost(pending_task_count);
-      --i;
-   }
-
-   while (stop_manager_flag != 2 || num_workers_running != 0)
+   while (num_workers_running) {
+      waiter_wake(&manager_monitor);
       SDL_Delay(10);
+   }
+   sim_end = SDL_GetPerformanceCounter();
+
    free_chunk_caches();
 
    for (i=0; i < MESH_STATUS_X*MESH_STATUS_Y*2; ++i) {
@@ -1949,16 +1982,14 @@ void stop_manager(void)
          abandon_mesh_chunk_status(&mesh_status[0][0][i]);
    }
 
-   while (finished_gen.head != finished_gen.tail) {
-      int t = finished_gen.tail;
-      finished_gen_chunk *fgc = (finished_gen_chunk *) (finished_gen.data + finished_gen.itemsize * t);
-      release_gen_chunk(fgc->gc, REF_queue);
-      finished_gen.tail = (t+1) % finished_gen.count;
-   }
+   time = (sim_end - sim_start) / (double) SDL_GetPerformanceFrequency();
 
-   stop_manager_flag = 3;
+   for (i=0; i < num_mesh_workers; ++i) {
+      ods("#%d: Process %5.2lf -- Manage %5.2lf -- Wait: %5.2lf\n", i, thread_prof[i].time_spent[PROF_processing]/time,
+                                                                       thread_prof[i].time_spent[PROF_managing]/time,
+                                                                       thread_prof[i].time_spent[PROF_waiting]/time);
+   }
 }
-#endif
 
 void init_mesh_build_threads(void)
 {
@@ -1985,6 +2016,8 @@ void init_mesh_build_threads(void)
 
    if (num_mesh_workers < 1)
       num_mesh_workers = 1;
+
+   sim_start = SDL_GetPerformanceCounter();
 
    for (i=0; i < num_mesh_workers; ++i)
       SDL_CreateThread(mesh_worker_handler, "mesh worker", (void *) i);
