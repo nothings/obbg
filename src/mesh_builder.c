@@ -217,6 +217,23 @@ static void abandon_mesh_chunk_status(mesh_chunk_status *mcs)
    memset(&mcs->cs, 0, sizeof(mcs->cs));
 }
 
+void finished_caching_mesh_chunk(int x, int y, Bool needs_triangles)
+{
+   // render knows about it now, so we don't need to cache it anymore
+   mesh_chunk_status *mcs;
+   SDL_LockMutex(manager_mutex);
+   mcs = get_chunk_status(x, y, needs_triangles);
+   if (mcs != NULL) {
+      int i,j;
+      assert(mcs->status == CHUNK_STATUS_processing);
+      for (j=0; j < 4; ++j)
+         for (i=0; i < 4; ++i)
+            assert(mcs->chunk_set_valid[j][i] == 0);
+      mcs->status = CHUNK_STATUS_invalid;
+   }
+   SDL_UnlockMutex(manager_mutex);
+}
+
 static mesh_chunk_status *get_chunk_status_alloc(int x, int y, Bool needs_triangles, Bool rebuild_chunks)
 {
    int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);

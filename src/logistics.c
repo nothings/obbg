@@ -751,6 +751,18 @@ void logistics_update_chunk(int x, int y, int z)
             p->output_is_belt = False;
          } 
       }
+
+      for (i=0; i < stb_arr_len(c->machine); ++i) {
+         machine_info *m = &c->machine[i];
+         if (m->type == BT_ore_drill) {
+            int ore_z = base_z + m->pos.unpacked.z - 1;
+            logi_chunk *d = logistics_get_chunk(base_x - m->pos.unpacked.x, base_y + m->pos.unpacked.y, ore_z, NULL);
+            if (d && d->type[ore_z & (LOGI_CHUNK_SIZE_Z-1)][m->pos.unpacked.y][m->pos.unpacked.x] == BT_marble) {
+               m->input_flags = 1;
+            } else
+               m->input_flags = 0;
+         }
+      }
    }
 }
 

@@ -687,6 +687,7 @@ void render_voxel_world(float campos[3])
             // don't free the physics data below, because the above call copies them
             bm.mc->allocs = NULL;
             free_mesh_chunk(bm.mc);
+            finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, False);
          } else {
             //s_process_mesh_chunk(bm.mc);
             // client:
@@ -694,6 +695,7 @@ void render_voxel_world(float campos[3])
             set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
             free(bm.face_buffer);
             free(bm.vertex_build_buffer);
+            finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, True);
             bm.mc = NULL;
          }
       }

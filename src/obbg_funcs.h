@@ -35,6 +35,7 @@ extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
 extern void build_picker(void);
 extern void add_draw_picker(float x, float y, float z, int rot, float states[4]);
 extern void logistics_record_ore(int x, int y, int z1, int z2, int type);
+extern void finished_caching_mesh_chunk(int x, int y, Bool needs_triangles);
 
 extern void physics_process_mesh_chunk(mesh_chunk *mc);
 extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py);
