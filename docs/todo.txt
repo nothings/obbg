@@ -1,20 +1,28 @@
-Possible tasks to work on next:
+   -  do you need the diagonal gen_chunk neighbors to the mesh chunks?!???
 
-   *  conveyor belts use voxel rotation instead of 4 block types
-   -  90-degree turns
-      - animated blocks
+Possible tasks to work on next:
    -  store 'promises' on conveyor belts
-   *  try making conveyor belts half-height
-   *  basic pickers (factorio "inserters")
-   -  correct picker logic for machine sides
    -  real driller machines (attached to specific block types that have ore)
    -  furnaces - factorio & minecraft
-   -  assemblers - factorio
+   -  assemblers - factorio & factoryidle
    -  liquid - factorio & minecraft
    -  power - factorio 
    -  enemies & tower defense-ish gameplay - factorio?
    -  passive splitter (split sides in opposite directions)
    -  balancer
+
+
+
+Factorio-esque features:
+   -  basic pickers (factorio "inserters")
+   -  conveyor belts - factorio & factoryidle
+   -  drills - factorio & modded minecraft
+   -  furnaces - factorio & minecraft
+   -  assemblers - factorio & factoryidle
+   -  liquid - factorio & minecraft
+   -  power - factorio 
+   -  enemies & tower defense-ish gameplay - factorio?
+
 
 
 Ideas:
@@ -65,24 +73,29 @@ Ideas:
    *  load textures from JPG
    *  conveyor belts
       * animation by scrolling textures
-      - how to do 90-degree turns
-      - how to make animated blocks
+      * how to do 90-degree turns
+         - use bottom bits instead of top bits for animation
+      * how to make animated blocks
    *  save changes to memory?
+   +  try making conveyor belts half-height
+   *  conveyor belts - factorio & factoryidle
    -  moving objects need to be treated as 'objects'
       - can be sprites or polygonal
       * large quantities (10,000?) of sprites
-      - small quantities of polygonal objects
+      * medium quantities of polygonal objects
    *  save changes to disk
    -  conveyor belts (special physics)
       * factorio-style two-rows-of-sprite-sized stuff per conveyor
       - or just one row of block-sized stuff
       - maybe require multi-block things to be supported by multiple conveyors
       * factorio-style stuff stops at end of conveyor, not infinifactory falling-off-esque
+   *  basic pickers (factorio "inserters")
    -  speed up texture loading
    -  fixed "objects" can be blocks
       - any machinery that you can have a lot of should be (geometrically) blocks
       - machinery that is rare can go through a simpler polygon engine (same as 'moving object' system?)
-   -  can build multi-block machines by infinifactory-style welding
+         - actually have a better instanced system
+   -  can build multi-block machines by infinifactory-style welding??
    -  mine ore from ore blocks
       - gradual process that slowly depletes ore
         - graphical representation how?!?

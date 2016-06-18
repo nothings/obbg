@@ -519,6 +519,7 @@ void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
                consider_mesh[n].y = wy;  
                consider_mesh[n].priority = (float) (i*i + j*j);
                consider_mesh[n].dirty = mc && mc->dirty;
+               assert(n < MAX_CONSIDER_MESHES);
                ++n;
             }
          }
@@ -686,6 +687,7 @@ void render_voxel_world(float campos[3])
             physics_process_mesh_chunk(bm.mc);
             // don't free the physics data below, because the above call copies them
             bm.mc->allocs = NULL;
+            finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, False);
             free_mesh_chunk(bm.mc);
          } else {
             //s_process_mesh_chunk(bm.mc);
@@ -694,6 +696,7 @@ void render_voxel_world(float campos[3])
             set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
             free(bm.face_buffer);
             free(bm.vertex_build_buffer);
+            finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, True);
             bm.mc = NULL;
          }
       }

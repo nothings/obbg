@@ -1,5 +1,6 @@
 obbg:
   open block building game
+
   exercise all interesting
     features of voxel stuff:
   - mesh generation/rendering
@@ -8,7 +9,18 @@ obbg:
   - save/load to disk
   - networking
 
-Done in today's stream
+Done in today's stream (31)
+   - fix placing blocks updating in renderer, only ever worked in MINIMIZE_MEMORY
+   - ore drills only work if they're on marble 'ore'
+
+Previous stream (30)
+   - start tracking ore deposits for logistics
+
+Previous stream (29)
+  - articulated arm pickers
+
+Previous stream (28)
+  - non-articulated pickers
 
 Previous stream (27)
   - 90-degree turn conveyors

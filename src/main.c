@@ -7,13 +7,14 @@
 #include <windows.h>
 #endif
 
-// stb.h
-#include "stb_leakcheck_sdl.h"
-
 #define STB_DEFINE
 #include "stb.h"
 
 #include "obbg_funcs.h"
+
+#ifdef _WIN32
+#include "crtdbg.h"
+#endif
 
 // stb_gl.h
 #define STB_GL_IMPLEMENTATION
@@ -398,6 +399,7 @@ float chunk_server_status[32];
 int chunk_server_pos;
 
 extern vec3i physics_cache_feedback[64][64];
+extern int num_gen_chunk_alloc;
 
 void draw_stats(void)
 {
@@ -420,6 +422,7 @@ void draw_stats(void)
    text_color[0] = text_color[1] = text_color[2] = 1.0f;
    print("Frame time: %6.2fms, CPU frame render time: %5.2fms", frame_time*1000, render_time*1000);
    print("Tris: %4.1fM drawn of %4.1fM in range", 2*quads_rendered/1000000.0f, 2*quads_considered/1000000.0f);
+   print("Gen chunks: %4d", num_gen_chunk_alloc);
    if (debug_render) {
       print("Vbuf storage: %dMB in frustum of %dMB in range of %dMB in cache", chunk_storage_rendered>>20, chunk_storage_considered>>20, chunk_storage_total>>20);
       print("Num mesh builds started this frame: %d; num uploaded this frame: %d\n", num_meshes_started, num_meshes_uploaded);
@@ -917,7 +920,7 @@ void process_event(SDL_Event *e)
          if (k == '3') block_base = BT_conveyor_ramp_up_high;
          if (k == '4') block_base = BT_conveyor_ramp_down_low;
          if (k == '5') block_base = BT_conveyor_ramp_down_high;
-         if (k == '6') block_base = BT_ore_maker;
+         if (k == '6') block_base = BT_ore_drill;
          if (k == '7') block_base = BT_ore_eater;
          if (k == '8') block_base = BT_picker;
          if (k == '9') block_base = BT_conveyor_90_right;
@@ -1035,6 +1038,11 @@ int SDL_main(int argc, char **argv)
 {
    int server_port = SERVER_PORT;
    SDL_Init(SDL_INIT_VIDEO);
+   #ifdef _NDEBUG
+   SDL_LogSetAllPriority(SDL_LOG_PRIORITY_INFO);
+   #else
+   SDL_LogSetAllPriority(SDL_LOG_PRIORITY_DEBUG);
+   #endif
 
    //client_player_input.flying = True;
 
@@ -1134,6 +1142,15 @@ int SDL_main(int argc, char **argv)
 
    if (networking)
       SDLNet_Quit();
+
+   #ifdef STB_LEAKCHECK_ENABLE
+   stb_leakcheck_dumpmem();
+   #endif
+
+   #ifdef _DEBUG
+   stop_manager();
+   _CrtDumpMemoryLeaks();
+   #endif
 
    return 0;
 }

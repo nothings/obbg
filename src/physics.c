@@ -91,6 +91,14 @@ void physics_process_mesh_chunk(mesh_chunk *mc)
    update_physics_cache_feedback();
 }
 
+void free_physics_cache(void)
+{
+   int i,j;
+   for (j=0; j < S_PHYSICS_CACHE_Y; ++j)
+      for (i=0; i < S_PHYSICS_CACHE_X; ++i)
+         free_mesh_chunk_physics(&s_phys_cache[j][i]);
+}
+
 mesh_chunk *get_physics_chunk_for_coord(int x, int y)
 {
    int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);

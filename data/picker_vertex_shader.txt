@@ -1,0 +1,51 @@
+#version 150 compatibility
+
+in vec3 position;
+in vec3 normal;
+in vec4 bone1;
+in vec4 bone2;
+
+uniform samplerBuffer xform_data;
+uniform vec3 camera_pos;
+
+//uniform vec4 bone_value;
+//uniform vec4 transform;
+
+const vec4 rotate[4] = vec4[4]( vec4(1,0,0,1), vec4(0,-1,1,0), vec4(-1,0,0,-1), vec4(0,1,-1,0) );
+out  vec3  vnormal;
+out  vec3  rpos;
+
+void main()
+{
+   vec3 pos = position;
+   vec3 tpos;
+   uint rot;
+
+   vec4 transform  = texelFetch(xform_data, gl_InstanceID*2+0);
+   vec4 bone_value = texelFetch(xform_data, gl_InstanceID*2+1);
+
+   // bone weighting:
+   // #1: x,y,z  <- bone1.xyz
+   // #2: x      <- bone1.w
+   // #3: x,y,z  <- bone2.xyz
+   // #4: z      <- bone2.w
+
+   pos   += bone1.xyz * bone_value.x;
+   pos.x += bone1.w   * bone_value.y;
+   pos   += bone2.xyz * bone_value.z;
+   pos.z += bone2.w   * bone_value.w;
+
+   rot = uint(transform.w);
+   tpos.x = dot(rotate[rot].xy, pos.xy);
+   tpos.y = dot(rotate[rot].zw, pos.xy);
+   tpos.z = pos.z;
+
+   vnormal.x = dot(rotate[rot].xy, normal.xy);
+   vnormal.y = dot(rotate[rot].zw, normal.xy);
+   vnormal.z = normal.z;
+
+   tpos += transform.xyz;
+   rpos = tpos - camera_pos;
+
+   gl_Position = gl_ModelViewProjectionMatrix * vec4(tpos,1.0);
+}
