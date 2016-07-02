@@ -1,6 +1,4 @@
 Things that must be done next:
-   -  write tool to parse Miblo's annotations and generate youtube-formatted info
-   -  fix bug that causes crashes occasionally
    -  write a real performance monitor
    -  write a real memory monitor
 
@@ -177,6 +175,7 @@ Ideas:
 
    Code quality
    -  check for memory leaks
+   -  check what happens if same mesh_chunk_status is allocated, abandoned, and reallocated
 
 Not right now:
 

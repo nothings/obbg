@@ -59,6 +59,11 @@ void set_blocktype_texture(int bt, int tex)
 
 float texture_scales[256];
 
+//   -2,0   <---  thread 1
+//    6,0   <---  thread 2
+//   -2,0   <---  thread 3
+
+
 void init_mesh_building(void)
 {
    int i;
@@ -1967,8 +1972,8 @@ int mesh_worker_handler(void *data)
             SDL_LockMutex(manager_mutex);
             {
                int i;
-               mesh_chunk_status *mcs = get_chunk_status(t.world_x, t.world_y, False);
                #if 0
+               mesh_chunk_status *mcs = get_chunk_status(t.world_x, t.world_y, False);
                if (mcs)
                   ods("[%d] Added built mesh %d,%d %p %d", thread_id, mc->chunk_x, mc->chunk_y, mcs, mcs->status);
                else
