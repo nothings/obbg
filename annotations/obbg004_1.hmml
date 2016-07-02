@@ -1,0 +1,67 @@
+[video title="Open Block Building Game Development #4 (1/2)" platform=youtube id=6J9z14CqIJI]
+[1:33][Make refcounting of mesh_chunk threadsafe][:"mesh building" :threading]
+[5:29][@abnercoimbre][Still on other stream listening. Will switch audio soon]
+[7:56][@kaminate][There's no colors]
+[10:56][Run the :game and set the stage for the day]
+[14:05][Consult the list of things todo in readiness to make the renderer rebuild the render_requested_meshes queue]
+[18:01][Introduce struct mesh_chunk_status][:"mesh building"]
+[19:23][@xxluckyponyxx][My god, how does programming have so many views?]
+[20:10][@evraire][@Abnercoimbre Makes sense! Is he using SDL2? I guess that means the renderer is OpenGL]
+[20:39][@pseudonym73][It's pair programming without the annoyance]
+[20:44][Enumerate CHUNK_STATUS and introduce get_chunk_status()][:"mesh building"]
+[25:07][@jtibble][@Nothings, have you been encouraged by the amount of positive feedback you've gotten from the community and from the viewers here on Twitch?]
+[27:02][
+    [ref
+    title=the Nothing itself nothings
+    page=The Basketball Game
+    url=http://nothings.org/opera/]]
+[28:35][Move chunk_set data from requested_mesh to mesh_chunk_status and propagate that change][:"mesh building"]
+[31:23][@voidqk][How many LOC in this library?]
+[32:57][Continue setting a mesh_chunk_status as needed][:"mesh building"]
+[36:49][@nothings2][Answers to why VC6, why limited syntax highlighting:
+    [ref
+    title=YouTube
+    page=stb programming FAQ
+    url=https://www.youtube.com/watch?v=3BYKiOHdCNg]]
+[37:34][Introduce request_mesh_generation()][:"mesh building"]
+[40:26][Introduce swap_requested_meshes()][:"mesh building"]
+[40:45][@pseudonym73][This link should probably go in the FAQ under the stream]
+[42:51][Make request_mesh_generation() request one chunk further than the view_distance]
+[44:42][@safeladz][Can you remember your first line of code in C++, @nothings2?]
+[46:50][Make render_voxel_world() conditionally build meshes depending on whether we are multithreaded][:"mesh building"]
+[50:05][#define MAX_CONSIDER_MESHES and introduce struct considered_mesh]
+[51:16][@rygorous]["Real" programming, once I understood the basics (no pun intended \[always a lie when I say that!\]) I moved on to Turbo Pascal, that was around 1992 / 1993 or so]
+[51:52][Make request_mesh_generation() consider and prioritise meshes]
+[53:58][@norad91][@nothings2 I remember Jeff saying something about you programming a game for the 2600 (on the JACS). Did you finish that, or what was your impression of that?]
+[56:07][:Demo some 2600 experiments and recommend Racing the Beam
+    [ref
+    title="Racing the Beam"
+    author="Nick Montford and Ian Bogost"
+    isbn=9780262012577]]
+[1:01:40][Finish making request_mesh_generation() prioritise meshes][:"mesh building"]
+[1:08:33][Make swap_requested_meshes() lock the render_requested_meshes queue]
+[1:10:49][Consider how to make mesh_worker_handler() threadsafe][:"mesh building" :threading]
+[1:11:47][@terminalgain][Is there a page as to why he uses SDL? Personally I don't use it because it won't compile easily on its own and you have to import premade extensions for it]
+[1:12:48][@rygorous][@Nothings2 This is what usually happens to me when I try to do "shoot from the hip" :threading]
+[1:13:18][On using SDL]
+[1:15:24][@jtibble][Describe the problem? We have people here with :threading experience]
+[1:16:46][@abnercoimbre][@nothings2: Did you ever work with Pascal? Were those "the good ol' days"?]
+[1:23:34][Make swap_requested_meshes() iterate over the requested meshes and rebuild the queue in priority order][":mesh building"]
+[1:26:10][Introduce get_chunk_status_alloc() and pull some of the functionality of get_chunk_status() out into it]
+[1:29:26][Finish implementing swap_requested_meshes()][:threading]
+[1:34:25][Introduce abandon_mesh_chunk_status()]
+[1:35:21][@jtibble][This is why low-level C++ frustrates me, because I feel like the problem could be abstracted to add some clarity]
+[1:36:54][Introduce the notion of a starvation_count]
+[1:40:32][Clean up compiler errors and enable the :"mesh building" to occur]
+[1:45:44][Run the :game and watch it crash]
+[1:47:18][Make worker_manager() get from queue at the tail]
+[1:47:38][Run the :game and investigate why we are seeing no meshes]
+[1:50:04][Make abandon_mesh_chunk_status() set the status to CHUNK_STATUS_invalid]
+[1:51:45][Do a memset when clearing the chunk set]
+[1:52:14][Run the :game and find that it runs for longer before crashing and freezing the machine]
+[1:53:12][Break into mesh_worker_handler() and see if we're getting a task]
+[1:53:50][Run the :game for a while and watch the CPU and :memory usage]
+[1:54:30][Assert that we have a gc in generate_chunk() and investigate who is leaking :memory]
+[1:57:40][@bitshift8][Is the difference between ++i and i++ in a for-loop completely stylistic?]
+[1:57:52][Continue investigating the :memory leak]
+[/video]

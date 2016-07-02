@@ -1,0 +1,7 @@
+[video title="Open Block Building Game Development #2 (3/3)" platform=youtube id=sifxrJ5Vxds]
+[0:02][Make worker_manager call end_procgen]
+[2:00][Move the mesh structs into obbg_data.h and consider how to thread the [:rendering renderer]]
+[7:49][Update TODO.txt]
+[9:14][Compile and run the :game before checking it in]
+[10:29][Stop the stream]
+[/video]
