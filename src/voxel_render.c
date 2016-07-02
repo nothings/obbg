@@ -691,6 +691,7 @@ void render_voxel_world(float campos[3])
          } else {
             //s_process_mesh_chunk(bm.mc);
             // client:
+            //ods("Received chunk: %d,%d", bm.mc->chunk_x, bm.mc->chunk_y);
             upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
             set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
             free(bm.face_buffer);

@@ -772,14 +772,21 @@ void error(char *s)
    exit(0);
 }
 
+SDL_mutex *logm;
+
 void ods(char *fmt, ...)
 {
    char buffer[1000];
    va_list va;
+
+   if (logm == NULL)
+      logm = SDL_CreateMutex();
    va_start(va, fmt);
    vsprintf(buffer, fmt, va);
    va_end(va);
+   SDL_LockMutex(logm);
    SDL_Log("%s", buffer);
+   SDL_UnlockMutex(logm);
 }
 
 #define TICKS_PER_SECOND  60
@@ -1114,6 +1121,7 @@ int SDL_main(int argc, char **argv)
    if (program_mode != MODE_single_player)
       networking = net_init(program_mode == MODE_server, server_port);
 
+   SDL_GL_SetSwapInterval(0);
    game_init();
    render_init();
 

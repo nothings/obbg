@@ -1,3 +1,11 @@
+Things that must be done next:
+   -  write tool to parse Miblo's annotations and generate youtube-formatted info
+   -  fix bug that causes crashes occasionally
+   -  write a real performance monitor
+   -  write a real memory monitor
+
+
+
    -  do you need the diagonal gen_chunk neighbors to the mesh chunks?!???
 
 Possible tasks to work on next:

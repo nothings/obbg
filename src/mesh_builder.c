@@ -206,6 +206,7 @@ void release_gen_chunk(gen_chunk *gc, int type);
 static void abandon_mesh_chunk_status(mesh_chunk_status *mcs)
 {
    int i,j;
+   //ods("Abandon %d,%d", mcs->chunk_x, mcs->chunk_y);
    for (j=0; j < 4; ++j)
       for (i=0; i < 4; ++i)
          if (mcs->chunk_set_valid[j][i])
@@ -229,6 +230,7 @@ void finished_caching_mesh_chunk(int x, int y, Bool needs_triangles)
       for (j=0; j < 4; ++j)
          for (i=0; i < 4; ++i)
             assert(mcs->chunk_set_valid[j][i] == 0);
+      //ods("Invalidating %d,%d", mcs->chunk_x, mcs->chunk_y);
       mcs->status = CHUNK_STATUS_invalid;
    }
    SDL_UnlockMutex(manager_mutex);
@@ -1703,7 +1705,7 @@ int get_next_built_mesh(built_mesh *bm)
    return get_from_queue_nonblocking(&built_meshes, bm);
 }
 
-Bool get_next_task(task *t)
+Bool get_next_task(task *t, int thread_id)
 {
    Bool found_task_flag = True;
    int i,n;
@@ -1779,6 +1781,9 @@ Bool get_next_task(task *t)
          }
 
          // go through all the chunks and see if they're created, and if not, request them
+         if (mcs->status == CHUNK_STATUS_processing)
+            continue;
+
          for (k=0; k < 4; ++k) {
             for (j=0; j < 4; ++j) {
                if (!mcs->chunk_set_valid[k][j]) {
@@ -1786,11 +1791,14 @@ Bool get_next_task(task *t)
                   int cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
                   gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(cx, cy);
                   if (gcc) {
+                     assert(mcs->status == CHUNK_STATUS_nonempty_chunk_set || mcs->status == CHUNK_STATUS_empty_chunk_set);
                      mcs->status = CHUNK_STATUS_nonempty_chunk_set;
                      mcs->cs.chunk[k][j] = gcc->chunk;
                      mcs->chunk_set_valid[k][j] = True;
                      assert(gcc->chunk != 0);
                      add_ref_count(gcc->chunk, REF_mesh_chunk_status);
+                     // @TODO
+                     //++valid_chunks;
                   } else {
                      if (is_in_progress(cx, cy)) {
                         // it's already in progress, so do nothing
@@ -1810,7 +1818,11 @@ Bool get_next_task(task *t)
 
          if (valid_chunks == 16) {
             int i,j;
-            mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
+            //mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
+            #if 0
+            if (rm->needs_triangles)
+               ods("[%d] Accepting: %d,%d %p %d", thread_id, C_MESH_CHUNK_X_FOR_WORLD_X(rm->x), C_MESH_CHUNK_Y_FOR_WORLD_Y(rm->y), mcs, mcs->status);
+            #endif
             for (j=0; j < 4; ++j)
                for (i=0; i < 4; ++i)
                   assert(mcs->chunk_set_valid[j][i]);
@@ -1828,6 +1840,7 @@ Bool get_next_task(task *t)
             } else {
                mesh_chunk *mc = malloc(sizeof(*mc));
                built_mesh out_mesh;
+               memset(mc, 0, sizeof(*mc));
                mc->chunk_x = rm->x >> MESH_CHUNK_SIZE_X_LOG2;
                mc->chunk_y = rm->y >> MESH_CHUNK_SIZE_Y_LOG2;
 
@@ -1844,9 +1857,8 @@ Bool get_next_task(task *t)
                out_mesh.face_buffer  = 0;
                out_mesh.mc = mc;
                out_mesh.mc->has_triangles = False;
-               if (!add_to_queue(&built_meshes, &out_mesh)) {
+               if (!add_to_queue(&built_meshes, &out_mesh))
                   free(out_mesh.mc);
-               }
                assert(rm->state == RMS_requested);
                rm->state = RMS_invalid;
             }
@@ -1907,7 +1919,7 @@ int mesh_worker_handler(void *data)
       Bool did_wait = False;
       task t;
 
-      while (!get_next_task(&t)) {
+      while (!get_next_task(&t, thread_id)) {
          if (stop_worker_flag) {
             SDL_LockMutex(ref_count_mutex);
             --num_workers_running;
@@ -1955,6 +1967,13 @@ int mesh_worker_handler(void *data)
             SDL_LockMutex(manager_mutex);
             {
                int i;
+               mesh_chunk_status *mcs = get_chunk_status(t.world_x, t.world_y, False);
+               #if 0
+               if (mcs)
+                  ods("[%d] Added built mesh %d,%d %p %d", thread_id, mc->chunk_x, mc->chunk_y, mcs, mcs->status);
+               else
+                  ods("[%d] Mesh chunk status for %d,%d is missing", thread_id, mc->chunk_x, mc->chunk_y);
+               #endif
                for (i=0; i < 16; ++i)
                   release_gen_chunk(t.cs.chunk[0][i], REF_mesh_chunk_status);
             }
@@ -1962,6 +1981,7 @@ int mesh_worker_handler(void *data)
             out_mesh.mc = mc;
             out_mesh.mc->has_triangles = True;
             if (!add_to_queue(&built_meshes, &out_mesh)) {
+               //ods("Failed to add %d,%d", mc->chunk_x, mc->chunk_y);
                free(out_mesh.vertex_build_buffer);
                free(out_mesh.face_buffer);
                free(out_mesh.mc);
@@ -2041,6 +2061,8 @@ void init_mesh_build_threads(void)
 
    if (num_mesh_workers < 1)
       num_mesh_workers = 1;
+
+   //num_mesh_workers = MAX_MESH_WORKERS;
 
    sim_start = SDL_GetPerformanceCounter();
 
