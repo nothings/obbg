@@ -1,4 +1,4 @@
-[video title="Open Block Building Game Development #2 (2/3)" platform=youtube id=C52SWtPvgls]
+[video @nothings ~obbg title="Open Block Building Game Development #2 (2/3)" platform=youtube id=C52SWtPvgls annotator=@Miblo]
 [0:29][@drstinkbomber][On the video it says Minecraft Maps]
 [1:12][#include assert.h in mesh_builder.c and continue to investigate why SDL_CreateThread is not working][:threading]
 [4:16][Use the "debug multithreaded" runtime library][:threading]

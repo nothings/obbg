@@ -1,4 +1,4 @@
-[video title="Open Block Building Game Development #8 (2/2)" platform=youtube id=yU8tkxt-YVE]
+[video @nothings ~obbg title="Open Block Building Game Development #8 (2/2)" platform=youtube id=yU8tkxt-YVE annotator=@Miblo]
 [2:08][@sethwklein][@Nothings2, just reboot if you need to. We'll still be here if you let us know in advance]
 [2:27][Run the :game and see that it's working, until hitting an out-of-memory bug][:memory]
 [3:21][@sethwklein][@Nothings2, switch scenes, please!]

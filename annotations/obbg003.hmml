@@ -1,4 +1,4 @@
-[video title="Open Block Building Game Development #3" platform=youtube id=_FwC0Ihw0_V0]
+[video @nothings ~obbg title="Open Block Building Game Development #3" platform=youtube id=_FwC0Ihw0_V0 annotator=@Miblo]
 [6:09][Recap and set the stage for the day]
 [8:55][Deduplicate the data taken by the :"mesh building" functions by adding them to the threadsafe_queue structure][:threading]
 [13:15][Introduce add_task]

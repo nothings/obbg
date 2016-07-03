@@ -1,4 +1,4 @@
-[video title="Open Block Building Game Development #2 (1/3)" platform=youtube id=P0Ncges4_Zs]
+[video @nothings ~obbg title="Open Block Building Game Development #2 (1/3)" platform=youtube id=P0Ncges4_Zs annotator=@Miblo]
 [0:43][Draw the light source as a cube][:lighting :rendering]
 [3:14][Run the :game and follow the light cube across the world]
 [5:09][@zloedi][Aah changed the mic]

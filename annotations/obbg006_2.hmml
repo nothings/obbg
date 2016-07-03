@@ -1,4 +1,4 @@
-[video title="Open Block Building Game Development #6 (2/2)" platform=youtube id=JNWJiR094nM]
+[video @nothings ~obbg title="Open Block Building Game Development #6 (2/2)" platform=youtube id=JNWJiR094nM annotator=@Miblo]
 [0:05][Make generate_chunk() initialise r where needed][:"procedural generation"]
 [1:00][@abnercoimbre][/me faints]
 [1:25][Run the :game and find that we have bugs]

@@ -22,6 +22,7 @@ int linecount(char *p, char *curpoint)
    return line;
 }
 
+// parse out space-delimited tokens which can't have nested []
 char **parse_tag(char **p_ptr)
 {
    char **tokens = NULL;
@@ -31,9 +32,11 @@ char **parse_tag(char **p_ptr)
 
    p = skipwhite(p);
    while (*p != ']') {
+      // scan until the next whitespace or end of the token (no nesting allowed)
       while (!isspace(*p) && *p != ']') {
          stb_arr_push(o, *p++);
 
+         // parse out a quoted section
          if (*p == '"' || *p == '\'') {
             char q = *p;
             stb_arr_push(o, *p++);
@@ -59,6 +62,9 @@ void free_tokens(char **tokens)
       free(tokens[i]);
    stb_arr_free(tokens);
 }
+
+////////////////////////////////////////////
+///   output buffering
 
 char *line_buffer;
 
@@ -130,6 +136,10 @@ int main(int argc, char **argv)
       while (*p) {
          char *token_start = p;
          switch (*p) {
+            default:
+               at_newline = 0;
+               stb_fatal("Failed to parse token at line %d %s", linecount(file,p), argv[i]);
+               break;
             case '\n':
                at_newline = 1;
                ++p;
@@ -139,6 +149,8 @@ int main(int argc, char **argv)
                   char **tokenlist;
                   at_newline = 0;
                   ++p;
+
+                  // some [] tokens are only allowed on a new line
                   if (*p == '/') {
                      if (!stb_prefix(p, "/video]"))
                         stb_fatal("Parse error, unexpected close tag at line %d %s", linecount(file, p), argv[i]);
@@ -172,7 +184,8 @@ int main(int argc, char **argv)
                   }
                }
 
-               // handle other cases
+               // handle cases that can appear anywhere
+
                if (p[1] == '@' && after_timestamp) {
                   // annotate comment from user being replied to
                   int nesting_depth=1;
@@ -200,7 +213,8 @@ int main(int argc, char **argv)
                   int after_space=1;
                   char **tokenlist;
                   int nesting_depth=1;
-                  if (!after_timestamp) {
+                  if (!after_timestamp) {  // this is probably buggy and should be 'after_text' instead of '!after_timestamp'
+                     // quote nodes look like text nodes, but start with 'quote' and can't appear until after text nodes
                      if (stb_prefix(p, "[quote")) {
                         while (*p != ']')
                            ++p;
@@ -214,6 +228,7 @@ int main(int argc, char **argv)
                      stb_fatal("Parse error, unexpected tag outside [video] block at line %d %s", linecount(file,p), argv[i]);
                   ++p;
 
+                  // delete any leading username and following punctuation, since they're twitch usernames, not meaningful on youtube
                   if (*p == '@') {
                      ++p;
                      while (isalnum(*p))
@@ -224,16 +239,20 @@ int main(int argc, char **argv)
                         ++p;
                   }
 
+                  // scan until the end of the text node
                   while (*p != ']') {
-                     if (p[0] == '\\') {
+                     if (*p == '\\') {
+                        // use \ as an escape character for a single token
                         ++p;
                         aputc(*p++);
-                     } if (*p == '[') {
+                     } else if (*p == '[') {
+                        // various types of nested tags are supported
                         int j;
                         ++p;
                         tokenlist = parse_tag(&p);
                         after_space = 0;
                         if (tokenlist[0][0] == ':' || tokenlist[0][0] == '@' || tokenlist[0][0] == '~') {
+                           // all of these tags have same format; first token is the category/username/project, the other tokens are the readable text
                            if (stb_arr_len(tokenlist) == 1)
                               stb_fatal("Name/tag token lacks readable text in line %d %s", linecount(file,p), argv[i]);
                            for (j=1; j < stb_arr_len(tokenlist); ++j) {
@@ -241,10 +260,11 @@ int main(int argc, char **argv)
                               aputc(' ');
                            }
                         } else if (0==strcmp(tokenlist[0], "ref")) {
+                           // a ref tag may or may not have a URL; if no URL output nothing
                            for (j=1; j < stb_arr_len(tokenlist); ++j) {
                               if (stb_prefix(tokenlist[j], "url=")) {
                                  char *q = stb_skipwhite(tokenlist[j]+4);
-                                 if (*q == '\'' || *q == '\"') {
+                                 if (*q == '\'' || *q == '"') {
                                     char *z = strchr(q+1, *q);
                                     *z = 0;
                                     ++q;
@@ -257,6 +277,7 @@ int main(int argc, char **argv)
                            stb_fatal("Unknown nested markup token at line %d %s", linecount(file,p), argv[i]);
                         }
                      } else if (after_space && p[0] == ':') {
+                        // a freely-embedded tag is output unaltered, but it may be quoted
                         if (p[1] == '"' || p[1] == '\'') {
                            char q = p[1];
                            p += 2;
@@ -268,16 +289,20 @@ int main(int argc, char **argv)
                               aputc(*p++);
                         }
                      } else if (after_space && p[0] == '@' && isalnum(p[1])) {
+                        // print usernames unaltered, but strip the @
                         after_space = 0;
                         ++p;
                      } else {
+                        // otherwise it's a normal character, print it
                         after_space = isspace(*p);
                         if (*p != '\n' && *p != '\r')
                            aputc(*p);
                         ++p;
                      }
                   }
-                  ++p;
+                  ++p;  // skip the final ] of the text node
+
+                  // if it was a chat comment and we're disaplying chat comments, output a closing quote, otherwise discard chat comments
                   if (chat_comment)
                      if (m < 2)
                         aputc('"');
@@ -287,9 +312,6 @@ int main(int argc, char **argv)
                   after_text = 1;
                }
                break;
-            default:
-               at_newline = 0;
-               stb_fatal("Failed to parse token at line %d %s", linecount(file,p), argv[i]);
          }
          p = skipwhite(p);
       }
