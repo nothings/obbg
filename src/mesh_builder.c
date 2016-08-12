@@ -554,30 +554,36 @@ float octave_multiplier[8] =
    1.157f,
 };
 
+float compute_height_field_octave(float ns, int o, float weight)
+{
+   float scale,heavier,sign;
+   scale = (float) (1 << o) * octave_multiplier[o];
+   sign = (ns < 0 ? -1.0f : 1.0f);
+   ns = (float) fabs(ns);
+   heavier = ns*ns*ns*ns*4*sign;
+   return scale/2 * stb_lerp(weight, ns, heavier) / 2;
+}
+
 float compute_height_field(int x, int y, float weight)
 {
-   float ht = AVG_GROUND;
-#if 1
    int o;
-   for (o=0; o < 8; ++o) {
+   float ht = AVG_GROUND;
+   for (o=3; o < 8; ++o) {
       float scale = (float) (1 << o) * octave_multiplier[o];
-      float ns = stb_perlin_noise3(x/scale, y/scale, o*2.0f, 256,256,256), heavier;
-      float sign = (ns < 0 ? -1.0f : 1.0f);
-      ns = (float) fabs(ns);
-      heavier = ns*ns*ns*ns*4*sign;
-      ht += scale/2 * stb_lerp(weight, ns, heavier) / 2;
+      float ns = stb_perlin_noise3(x/scale, y/scale, o*2.0f, 256,256,256);
+      ht += compute_height_field_octave(ns, o, weight);
    }
-#else
+   return ht;
+}
 
-   if (x >= 10 && x <= 50 && y >= 30 && y <= 70) {
-      ht += x;
+float compute_height_field_delta(int x, int y, float weight)
+{
+   int o;
+   float ht = 0;
+   for (o=0; o < 3; ++o) {
+      float ns = (big_noise(x, y, o, 8348+o*23787)/32678.0f - 1.0f)/2.0f;
+      ht += compute_height_field_octave(ns, o, weight);
    }
-
-   if (x >= 110 && x <= 150 && y >= 30 && y <= 70) {
-      ht += y;
-   }
-
-#endif
    return ht;
 }
 
@@ -960,20 +966,33 @@ void change_block(int x, int y, int z, int type, int rot)
    }
 }
 
+#define HEIGHT_FIELD_SPACING       (1 << HEIGHT_FIELD_SPACING_LOG2)
+#define HEIGHT_FIELD_SPACING_LOG2  3
+
+float bilinear_interpolate(float p00, float p10, float p01, float p11, int ix, int iy)
+{
+   float x = (ix / (float) HEIGHT_FIELD_SPACING);
+   float y = (iy / (float) HEIGHT_FIELD_SPACING);
+   float p0 = stb_lerp(y, p00, p01);
+   float p1 = stb_lerp(y, p10, p11);
+   return stb_lerp(x, p0, p1);
+}
+
 gen_chunk *generate_chunk(int x, int y, int thread_id)
 {
+   float height_base[GEN_CHUNK_SIZE_Y/HEIGHT_FIELD_SPACING+1+2][GEN_CHUNK_SIZE_X/HEIGHT_FIELD_SPACING+1+2];
+   float weight_base[GEN_CHUNK_SIZE_Y/HEIGHT_FIELD_SPACING+1+2][GEN_CHUNK_SIZE_X/HEIGHT_FIELD_SPACING+1+2];
    Uint64 start;
    int z_seg;
-   int i,j,z;
+   int i,j,z,ji,ii;
    int ground_top = 0;
    gen_chunk *gc;
    int num_trees;
    tree_location trees[MAX_TREES_PER_CHUNK];
    float height_lerp[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    float height_field[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
-   float height_ore[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
+   unsigned short height_ore[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    int height_field_int[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
-
 
    start = SDL_GetPerformanceCounter();
 
@@ -987,18 +1006,32 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
    // @TODO: compute non_empty based on below updates
    // @OPTIMIZE: change mesh builder to check non_empty
 
+   for (j=-HEIGHT_FIELD_SPACING,ji=0; j <= GEN_CHUNK_SIZE_Y+HEIGHT_FIELD_SPACING; j += HEIGHT_FIELD_SPACING, ++ji)
+      for (i=-HEIGHT_FIELD_SPACING,ii=0; i <= GEN_CHUNK_SIZE_Y+HEIGHT_FIELD_SPACING; i += HEIGHT_FIELD_SPACING, ++ii) {
+         float ht;
+         float weight = (float) stb_linear_remap(stb_perlin_noise3((x+i)/256.0f,(y+j)/256.0f,100,256,256,256), -1.5, 1.5, -4.0f, 5.0f);
+         weight_base[ji][ii] = weight;
+         ht = compute_height_field(x+i,y+j, weight);
+         height_base[ji][ii] = ht;
+      }
+
    for (j=-4; j < GEN_CHUNK_SIZE_Y+4; ++j)
       for (i=-4; i < GEN_CHUNK_SIZE_X+4; ++i) {
          float ht;
-         float weight = (float) stb_linear_remap(stb_perlin_noise3((x+i)/256.0f,(y+j)/256.0f,100,256,256,256), -1.5, 1.5, -4.0f, 5.0f);
+         float weight;
+         
+         ii = (i >> HEIGHT_FIELD_SPACING_LOG2) + 1;
+         ji = (j >> HEIGHT_FIELD_SPACING_LOG2) + 1;
+         weight = bilinear_interpolate(weight_base[ji][ii], weight_base[ji][ii+1], weight_base[ji+1][ii], weight_base[ji+1][ii+1], i&7, j&7);
          weight = stb_clamp(weight,0,1);
+         ht = bilinear_interpolate(height_base[ji][ii], height_base[ji][ii+1], height_base[ji+1][ii], height_base[ji+1][ii+1], i&7, j&7);
+         ht += compute_height_field_delta(x+i,y+j,weight);
+         if (ht < 4) ht = 4; else if (ht > 160) ht = 160;
          height_lerp[j+4][i+4] = weight;
-         ht = compute_height_field(x+i,y+j, weight);
-         assert(ht >= 4);
          height_field[j+4][i+4] = ht;
          height_field_int[j+4][i+4] = (int) height_field[j+4][i+4];
          ground_top = stb_max(ground_top, height_field_int[j+4][i+4]);
-         height_ore[j+4][i+4] = stb_perlin_noise3((float)(x+i)+0.5f,(float)(y+j)+0.5f,(float)(x*77+y*31)+0.5f,256,256,256);
+         height_ore[j+4][i+4] = big_noise(x+i,y+j, 0, x*77+y*31);
       }
    add_time(thread_id, start, 2);
    start = SDL_GetPerformanceCounter();
@@ -1044,7 +1077,7 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
    for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
       for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
          int ht = height_field_int[j+4][i+4];
-         if (height_ore[j+4][i+4] < -0.5) {
+         if (height_ore[j+4][i+4] < 0x1000) {
             logistics_record_ore(x+i,y+j, ht-2, ht+1, BT_stone);
          }
       }
