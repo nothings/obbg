@@ -9,8 +9,6 @@
 
 #include "obbg_funcs.h"
 
-#include "crtdbg.h"
-
 // stb_gl.h
 #define STB_GL_IMPLEMENTATION
 #define STB_GLEXT_DEFINE "glext_list.h"
@@ -396,6 +394,70 @@ int chunk_server_pos;
 extern vec3i physics_cache_feedback[64][64];
 extern int num_gen_chunk_alloc;
 
+
+stb_sdict *memstats_table;
+typedef struct
+{
+   char *info;
+   size_t total;
+   size_t largest;
+   size_t count;
+} memstats;
+
+void dump_callback(size_t size, char *info)
+{
+   memstats *ms = stb_sdict_get(memstats_table, info);
+   if (ms == NULL) {
+      ms = malloc(sizeof(*ms));
+      ms->count = 1;
+      ms->total = size;
+      ms->largest = size;
+      ms->info = info;
+      stb_sdict_add(memstats_table, info, ms);
+   } else {
+      ++ms->count;
+      ms->total += size;
+      ms->largest = stb_max(ms->largest, size);
+   }
+}
+
+void print_column(char *str, int id)
+{
+   static float xtab[4] = { 30,90,150,180 };
+   float x = xtab[id];
+   if (id >= 0 && id <= 2) {
+      x -= stb_easy_font_width(str);
+   }
+   print_string(x, pos_y, str, text_color[0], text_color[1], text_color[2]);
+}
+
+void dump_memory(void)
+{
+   int i;
+   char *info;
+   memstats *arr=NULL;
+   memstats *ms;
+   memstats_table = stb_sdict_new(1);
+   obbg_malloc_dump(dump_callback);
+
+   stb_sdict_for(memstats_table, i, info, ms) {
+      stb_arr_push(arr, *ms);
+   }
+
+   qsort(arr, stb_arr_len(arr), sizeof(*arr), stb_intcmp(offsetof(memstats,total)));
+
+   for (i=stb_arr_len(arr)-1; i >= 0; --i) {
+      ms = &arr[i];
+
+      print_column(stb_sprintf("%9d", ms->count), 0);
+      print_column(stb_sprintf("%9d", ms->total), 1);
+      print_column(stb_sprintf("%9d", ms->largest), 2);
+      print_column(ms->info, 3);
+      print("");
+   }
+   stb_sdict_delete(memstats_table);
+}
+
 void draw_stats(void)
 {
    int i;
@@ -442,6 +504,11 @@ void draw_stats(void)
       text_color[1] = 0.5;
       text_color[2] = 0.5;
       print("SLOWNESS: Synchronous debug output is enabled!");
+   }
+
+   if (1) {
+      dump_memory();
+
    }
 }
 
@@ -1031,6 +1098,8 @@ Bool networking;
 
 #define SERVER_PORT 4127
 
+void *memory_mutex;
+
 //void stbwingraph_main(void)
 int SDL_main(int argc, char **argv)
 {
@@ -1041,6 +1110,10 @@ int SDL_main(int argc, char **argv)
    #else
    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_DEBUG);
    #endif
+
+   memory_mutex = SDL_CreateMutex();
+   if (memory_mutex == NULL) error("Couldn't create mutex for memory tracker");
+
 
    //client_player_input.flying = True;
 
@@ -1121,7 +1194,7 @@ int SDL_main(int argc, char **argv)
    if (program_mode != MODE_single_player)
       networking = net_init(program_mode == MODE_server, server_port);
 
-   SDL_GL_SetSwapInterval(0);
+   //SDL_GL_SetSwapInterval(0);
    game_init();
    render_init();
 
@@ -1142,13 +1215,8 @@ int SDL_main(int argc, char **argv)
    if (networking)
       SDLNet_Quit();
 
-   #ifdef STB_LEAKCHECK_ENABLE
-   stb_leakcheck_dumpmem();
-   #endif
-
    #ifdef _DEBUG
    stop_manager();
-   _CrtDumpMemoryLeaks();
    #endif
 
    return 0;

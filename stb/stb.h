@@ -192,9 +192,6 @@ Parenthesized items have since been removed.
 #include <time.h>       // stb_dirtree
 #include <malloc.h>
 
-#define _CRTDBG_MAP_ALLOC
-#include "crtdbg.h"
-
 #ifdef STB_PERSONAL
    typedef int Bool;
    #define False 0
@@ -405,6 +402,7 @@ STB_EXTERN char * stb_sstrdup(char *s);
 #endif
 
 #ifdef STB_FASTMALLOC
+#error foo
 #define malloc  stb_smalloc
 #define free    stb_sfree
 #define realloc stb_srealloc
@@ -671,6 +669,7 @@ STB_EXTERN char * stb_sstrdup(char *s);
    #include <malloc.h>
 
    #define malloc(s)      stb__malloc (  s, __FILE__, __LINE__)
+   #error foo
    #define realloc(p,s)   stb__realloc(p,s, __FILE__, __LINE__)
    #define calloc(n,s)    stb__calloc (n,s, __FILE__, __LINE__)
    #define free(p)        stb__free   (p,   __FILE__, __LINE__)
@@ -1570,6 +1569,7 @@ int (*stb_doublecmp(int offset))(const void *, const void *)
 //
 //                           Binary Search Toolkit
 //
+
 
 typedef struct
 {
@@ -2934,7 +2934,6 @@ void stb_reassign(void *new_context, void *ptr)
 //     stb_arr_pop(my_array);
 //
 //     assert(stb_arr_len(my_array) == 6);
-
 
 #ifdef STB_MALLOC_WRAPPER
   #define STB__PARAMS    , char *file, int line

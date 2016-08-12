@@ -694,8 +694,8 @@ void render_voxel_world(float campos[3])
             //ods("Received chunk: %d,%d", bm.mc->chunk_x, bm.mc->chunk_y);
             upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
             set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
-            free(bm.face_buffer);
-            free(bm.vertex_build_buffer);
+            obbg_free(bm.face_buffer);
+            obbg_free(bm.vertex_build_buffer);
             finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, True);
             bm.mc = NULL;
          }

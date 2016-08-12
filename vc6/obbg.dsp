@@ -218,6 +218,10 @@ SOURCE=..\src\u_noise.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\src\util.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\voxel_render.c
 # End Source File
 # Begin Source File

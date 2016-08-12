@@ -335,9 +335,9 @@ void free_mesh_chunk_physics(mesh_chunk *mc)
 {
    if (mc->allocs) {
       int i;
-      for (i=0; i < stb_arr_len(mc->allocs); ++i)
-         free(mc->allocs[i]);
-      stb_arr_free(mc->allocs);
+      for (i=0; i < obarr_len(mc->allocs); ++i)
+         obbg_free(mc->allocs[i]);
+      obarr_free(mc->allocs);
    }
 }
 
@@ -348,7 +348,7 @@ void free_mesh_chunk(mesh_chunk *mc)
    glDeleteBuffersARB(1, &mc->fbuf);
 
    free_mesh_chunk_physics(mc);
-   free(mc);
+   obbg_free(mc);
 }
 
 
@@ -443,7 +443,7 @@ void release_gen_chunk(gen_chunk *gc, int type)
    if (gc->ref_count == 0) {
       SDL_UnlockMutex(ref_count_mutex);
       monitor_delete_gen_chunk(gc);
-      free(gc);
+      obbg_free(gc);
       --num_gen_chunk_alloc;
    } else
       SDL_UnlockMutex(ref_count_mutex);
@@ -810,7 +810,7 @@ void save_edits(void)
 {
    FILE *f = fopen("savegame.dat", "wb");
    int i;
-   for (i=0; i < stb_arr_len(edit_chunks); ++i) {
+   for (i=0; i < obarr_len(edit_chunks); ++i) {
       fwrite(edit_chunks[i], sizeof(edit_chunk), 1, f);
    }
    fclose(f);
@@ -846,18 +846,18 @@ static edit_chunk *get_edit_chunk_for_coord_raw(int x, int y, int z, Bool alloc)
    int cy = y >> GEN_CHUNK_SIZE_Y_LOG2;
    int cz = z >> EDIT_CHUNK_Z_COUNT_LOG2;
    int i;
-   for (i=0; i < stb_arr_len(edit_chunks); ++i) {
+   for (i=0; i < obarr_len(edit_chunks); ++i) {
       edit_chunk *e = edit_chunks[i];
       if (e->x == cx && e->y == cy && e->z == cz)
          return e;
    }
    if (alloc) {
-      edit_chunk *e = malloc(sizeof(*e));
+      edit_chunk *e = obbg_malloc(sizeof(*e), "/mapgen/edit/chunk");
       e->x = cx;
       e->y = cy;
       e->z = cz;
       memset(e->blocks, BT_no_change, sizeof(e->blocks));
-      stb_arr_push(edit_chunks, e);
+      obarr_push(edit_chunks, e, "/mapgen/edit/chunklist");
       return e;
    } else
       return NULL;
@@ -911,7 +911,7 @@ gen_chunk *generate_chunk(int x, int y)
    int z_seg;
    int i,j,z;
    int ground_top = 0;
-   gen_chunk *gc = malloc(sizeof(*gc));
+   gen_chunk *gc = obbg_malloc(sizeof(*gc), "/mapgen/gen/chunk");
    int num_trees;
    tree_location trees[MAX_TREES_PER_CHUNK];
    float height_lerp[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
@@ -1225,19 +1225,19 @@ void *arena_alloc(arena_chunk ***chunks, size_t size, size_t arena_chunk_size)
 {
    void *p;
    arena_chunk **ac = *chunks;
-   arena_chunk *cur = ac == NULL ? NULL : stb_arr_last(ac);
-   if (stb_arr_len(ac) == 0)
+   arena_chunk *cur = ac == NULL ? NULL : obarr_last(ac);
+   if (obarr_len(ac) == 0)
       goto alloc;
    if (cur->in_use + size > cur->capacity) {
       ac=ac;
      alloc:
       arena_chunk_size = stb_max(size, arena_chunk_size);
-      cur = malloc(arena_chunk_size + sizeof(arena_chunk)-1);
+      cur = obbg_malloc(arena_chunk_size + sizeof(arena_chunk)-1, "/physics/chunk/arena");
       cur->capacity = arena_chunk_size;
       cur->in_use = 0;
-      stb_arr_push(ac, cur);  
+      obarr_push(ac, cur, "/physics/chunk/arenalist");  
       *chunks = ac;
-      cur = stb_arr_last(ac);
+      cur = obarr_last(ac);
    } else {
       cur = cur;
    }
@@ -1251,15 +1251,15 @@ void *arena_alloc(arena_chunk ***chunks, size_t size, size_t arena_chunk_size)
 // release unused memory from end of last allocation
 void arena_release(arena_chunk **chunks, size_t size)
 {
-   stb_arr_last(chunks)->in_use -= size;
+   obarr_last(chunks)->in_use -= size;
 }
 
 void arena_free_all(arena_chunk **chunks)
 {
    int i;
-   for (i=0; i < stb_arr_len(chunks); ++i)
-      free(chunks[i]);
-   stb_arr_free(chunks);
+   for (i=0; i < obarr_len(chunks); ++i)
+      obbg_free(chunks[i]);
+   obarr_free(chunks);
 }
 
 phys_chunk_run *build_phys_column(mesh_chunk *mc, gen_chunk *gc, int x, int y)
@@ -1613,7 +1613,7 @@ void init_threadsafe_queue(threadsafe_queue *tq, int count, size_t size)
    tq->head = tq->tail = 0;
    tq->count = count;
    tq->itemsize = size;
-   tq->data = malloc(size * count); // @TODO cache-align
+   tq->data = obbg_malloc(size * count, "/thread/queue"); // @TODO cache-align
 }
 
 int add_to_queue(threadsafe_queue *tq, void *item)
@@ -1843,7 +1843,7 @@ Bool get_next_task(task *t, int thread_id)
                t->world_y = rm->y;
                goto found_task;
             } else {
-               mesh_chunk *mc = malloc(sizeof(*mc));
+               mesh_chunk *mc = obbg_malloc(sizeof(*mc), "/mesh/chunk");
                built_mesh out_mesh;
                memset(mc, 0, sizeof(*mc));
                mc->chunk_x = rm->x >> MESH_CHUNK_SIZE_X_LOG2;
@@ -1863,7 +1863,7 @@ Bool get_next_task(task *t, int thread_id)
                out_mesh.mc = mc;
                out_mesh.mc->has_triangles = False;
                if (!add_to_queue(&built_meshes, &out_mesh))
-                  free(out_mesh.mc);
+                  obbg_free(out_mesh.mc);
                assert(rm->state == RMS_requested);
                rm->state = RMS_invalid;
             }
@@ -1910,10 +1910,10 @@ void add_time(int thread_id, Uint64 time, int mode)
 int mesh_worker_handler(void *data)
 {
    int thread_id;
-   build_data *bd = malloc(sizeof(*bd));
+   build_data *bd = obbg_malloc(sizeof(*bd), "/worker/build_data");
    size_t vert_buf_size = 16*1024*1024;
-   bd->vertex_build_buffer = malloc(vert_buf_size);
-   bd->face_buffer = malloc(4*1024*1024);
+   bd->vertex_build_buffer = obbg_malloc(vert_buf_size, "/worker/vertex_buffer");
+   bd->face_buffer = obbg_malloc(4*1024*1024, "/worker/face_buffer");
 
    SDL_LockMutex(ref_count_mutex);
    thread_id = num_workers_running++;
@@ -1951,7 +1951,7 @@ int mesh_worker_handler(void *data)
       switch (t.task_type) {
          case JOB_build_mesh: {
             stbvox_mesh_maker mm;
-            mesh_chunk *mc = malloc(sizeof(*mc));
+            mesh_chunk *mc = obbg_malloc(sizeof(*mc), "/mesh/chunk");
             built_mesh out_mesh;
             vec3i wc = { t.world_x, t.world_y, 0 };
 
@@ -1964,8 +1964,8 @@ int mesh_worker_handler(void *data)
 
             generate_mesh_for_chunk_set(&mm, mc, wc, &t.cs, vert_buf_size, bd);
 
-            out_mesh.vertex_build_buffer = malloc(mc->num_quads * 16);
-            out_mesh.face_buffer  = malloc(mc->num_quads *  4);
+            out_mesh.vertex_build_buffer = obbg_malloc(mc->num_quads * 16, "/mesh/vertex_buffer");
+            out_mesh.face_buffer  = obbg_malloc(mc->num_quads *  4, "/mesh/face_buffer");
 
             memcpy(out_mesh.vertex_build_buffer, bd->vertex_build_buffer, mc->num_quads * 16);
             memcpy(out_mesh.face_buffer, bd->face_buffer, mc->num_quads * 4);
