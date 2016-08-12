@@ -3,15 +3,9 @@
 
 //#define MINIMIZE_MEMORY
 
-//#define STB_LEAKCHECK_ENABLE
-//#include "stb_leakcheck_sdl.h"
-
 #include "stb.h"
 
 #include <stdlib.h>
-//#include <malloc.h>
-//#define _CRTDBG_MAP_ALLOC
-//#include "crtdbg.h"
 
 #include <assert.h>
 
@@ -268,5 +262,7 @@ enum
 extern int program_mode;
 extern player_controls p_input[PLAYER_OBJECT_MAX];
 extern int global_hack;
+
+extern void *memory_mutex;
 
 #endif

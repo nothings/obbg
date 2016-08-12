@@ -9,6 +9,15 @@ obbg:
   - save/load to disk
   - networking
 
+Todo:
+   -  merge linux pull request
+   -  write a real performance monitor
+   -  write a real memory monitor
+
+Done in today's stream (32)
+   -  write tool to parse Miblo's annotations, generate youtube-formatted info
+   -  fix bug that causes crashes occasionally
+
 Done in today's stream (31)
    - fix placing blocks updating in renderer, only ever worked in MINIMIZE_MEMORY
    - ore drills only work if they're on marble 'ore'
