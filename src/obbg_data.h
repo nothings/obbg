@@ -21,6 +21,8 @@ typedef int Bool;
    typedef unsigned long long uint64;
 #endif
 
+#define MAX_MESH_WORKERS 3
+
 #define MAX_Z                    255
 #define MAX_Z_POW2CEIL           256
 
@@ -263,6 +265,6 @@ extern int program_mode;
 extern player_controls p_input[PLAYER_OBJECT_MAX];
 extern int global_hack;
 
-extern void *memory_mutex;
+extern void *memory_mutex, *prof_mutex;
 
 #endif

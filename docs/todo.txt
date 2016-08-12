@@ -8,12 +8,6 @@ Things that must be done next:
 
 Possible tasks to work on next:
    -  store 'promises' on conveyor belts
-   -  real driller machines (attached to specific block types that have ore)
-   -  furnaces - factorio & minecraft
-   -  assemblers - factorio & factoryidle
-   -  liquid - factorio & minecraft
-   -  power - factorio 
-   -  enemies & tower defense-ish gameplay - factorio?
    -  passive splitter (split sides in opposite directions)
    -  balancer
 
@@ -23,10 +17,11 @@ Factorio-esque features:
    -  basic pickers (factorio "inserters")
    -  conveyor belts - factorio & factoryidle
    -  drills - factorio & modded minecraft
+      +  real driller machines (attached to specific block types that have ore)
    -  furnaces - factorio & minecraft
    -  assemblers - factorio & factoryidle
    -  liquid - factorio & minecraft
-   -  power - factorio 
+   -  power - factorio & infinifactory-ish
    -  enemies & tower defense-ish gameplay - factorio?
 
 
@@ -99,10 +94,10 @@ Ideas:
    -  speed up texture loading
    -  fixed "objects" can be blocks
       - any machinery that you can have a lot of should be (geometrically) blocks
-      - machinery that is rare can go through a simpler polygon engine (same as 'moving object' system?)
+      * machinery that is rare can go through a simpler polygon engine (same as 'moving object' system?)
          - actually have a better instanced system
    -  can build multi-block machines by infinifactory-style welding??
-   -  mine ore from ore blocks
+   +  mine ore from ore blocks
       - gradual process that slowly depletes ore
         - graphical representation how?!?
           - encode as second texture on block so can have many degraded blocks?

@@ -17,6 +17,7 @@ extern void world_init(void);
 extern void free_physics_cache(void);
 typedef void (obbg_malloc_dump_func)(size_t size, char *info);
 extern void obbg_malloc_dump(obbg_malloc_dump_func *f);
+extern void query_thread_info(int id, int *count, double *time);
 
 extern void process_tick_raw(float dt);
 extern int get_next_built_mesh(built_mesh *bm);

@@ -458,9 +458,33 @@ void dump_memory(void)
    stb_sdict_delete(memstats_table);
 }
 
+struct
+{
+   float count[32];
+   double time[32];
+} thread_timing[MAX_MESH_WORKERS];
+
+void update_thread_times(void)
+{
+   int i,j;
+   for (i=0; i < MAX_MESH_WORKERS; ++i) {
+      int count[32];
+      double time[32];
+      query_thread_info(i, count, time);
+      for (j=0; j<32; ++j) {
+         thread_timing[i].count[j] = count[j];
+         thread_timing[i].time[j] = time[j];
+      }
+   }
+}
+
+
 Bool show_memory;
 void draw_stats(void)
 {
+   static double last_update_time;
+   static Bool initialize_update = True;
+
    int i;
 
    static Uint64 last_frame_time;
@@ -468,6 +492,16 @@ void draw_stats(void)
    float chunk_server=0;
    float frame_time = (cur_time - last_frame_time) / (float) SDL_GetPerformanceFrequency();
    last_frame_time = cur_time;
+
+   if (initialize_update) {
+      last_update_time = cur_time / (double) SDL_GetPerformanceFrequency();
+      initialize_update = False;
+   }
+
+   if (cur_time / (double) SDL_GetPerformanceFrequency() >= last_update_time + 1.0f) {
+      last_update_time = cur_time / (double) SDL_GetPerformanceFrequency();
+      update_thread_times();
+   }
 
    chunk_server_status[chunk_server_pos] = chunk_server_activity;
    chunk_server_pos = (chunk_server_pos+1) %32;
@@ -481,6 +515,18 @@ void draw_stats(void)
    print("Frame time: %6.2fms, CPU frame render time: %5.2fms", frame_time*1000, render_time*1000);
    print("Tris: %4.1fM drawn of %4.1fM in range", 2*quads_rendered/1000000.0f, 2*quads_considered/1000000.0f);
    print("Gen chunks: %4d", num_gen_chunk_alloc);
+   for (i=0; i < MAX_MESH_WORKERS; ++i) {
+      static char *task[32] = { "mesh", "gencache", "heightf", "fill", "ore", "trees", "edits", "light" };
+      char buffer[1024];
+      int pos=0,j;
+      pos += sprintf(buffer+pos, "Thread %d - ", i);
+      for (j=0; j < 8; ++j) {
+         if (0==strcmp(task[j], "ore")) continue;
+         if (0==strcmp(task[j], "edits")) continue;
+         pos += sprintf(buffer+pos, "%s:%3g/%4.2fms ", task[j], thread_timing[i].count[j], thread_timing[i].time[j]);
+      }
+      print(buffer);
+   }
    if (debug_render) {
       print("Vbuf storage: %dMB in frustum of %dMB in range of %dMB in cache", chunk_storage_rendered>>20, chunk_storage_considered>>20, chunk_storage_total>>20);
       print("Num mesh builds started this frame: %d; num uploaded this frame: %d\n", num_meshes_started, num_meshes_uploaded);
@@ -1104,7 +1150,7 @@ Bool networking;
 
 #define SERVER_PORT 4127
 
-void *memory_mutex;
+void *memory_mutex, *prof_mutex;
 
 //void stbwingraph_main(void)
 int SDL_main(int argc, char **argv)
@@ -1118,7 +1164,8 @@ int SDL_main(int argc, char **argv)
    #endif
 
    memory_mutex = SDL_CreateMutex();
-   if (memory_mutex == NULL) error("Couldn't create mutex for memory tracker");
+   prof_mutex = SDL_CreateMutex();
+   if (memory_mutex == NULL || prof_mutex == NULL) error("Couldn't create mutex");
 
 
    //client_player_input.flying = True;

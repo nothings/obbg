@@ -166,6 +166,34 @@ struct st_gen_chunk
 
 typedef struct
 {
+   double time_spent[32];
+   int times_executed[32];
+} thread_timing_data;
+
+thread_timing_data thread_prof[MAX_MESH_WORKERS];
+
+void add_time(int thread_id, Uint64 start, int job)
+{
+   Uint64 end = SDL_GetPerformanceCounter();
+   assert(thread_id >= 0 && thread_id < MAX_MESH_WORKERS);
+   SDL_LockMutex(prof_mutex);
+   thread_prof[thread_id].time_spent    [job] += (end-start) / (double) SDL_GetPerformanceFrequency();
+   thread_prof[thread_id].times_executed[job] += 1;
+   SDL_UnlockMutex(prof_mutex);
+}
+
+void query_thread_info(int id, int *count, double *time)
+{
+   SDL_LockMutex(prof_mutex);
+   memcpy(count, thread_prof[id].times_executed, sizeof(thread_prof[id].times_executed));
+   memcpy( time, thread_prof[id].time_spent    , sizeof(thread_prof[id].time_spent));
+   memset(thread_prof[id].times_executed, 0, sizeof(thread_prof[id].times_executed));
+   memset(thread_prof[id].time_spent    , 0, sizeof(thread_prof[id].time_spent));
+   SDL_UnlockMutex(prof_mutex);
+}
+
+typedef struct
+{
    int chunk_x, chunk_y;
    gen_chunk *chunk;
 } gen_chunk_cache;
@@ -932,20 +960,25 @@ void change_block(int x, int y, int z, int type, int rot)
    }
 }
 
-gen_chunk *generate_chunk(int x, int y)
+gen_chunk *generate_chunk(int x, int y, int thread_id)
 {
+   Uint64 start;
    int z_seg;
    int i,j,z;
    int ground_top = 0;
-   gen_chunk *gc = obbg_malloc(sizeof(*gc), "/mapgen/gen/chunk");
+   gen_chunk *gc;
    int num_trees;
    tree_location trees[MAX_TREES_PER_CHUNK];
    float height_lerp[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    float height_field[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    float height_ore[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
    int height_field_int[GEN_CHUNK_SIZE_Y+8][GEN_CHUNK_SIZE_X+8];
-   assert(gc);
 
+
+   start = SDL_GetPerformanceCounter();
+
+   gc = obbg_malloc(sizeof(*gc), "/mapgen/gen/chunk");
+   assert(gc);
    ++num_gen_chunk_alloc;
 
    memset(gc->non_empty, 0, sizeof(gc->non_empty));
@@ -967,6 +1000,8 @@ gen_chunk *generate_chunk(int x, int y)
          ground_top = stb_max(ground_top, height_field_int[j+4][i+4]);
          height_ore[j+4][i+4] = stb_perlin_noise3((float)(x+i)+0.5f,(float)(y+j)+0.5f,(float)(x*77+y*31)+0.5f,256,256,256);
       }
+   add_time(thread_id, start, 2);
+   start = SDL_GetPerformanceCounter();
 
    for (z_seg=0; z_seg < NUM_Z_SEGMENTS; ++z_seg) {
       int z0 = z_seg * Z_SEGMENT_SIZE;
@@ -1003,6 +1038,8 @@ gen_chunk *generate_chunk(int x, int y)
          }
       }
    }
+   add_time(thread_id, start, 3);
+   start = SDL_GetPerformanceCounter();
 
    for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
       for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
@@ -1012,6 +1049,8 @@ gen_chunk *generate_chunk(int x, int y)
          }
       }
    }
+   add_time(thread_id, start, 4);
+   start = SDL_GetPerformanceCounter();
 
    num_trees = generate_trees_for_chunk(trees, x, y, MAX_TREES_PER_CHUNK);
    for (i=0; i < num_trees; ++i) {
@@ -1073,6 +1112,8 @@ gen_chunk *generate_chunk(int x, int y)
          }
       }
    }
+   add_time(thread_id, start, 5);
+   start = SDL_GetPerformanceCounter();
 
    #if 0
    for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
@@ -1123,6 +1164,9 @@ gen_chunk *generate_chunk(int x, int y)
       }
    }
 
+   add_time(thread_id, start, 6);
+   start = SDL_GetPerformanceCounter();
+
    // compute lighting for every block by weighted average of neighbors
 
    // loop through every partial chunk separately
@@ -1143,6 +1187,7 @@ gen_chunk *generate_chunk(int x, int y)
    memset(gc->augmented_ref_count, 0, sizeof(gc->augmented_ref_count));
    monitor_create_gen_chunk(gc);
 
+   add_time(thread_id, start, 7);
    return gc;
 }
 
@@ -1184,7 +1229,7 @@ gen_chunk *get_gen_chunk_for_coord(int x, int y)
 {
    gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(x,y);
    if (gcc == NULL) {
-      gcc = put_chunk_in_cache(x, y, generate_chunk(x, y));
+      gcc = put_chunk_in_cache(x, y, generate_chunk(x, y, 0));
    }
    assert(gcc->chunk_x*GEN_CHUNK_SIZE_X == x && gcc->chunk_y*GEN_CHUNK_SIZE_Y == y);
    return gcc->chunk;
@@ -1555,8 +1600,6 @@ mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
    return mc;
 }
 
-#define MAX_MESH_WORKERS 3
-
 enum
 {
    JOB_none,
@@ -1924,30 +1967,6 @@ int num_mesh_workers;
 volatile int num_workers_running;
 volatile Bool stop_worker_flag;
 
-enum
-{
-   PROF_waiting,
-   PROF_managing,
-   PROF_processing,
-
-   PROF__count
-};
-
-typedef struct
-{
-   double time_spent[PROF__count];
-   int times_executed[PROF__count];
-} thread_timing_data;
-
-thread_timing_data thread_prof[MAX_MESH_WORKERS];
-
-void add_time(int thread_id, Uint64 time, int mode)
-{
-   assert(thread_id >= 0 && thread_id < MAX_MESH_WORKERS);
-   thread_prof[thread_id].time_spent[mode]     += time / (double) SDL_GetPerformanceFrequency();
-   thread_prof[thread_id].times_executed[mode] += 1;
-}
-
 int mesh_worker_handler(void *data)
 {
    int thread_id;
@@ -1961,7 +1980,7 @@ int mesh_worker_handler(void *data)
    SDL_UnlockMutex(ref_count_mutex);
 
    for(;;) {
-      Uint64 start, end;
+      Uint64 start;
       Bool did_wait = False;
       task t;
 
@@ -1976,8 +1995,6 @@ int mesh_worker_handler(void *data)
          waiter_wait(&manager_monitor);
          did_wait = True;
       }
-
-      start = SDL_GetPerformanceCounter();
 
       // if we got some work, but we HAD been idle, then wake up the
       // next thread so it can see if it also has work to do
@@ -1995,6 +2012,8 @@ int mesh_worker_handler(void *data)
             mesh_chunk *mc = obbg_malloc(sizeof(*mc), "/mesh/chunk");
             built_mesh out_mesh;
             vec3i wc = { t.world_x, t.world_y, 0 };
+            start = SDL_GetPerformanceCounter();
+
 
             memset(mc, 0, sizeof(mc));
 
@@ -2032,21 +2051,23 @@ int mesh_worker_handler(void *data)
                free(out_mesh.face_buffer);
                free(out_mesh.mc);
             }
+            add_time(thread_id, start, 0);
             break;
          }
          case JOB_generate_terrain: {
             gen_chunk *gc;
-            gc = generate_chunk(t.world_x, t.world_y);
+            gc = generate_chunk(t.world_x, t.world_y, thread_id);
+
+            start = SDL_GetPerformanceCounter();
             assert(gc->ref_count == 0);
             SDL_LockMutex(manager_mutex);
             put_chunk_in_cache(t.world_x, t.world_y, gc);
             end_procgen(t.world_x, t.world_y);
             SDL_UnlockMutex(manager_mutex);
+            add_time(thread_id, start, 1);
             break;
          }
       }
-      end = SDL_GetPerformanceCounter();
-      add_time(thread_id, end-start, PROF_processing);
    }
 }
 
@@ -2074,12 +2095,6 @@ void stop_manager(void)
    }
 
    time = (sim_end - sim_start) / (double) SDL_GetPerformanceFrequency();
-
-   for (i=0; i < num_mesh_workers; ++i) {
-      ods("#%d: Process %5.2lf -- Manage %5.2lf -- Wait: %5.2lf\n", i, thread_prof[i].time_spent[PROF_processing]/time,
-                                                                       thread_prof[i].time_spent[PROF_managing]/time,
-                                                                       thread_prof[i].time_spent[PROF_waiting]/time);
-   }
 }
 
 void init_mesh_build_threads(void)
