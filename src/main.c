@@ -458,6 +458,7 @@ void dump_memory(void)
    stb_sdict_delete(memstats_table);
 }
 
+Bool show_memory;
 void draw_stats(void)
 {
    int i;
@@ -506,9 +507,8 @@ void draw_stats(void)
       print("SLOWNESS: Synchronous debug output is enabled!");
    }
 
-   if (1) {
+   if (show_memory) {
       dump_memory();
-
    }
 }
 
@@ -1004,7 +1004,7 @@ void process_event(SDL_Event *e)
          //if (k == '2') global_hack = -1;
          //if (k == '3') obj[player_id].position.x += 65536;
          if (s == SDL_SCANCODE_P) debug_render = !debug_render;
-         if (s == SDL_SCANCODE_C) examine_outstanding_genchunks();
+         if (s == SDL_SCANCODE_C) show_memory = !show_memory;//examine_outstanding_genchunks();
          #if 0
          if (s == SDL_SCANCODE_R) {
             objspace_to_worldspace(light_vel, player_id, 0,32,0);
