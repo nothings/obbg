@@ -212,6 +212,8 @@ static void abandon_mesh_chunk_status(mesh_chunk_status *mcs)
 {
    int i,j;
    //ods("Abandon %d,%d", mcs->chunk_x, mcs->chunk_y);
+   if (mcs->status == CHUNK_STATUS_invalid)
+      return;
    for (j=0; j < 4; ++j)
       for (i=0; i < 4; ++i)
          if (mcs->chunk_set_valid[j][i])
@@ -219,6 +221,7 @@ static void abandon_mesh_chunk_status(mesh_chunk_status *mcs)
          else
             assert(mcs->cs.chunk[j][i] == 0);
    mcs->status = CHUNK_STATUS_invalid;
+   ++mcs->chunk_x; // make chunk_x invalid for this direct-mapped cache slot
    memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
    memset(&mcs->cs, 0, sizeof(mcs->cs));
 }
@@ -424,10 +427,33 @@ static void monitor_refcount_gen_chunk(gen_chunk *gc)
    assert(i < num_gen_chunk);
    SDL_UnlockMutex(ref_count_mutex);
 }
+
+void examine_outstanding_genchunks(void)
+{
+   int cache_count=0;
+   int i,j;
+   SDL_LockMutex(ref_count_mutex);
+   for (i=0; i < num_gen_chunk; ++i) {
+      gen_chunk *gc = gen_chunk_table[i];
+      if (gc->augmented_ref_count[REF_cache]) {
+         ++cache_count;
+      } else {
+         ods("GenChunk %p -- ");
+         for (j=0; j < REF__count; ++j) {
+            ods("%d ", gc->augmented_ref_count[j]);
+         }
+         ods("\n");
+      }
+   }
+   ods("Num in cache: %d\n", cache_count);
+   SDL_UnlockMutex(ref_count_mutex);
+}
+
 #else
 #define monitor_delete_gen_chunk(gc)
 #define monitor_create_gen_chunk(gc)
 #define monitor_refcount_gen_chunk(gc)
+void examine_outstanding_genchunks(void){}
 #endif
 
 
@@ -1720,6 +1746,12 @@ Bool get_next_task(task *t, int thread_id)
    SDL_LockMutex(swap_renderer_request_mutex);
    if (swap_current_processing()) {
       // delete any requests that are already in the mesh-building stage by rebuilding list in-place
+
+      #if 1
+      for (i=0; i < MESH_STATUS_X*MESH_STATUS_Y*2; ++i)
+         mesh_status[0][0][i].in_new_list = False;
+      #endif
+
       n=0;
       for (i=0; i < MAX_BUILT_MESHES; ++i) {
          requested_mesh *rm = &current_processing_meshes[i];
@@ -1739,6 +1771,14 @@ Bool get_next_task(task *t, int thread_id)
       if (n < MAX_BUILT_MESHES)
          current_processing_meshes[n].state = RMS_invalid;
 
+      #if 1
+      // delete any old mesh status requests that are no longer requested, but only if
+      // they haven't made it to the final processing stage
+      for (i=0; i < MESH_STATUS_X*MESH_STATUS_Y*2; ++i)
+         if (!mesh_status[0][0][i].in_new_list && mesh_status[0][0][i].status != CHUNK_STATUS_processing)
+            abandon_mesh_chunk_status(&mesh_status[0][0][i]);
+      #else
+
       // scan old list for things that we were building but aren't in the list now,
       // and discard them
       for (i=0; i < MAX_BUILT_MESHES; ++i) {
@@ -1747,7 +1787,7 @@ Bool get_next_task(task *t, int thread_id)
          if (rm->state == RMS_invalid)
             break;
          mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
-         if (mcs && !mcs->in_new_list) {
+         if (mcs && !mcs->in_new_list && mcs->status != CHUNK_STATUS_processing) {
             abandon_mesh_chunk_status(mcs);
          }
       }
@@ -1761,6 +1801,7 @@ Bool get_next_task(task *t, int thread_id)
          mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
          mcs->in_new_list = False;
       }
+      #endif
    }
    SDL_UnlockMutex(swap_renderer_request_mutex);
 
