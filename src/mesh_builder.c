@@ -159,7 +159,8 @@ struct st_gen_chunk
 {
    int ref_count;
    gen_chunk_partial partial  [NUM_Z_SEGMENTS];
-   unsigned char     non_empty[NUM_Z_SEGMENTS];
+   int highest_z;
+   int lowest_z;
 
    int augmented_ref_count[REF__count];
 };
@@ -985,7 +986,7 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
    Uint64 start;
    int z_seg;
    int i,j,z,ji,ii;
-   int ground_top = 0;
+   int ground_top = 0, solid_bottom=255;
    gen_chunk *gc;
    int num_trees;
    tree_location trees[MAX_TREES_PER_CHUNK];
@@ -999,9 +1000,6 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
    gc = obbg_malloc(sizeof(*gc), "/mapgen/gen/chunk");
    assert(gc);
    ++num_gen_chunk_alloc;
-
-   memset(gc->non_empty, 0, sizeof(gc->non_empty));
-   memset(gc->non_empty, 1, (ground_top+Z_SEGMENT_SIZE-1)>>Z_SEGMENT_SIZE_LOG2);
 
    // @TODO: compute non_empty based on below updates
    // @OPTIMIZE: change mesh builder to check non_empty
@@ -1031,13 +1029,17 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
          height_field[j+4][i+4] = ht;
          height_field_int[j+4][i+4] = (int) height_field[j+4][i+4];
          ground_top = stb_max(ground_top, height_field_int[j+4][i+4]);
+         solid_bottom = stb_min(solid_bottom, height_field_int[j+4][i+4]);
          height_ore[j+4][i+4] = big_noise(x+i,y+j, 0, x*77+y*31);
       }
    add_time(thread_id, start, 2);
    start = SDL_GetPerformanceCounter();
 
+   gc->highest_z = ground_top;
+   gc->lowest_z = solid_bottom;
    for (z_seg=0; z_seg < NUM_Z_SEGMENTS; ++z_seg) {
       int z0 = z_seg * Z_SEGMENT_SIZE;
+      int z1 = z0 + Z_SEGMENT_SIZE-1;
       gen_chunk_partial *gcp = &gc->partial[z_seg];
       for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
          for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
@@ -1057,6 +1059,7 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
             if (height_ore[j+4][i+4] < -0.5) {
                bt = BT_stone;
                z_limit = stb_clamp(ht+1-z0, 0, Z_SEGMENT_SIZE);
+               gc->highest_z = stb_max(gc->highest_z, stb_min(ht+1,255));
             }
 
             //bt = (int) stb_lerp(height_lerp[j][i], BT_sand, BT_marble+0.99f);
@@ -1104,6 +1107,9 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
 
             leaf_top += 3;
             leaf_bottom += 3;
+            leaf_bottom = stb_clamp(leaf_bottom,1,255);
+
+            gc->highest_z = stb_max(gc->highest_z, leaf_bottom);
 
             r >>= 2;
             tree_width = stb_linear_remap((r&15), 0, 15, 2.5f, 3.9f); r >>= 4;
@@ -1193,6 +1199,8 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
                      int zoff = ht & (Z_SEGMENT_SIZE-1);
                      gc->partial[zs].block[j][i][zoff] = e->blocks[k][j][i].type;
                      gc->partial[zs].rotate[j][i][zoff] = e->blocks[k][j][i].rotate;
+                     gc->highest_z = stb_max(gc->highest_z, ht);
+                     gc->lowest_z = stb_min(gc->lowest_z, ht-1);
                   }
       }
    }
@@ -1206,14 +1214,32 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
 
    for (z_seg=0; z_seg < NUM_Z_SEGMENTS; ++z_seg) {
       gen_chunk_partial *gcp = &gc->partial[z_seg];
-      for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
-         for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
-            for (z=0; z < Z_SEGMENT_SIZE; ++z) {
-               static uint8 convert_rot[4] = { 0,3,2,1 };
-               int type = gcp->block[j][i][z];
-               int is_solid = type != 0 && type != BT_picker;
-               gcp->lighting[j][i][z] = STBVOX_MAKE_LIGHTING_EXT(is_solid ? 0 : 255, convert_rot[gcp->rotate[j][i][z]]);
-            }
+      if (z_seg*Z_SEGMENT_SIZE > gc->highest_z+1 || (z_seg+1)*Z_SEGMENT_SIZE < gc->lowest_z) {
+         unsigned char light = STBVOX_MAKE_LIGHTING_EXT(255,0);
+         if ((z_seg+1)*Z_SEGMENT_SIZE < gc->lowest_z) light = STBVOX_MAKE_LIGHTING_EXT(0,0);
+         #if 1
+         for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
+            memset(gcp->lighting[j][0                 ], light, Z_SEGMENT_SIZE);
+            memset(gcp->lighting[j][GEN_CHUNK_SIZE_X-1], light, Z_SEGMENT_SIZE);
+         }
+         for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+            memset(gcp->lighting[0                 ][i], light, Z_SEGMENT_SIZE);
+            memset(gcp->lighting[GEN_CHUNK_SIZE_Y-1][i], light, Z_SEGMENT_SIZE);
+         }
+         #else
+         memset(gcp->lighting, light, sizeof(gcp->lighting));
+         #endif
+      } else {
+         gen_chunk_partial *gcp = &gc->partial[z_seg];
+         for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+            for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
+               for (z=0; z < Z_SEGMENT_SIZE; ++z) {
+                  static uint8 convert_rot[4] = { 0,3,2,1 };
+                  int type = gcp->block[j][i][z];
+                  int is_solid = type != 0 && type != BT_picker;
+                  gcp->lighting[j][i][z] = STBVOX_MAKE_LIGHTING_EXT(is_solid ? 0 : 255, convert_rot[gcp->rotate[j][i][z]]);
+               }
+      }
    }
 
    gc->ref_count = 0;
