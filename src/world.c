@@ -68,6 +68,10 @@ void client_view_physics(objid oid, player_controls *con, float dt)
 {
    object *o = &obj[oid];
    if (con->flying) {
+      #if 1
+      o->ang.x = pending_view_x*0.25f;
+      o->ang.z = pending_view_z*0.50f;
+      #else
       view_x_vel *= (float) pow(0.75, dt);
       view_z_vel *= (float) pow(0.75, dt);
 
@@ -79,6 +83,9 @@ void client_view_physics(objid oid, player_controls *con, float dt)
 
       o->ang.x += view_x_vel * dt;
       o->ang.z += view_z_vel * dt;
+      #endif
+
+
       o->ang.x = stb_clamp(o->ang.x, -90, 90);
       o->ang.z = (float) fmod(o->ang.z, 360);
    } else {
@@ -90,9 +97,9 @@ void client_view_physics(objid oid, player_controls *con, float dt)
       o->ang.z += pending_view_z * 0.50f;
       pending_view_x = 0;
       pending_view_z = 0;
+      #endif
       o->ang.x = stb_clamp(o->ang.x, -90, 90);
       o->ang.z = (float) fmod(o->ang.z, 360);
-      #endif
    }
 }
 

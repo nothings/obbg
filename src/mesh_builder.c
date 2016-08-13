@@ -1041,36 +1041,46 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
       int z0 = z_seg * Z_SEGMENT_SIZE;
       int z1 = z0 + Z_SEGMENT_SIZE-1;
       gen_chunk_partial *gcp = &gc->partial[z_seg];
-      for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
-         for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
-            int bt;
-            int ht = height_field_int[j+4][i+4];
+      if (z0 > gc->highest_z+1) {
+         for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+            for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
+               memset(gcp->block[j][0], BT_empty, Z_SEGMENT_SIZE);
+      } else if (z1+1 < gc->lowest_z) {
+         for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+            for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
+               memset(gcp->block[j][0], BT_stone, Z_SEGMENT_SIZE);
+      } else {
+         for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
+            for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
+               int bt;
+               int ht = height_field_int[j+4][i+4];
 
-            int z_stone = stb_clamp(ht-2-z0, 0, Z_SEGMENT_SIZE);
-            int z_limit = stb_clamp(ht-z0, 0, Z_SEGMENT_SIZE);
+               int z_stone = stb_clamp(ht-2-z0, 0, Z_SEGMENT_SIZE);
+               int z_limit = stb_clamp(ht-z0, 0, Z_SEGMENT_SIZE);
 
-            if (height_lerp[j][i] < 0.5)
-               bt = BT_grass;
-            else
-               bt = BT_sand;
-            if (ht > AVG_GROUND+14)
-               bt = BT_gravel;
+               if (height_lerp[j][i] < 0.5)
+                  bt = BT_grass;
+               else
+                  bt = BT_sand;
+               if (ht > AVG_GROUND+14)
+                  bt = BT_gravel;
 
-            if (height_ore[j+4][i+4] < -0.5) {
-               bt = BT_stone;
-               z_limit = stb_clamp(ht+1-z0, 0, Z_SEGMENT_SIZE);
-               gc->highest_z = stb_max(gc->highest_z, stb_min(ht+1,255));
+               if (height_ore[j+4][i+4] < -0.5) {
+                  bt = BT_stone;
+                  z_limit = stb_clamp(ht+1-z0, 0, Z_SEGMENT_SIZE);
+                  gc->highest_z = stb_max(gc->highest_z, stb_min(ht+1,255));
+               }
+
+               //bt = (int) stb_lerp(height_lerp[j][i], BT_sand, BT_marble+0.99f);
+               assert(z_limit >= 0 && Z_SEGMENT_SIZE - z_limit >= 0);
+
+               memset(&gcp->rotate[j][i][0], 0, Z_SEGMENT_SIZE);
+               if (z_limit > 0) {
+                  memset(&gcp->block[j][i][   0   ], BT_stone, z_stone);
+                  memset(&gcp->block[j][i][z_stone],  bt     , z_limit-z_stone);
+               }
+               memset(&gcp->block[j][i][z_limit],     BT_empty    , Z_SEGMENT_SIZE - z_limit);
             }
-
-            //bt = (int) stb_lerp(height_lerp[j][i], BT_sand, BT_marble+0.99f);
-            assert(z_limit >= 0 && Z_SEGMENT_SIZE - z_limit >= 0);
-
-            memset(&gcp->rotate[j][i][0], 0, Z_SEGMENT_SIZE);
-            if (z_limit > 0) {
-               memset(&gcp->block[j][i][   0   ], BT_stone, z_stone);
-               memset(&gcp->block[j][i][z_stone],  bt     , z_limit-z_stone);
-            }
-            memset(&gcp->block[j][i][z_limit],     BT_empty    , Z_SEGMENT_SIZE - z_limit);
          }
       }
    }
@@ -1107,9 +1117,9 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
 
             leaf_top += 3;
             leaf_bottom += 3;
-            leaf_bottom = stb_clamp(leaf_bottom,1,255);
+            leaf_top = stb_clamp(leaf_top,1,255);
 
-            gc->highest_z = stb_max(gc->highest_z, leaf_bottom);
+            gc->highest_z = stb_max(gc->highest_z, leaf_top);
 
             r >>= 2;
             tree_width = stb_linear_remap((r&15), 0, 15, 2.5f, 3.9f); r >>= 4;

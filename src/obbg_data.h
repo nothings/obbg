@@ -1,7 +1,7 @@
 #ifndef INCLUDE_OBBG_DATA_H
 #define INCLUDE_OBBG_DATA_H
 
-//#define MINIMIZE_MEMORY
+#define MINIMIZE_MEMORY
 
 #include "stb.h"
 

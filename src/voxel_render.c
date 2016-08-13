@@ -79,7 +79,7 @@ void init_voxel_render(int voxel_tex[2])
 #if VIEW_DIST_LOG2 < 11
 int view_distance=300;
 #else
-int view_distance=1800;
+int view_distance=1500;
 #endif
 
 static float bone_data[4] = { 0,0,0,0 };

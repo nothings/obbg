@@ -128,7 +128,7 @@ typedef struct
 ore_hack_info ore_hack[500000];
 ore_hack_info *next_ohi = ore_hack;
 
-int ore_processed, ore_pending;
+int ore_processed, ore_pending, ore_count;
 
 extern SDL_mutex *ore_update_mutex;
 void logistics_record_ore(int x, int y, int z1, int z2, int type)
@@ -137,17 +137,19 @@ void logistics_record_ore(int x, int y, int z1, int z2, int type)
    SDL_LockMutex(ore_update_mutex);
    if (uidict == NULL) uidict = stb_uidict_create();
 
-   ohi = stb_uidict_get(uidict, y*65536+x);
-   if (ohi == NULL) {
-      ++ore_pending;
-      ohi = next_ohi++;//malloc(sizeof(*ohi));
-      ohi->x = x;
-      ohi->y = y;
-      ohi->z1 = z1;
-      ohi->z2 = z2;
-      ohi->type = type;
-      ohi->padding = 0;
-      stb_uidict_add(uidict, y*65536+x, ohi);
+   if (ore_count++ <= 2000) {
+      ohi = stb_uidict_get(uidict, y*65536+x);
+      if (ohi == NULL) {
+         ++ore_pending;
+         ohi = next_ohi++;//malloc(sizeof(*ohi));
+         ohi->x = x;
+         ohi->y = y;
+         ohi->z1 = z1;
+         ohi->z2 = z2;
+         ohi->type = type;
+         ohi->padding = 0;
+         stb_uidict_add(uidict, y*65536+x, ohi);
+      }
    }
 
    SDL_UnlockMutex(ore_update_mutex);
