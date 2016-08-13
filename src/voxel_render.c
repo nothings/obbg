@@ -8,8 +8,8 @@
 #include "stb_glprog.h"
 
 #include "stb.h"
-#include "sdl.h"
-#include "sdl_thread.h"
+#include "SDL.h"
+#include "SDL_thread.h"
 #include <math.h>
 
 #include "stb_voxel_render.h"
@@ -36,10 +36,10 @@ void init_voxel_render(int voxel_tex[2])
    fragment = stbvox_get_fragment_shader();
 
    {
-      char *binds[] = { "attr_vertex", "attr_face", NULL };
+      char const *binds[] = { "attr_vertex", "attr_face", NULL };
       char error_buffer[1024];
-      char *main_vertex[] = { vertex, NULL };
-      char *main_fragment[] = { fragment, NULL };
+      char const *main_vertex[] = { vertex, NULL };
+      char const *main_fragment[] = { fragment, NULL };
       int which_failed;
       main_prog = stbgl_create_program(main_vertex, main_fragment, binds, error_buffer, sizeof(error_buffer), &which_failed);
       if (main_prog == 0) {
@@ -57,15 +57,16 @@ void init_voxel_render(int voxel_tex[2])
    vertex = stb_file("data/picker_vertex_shader.txt", NULL);
    fragment = stb_file("data/picker_fragment_shader.txt", NULL);
    {
-      char *binds[] = { "position", "normal", "bone1", "bone2", NULL };
+      char const *binds[] = { "position", "normal", "bone1", "bone2", NULL };
       char error_buffer[1024];
-      char *main_vertex[] = { vertex, NULL };
-      char *main_fragment[] = { fragment, NULL };
+      char const *main_vertex[] = { vertex, NULL };
+      char const *main_fragment[] = { fragment, NULL };
       int which_failed;
       picker_prog = stbgl_create_program(main_vertex, main_fragment, binds, error_buffer, sizeof(error_buffer), &which_failed);
       if (picker_prog == 0) {
          char *prog = which_failed == STBGL_FAILURE_STAGE_VERTEX ? vertex : fragment;
-         stb_filewrite("obbg_failed_shader.txt", prog, strlen(prog));
+         if(prog)
+            stb_filewrite("obbg_failed_shader.txt", prog, strlen(prog));
          ods("Compile error for picker shader: %s\n", error_buffer);
          assert(0);
          exit(1);

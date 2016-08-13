@@ -12,8 +12,8 @@
 #include "stb_glprog.h"
 
 #include "stb.h"
-#include "sdl.h"
-#include "sdl_thread.h"
+#include "SDL.h"
+#include "SDL_thread.h"
 
 #include <math.h>
 #include <assert.h>
@@ -46,7 +46,7 @@ static unsigned char geom_for_blocktype[256] =
 
 static unsigned char vheight_for_blocktype[256];
 
-static unsigned char tex1_for_blocktype[256][6];
+unsigned char tex1_for_blocktype[256][6];
 static unsigned char tex2_for_blocktype[256][6];
 static unsigned char color_for_blocktype[256][6];
 

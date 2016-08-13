@@ -1,7 +1,7 @@
 #include "obbg_funcs.h"
 #include "stb_gl.h"
 #include <math.h>
-#include "sdl_thread.h"
+#include "SDL_thread.h"
 
 #define ITEMS_PER_BELT_SIDE   4
 #define BELT_SIDES   2
@@ -105,8 +105,6 @@ typedef struct
 #define LOGI_CHUNK_MASK_X(x) ((x) & (LOGI_CHUNK_SIZE_X-1))
 #define LOGI_CHUNK_MASK_Y(y) ((y) & (LOGI_CHUNK_SIZE_Y-1))
 #define LOGI_CHUNK_MASK_Z(z) ((z) & (LOGI_CHUNK_SIZE_Z-1))
-
-
 
 
 //   HUGE HACK to keep track of ore for now

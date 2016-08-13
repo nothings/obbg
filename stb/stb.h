@@ -3749,6 +3749,8 @@ int stb_ischar(char c, char *set)
 #define STB__nogcc(x)  x
 #endif
 
+// the typedef below was STB__nogcc, but that broke linux compilation
+
 #define stb_define_hash_base(PREFIX,TYPE,FIELDS,N,NC,LOAD_FACTOR,             \
                              KEY,EMPTY,DEL,COPY,DISPOSE,SAFE,                 \
                              VCOMPARE,CCOMPARE,HASH,                          \
@@ -3760,7 +3762,7 @@ typedef struct                                                                \
    VALUE v;                                                                   \
 } STB_(N,_hashpair);                                                          \
                                                                               \
-STB__nogcc( typedef struct stb__st_##TYPE TYPE;  )                            \
+typedef struct stb__st_##TYPE TYPE;                                           \
 struct stb__st_##TYPE {                                                       \
    FIELDS                                                                     \
    STB_(N,_hashpair) *table;                                                  \

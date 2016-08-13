@@ -70,3 +70,5 @@ dlldata.c
 # VC12
 *.sdf
 *.opensdf
+
+/obbg
