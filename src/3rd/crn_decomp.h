@@ -925,7 +925,7 @@ namespace crnd
          if (m_size != new_size)
          {
             if (new_size < m_size)
-               ;//scalar_type<T>::destruct_array(m_p + new_size, m_size - new_size);
+               ;
             else
             {
                if (new_size > m_capacity)
@@ -941,33 +941,6 @@ namespace crnd
          }
 
          return true;
-      }
-
-      inline bool push_back(const T& obj)
-      {
-         CRND_ASSERT(!m_p || (&obj < m_p) || (&obj >= (m_p + m_size)));
-
-         if (m_size >= m_capacity)
-         {
-            if (!increase_capacity(m_size + 1, true))
-               return false;
-         }
-
-         scalar_type<T>::construct(m_p + m_size, obj);
-         m_size++;
-
-         return true;
-      }
-
-      inline void pop_back()
-      {
-         CRND_ASSERT(m_size);
-
-         if (m_size)
-         {
-            m_size--;
-            scalar_type<T>::destruct(&m_p[m_size]);
-         }
       }
 
       inline void insert(uint32 index, const T* p, uint32 n)
@@ -998,59 +971,6 @@ namespace crnd
             CRND_ASSERT((pDst - m_p) < (int)m_size);
             *pDst++ = *p++;
          }
-      }
-
-      inline void erase(uint32 start, uint32 n)
-      {
-         CRND_ASSERT((start + n) <= m_size);
-
-         if (!n)
-            return;
-
-         const uint32 num_to_move = m_size - (start + n);
-
-         T* pDst = m_p + start;
-         T* pDst_end = pDst + num_to_move;
-         const T* pSrc = m_p + start + n;
-
-         while (pDst != pDst_end)
-            *pDst++ = *pSrc++;
-
-         scalar_type<T>::destruct_array(pDst_end, n);
-
-         m_size -= n;
-      }
-
-      inline void erase(uint32 index)
-      {
-         erase(index, 1);
-      }
-
-      inline void erase(T* p)
-      {
-         CRND_ASSERT((p >= m_p) && (p < (m_p + m_size)));
-         erase(p - m_p);
-      }
-
-      inline bool operator== (const vector& rhs) const
-      {
-         if (m_size != rhs.m_size)
-            return false;
-         else if (m_size)
-         {
-            if (scalar_type<T>::cFlag)
-               return memcmp(m_p, rhs.m_p, sizeof(T) * m_size) == 0;
-            else
-            {
-               const T* pSrc = m_p;
-               const T* pDst = rhs.m_p;
-               for (uint32 i = m_size; i; i--)
-                  if (!(*pSrc++ == *pDst++))
-                     return false;
-            }
-         }
-
-         return true;
       }
 
       inline bool operator< (const vector& rhs) const
@@ -1658,8 +1578,6 @@ namespace crnd
       static uint32        pack_endpoints(uint32 lo, uint32 hi);
    };
 
-   CRND_DEFINE_BITWISE_MOVABLE(dxt1_block);
-
    struct dxt3_block
    {
       enum { cNumAlphaBytes = 8 };
@@ -1668,8 +1586,6 @@ namespace crnd
       void set_alpha(uint32 x, uint32 y, uint32 value, bool scaled);
       uint32 get_alpha(uint32 x, uint32 y, bool scaled) const;
    };
-
-   CRND_DEFINE_BITWISE_MOVABLE(dxt3_block);
 
    struct dxt5_block
    {
@@ -1761,9 +1677,6 @@ namespace crnd
       static uint32          unpack_endpoint(uint32 packed, uint32 index);
       static uint32          pack_endpoints(uint32 lo, uint32 hi);
    };
-
-   CRND_DEFINE_BITWISE_MOVABLE(dxt5_block);
-
 } // namespace crnd
 
 // File: crnd_dxt_hc_common.h

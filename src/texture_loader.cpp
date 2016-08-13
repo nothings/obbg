@@ -1,10 +1,5 @@
 #include "string.h"
 
-template<class T>
-using scalar_type = T;
-
-#define CRND_DEFINE_BITWISE_MOVABLE(...)
-
 #include "3rd/crn_decomp.h"
 
 #define STB_GLEXT_DECLARE "glext_list.h"
