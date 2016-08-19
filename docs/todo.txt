@@ -1,9 +1,3 @@
-Things that must be done next:
-   -  write a real performance monitor
-   -  write a real memory monitor
-
-
-
    -  do you need the diagonal gen_chunk neighbors to the mesh chunks?!???
 
 Possible tasks to work on next:
@@ -171,6 +165,7 @@ Ideas:
    Code quality
    -  check for memory leaks
    -  check what happens if same mesh_chunk_status is allocated, abandoned, and reallocated
+   -  organize obbg_funcs.h by source file
 
 Not right now:
 

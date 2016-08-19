@@ -18,6 +18,8 @@ extern void free_physics_cache(void);
 typedef void (obbg_malloc_dump_func)(size_t size, char *info);
 extern void obbg_malloc_dump(obbg_malloc_dump_func *f);
 extern void query_thread_info(int id, int *count, double *time);
+extern void init_object_render(void);
+extern void force_update_for_block_raw(int x, int y, int z);
 
 extern void process_tick_raw(float dt);
 extern int get_next_built_mesh(built_mesh *bm);
@@ -29,7 +31,7 @@ extern void save_edits(void);
 extern void load_edits(void);
 extern void init_mesh_building(void);
 
-extern mesh_chunk *build_mesh_chunk_for_coord(int x, int y);
+extern mesh_chunk *build_mesh_chunk_for_coord(mesh_chunk *mc, int x, int y);
 extern void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer);
 extern void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc);
 extern mesh_chunk *get_mesh_chunk_for_coord(int x, int y);

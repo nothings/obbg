@@ -225,6 +225,7 @@ void render_init(void)
 
 
    init_voxel_render(voxel_tex);
+   init_object_render();
 
    {
       char const *frag[] = { dumb_fragment_shader, NULL };
@@ -1254,7 +1255,7 @@ int SDL_main(int argc, char **argv)
    if (program_mode != MODE_single_player)
       networking = net_init(program_mode == MODE_server, server_port);
 
-   //SDL_GL_SetSwapInterval(0);
+   SDL_GL_SetSwapInterval(0);
    game_init();
    render_init();
 

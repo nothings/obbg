@@ -145,7 +145,8 @@ typedef struct
 {
    int chunk_x, chunk_y;
 
-   int vbuf_size, fbuf_size;
+   size_t vbuf_size, fbuf_size;
+   size_t total_size;
 
    float transform[3][3];
    float bounds[2][3];
@@ -154,6 +155,8 @@ typedef struct
    unsigned int fbuf, fbuf_tex;
    int num_quads;
    int has_triangles;
+
+   float priority;
 
    int dirty;
 
@@ -205,7 +208,7 @@ extern object obj[MAX_OBJECTS];
 
 extern float texture_scales[256];
 
-extern mesh_chunk     *c_mesh_cache[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
+//extern mesh_chunk     *c_mesh_cache[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
 
 extern objid player_id;
 extern objid max_obj_id, max_player_id;
@@ -264,6 +267,7 @@ enum
 extern int program_mode;
 extern player_controls p_input[PLAYER_OBJECT_MAX];
 extern int global_hack;
+extern int view_distance;
 
 extern void *memory_mutex, *prof_mutex;
 

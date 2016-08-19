@@ -9,12 +9,10 @@ obbg:
   - save/load to disk
   - networking
 
-Todo:
-   -  merge linux pull request
-   -  write a real performance monitor
-
 Done in today's stream (33)
    -  write a real memory monitor
+   -  write a real performance monitor
+   -  merge linux pull request
 
 Previous stream (32)
    -  write tool to parse Miblo's annotations, generate youtube-formatted info

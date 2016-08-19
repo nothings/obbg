@@ -194,6 +194,10 @@ SOURCE=..\src\object.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\src\object_render.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\physics.c
 # End Source File
 # Begin Source File

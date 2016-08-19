@@ -220,8 +220,6 @@ typedef struct
 #define MESH_STATUS_X   64
 #define MESH_STATUS_Y   64
 
-       mesh_chunk      *c_mesh_cache[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
-
 static mesh_chunk_status mesh_status[MESH_STATUS_Y][MESH_STATUS_X][2];
 static gen_chunk_cache    gen_cache [   GEN_CHUNK_CACHE_Y][   GEN_CHUNK_CACHE_X];
 
@@ -351,39 +349,6 @@ int can_start_procgen(int x, int y)
    return !procgen_in_progress[slot_y][slot_x].in_use;
 }
 
-mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
-{
-   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
-   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   mesh_chunk *mc = c_mesh_cache[cy & (C_MESH_CHUNK_CACHE_Y-1)][cx & (C_MESH_CHUNK_CACHE_X-1)];
-
-   if (mc && mc->chunk_x == cx && mc->chunk_y == cy)
-      return mc;
-   else
-      return NULL;
-}
-
-void free_mesh_chunk_physics(mesh_chunk *mc)
-{
-   if (mc->allocs) {
-      int i;
-      for (i=0; i < obarr_len(mc->allocs); ++i)
-         obbg_free(mc->allocs[i]);
-      obarr_free(mc->allocs);
-   }
-}
-
-void free_mesh_chunk(mesh_chunk *mc)
-{
-   glDeleteTextures(1, &mc->fbuf_tex);
-   glDeleteBuffersARB(1, &mc->vbuf);
-   glDeleteBuffersARB(1, &mc->fbuf);
-
-   free_mesh_chunk_physics(mc);
-   obbg_free(mc);
-}
-
-
 gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
 {
    int cx = GEN_CHUNK_X_FOR_WORLD_X(x);
@@ -400,12 +365,6 @@ gen_chunk_cache *get_gen_chunk_cache_for_coord(int x, int y)
 void init_chunk_caches(void)
 {
    int i,j;
-   for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j) {
-      for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i) {
-         c_mesh_cache[j][i] = 0;
-      }
-   }
-
    for (j=0; j < GEN_CHUNK_CACHE_Y; ++j) {
       for (i=0; i < GEN_CHUNK_CACHE_X; ++i) {
          assert(gen_cache[j][i].chunk == NULL);
@@ -522,13 +481,6 @@ void free_gen_chunk(gen_chunk_cache *gcc, int type)
 void free_chunk_caches(void)
 {
    int i,j;
-   for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j) {
-      for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i) {
-         if (c_mesh_cache[j][i] != NULL)
-            free_mesh_chunk(c_mesh_cache[j][i]);
-      }
-   }
-
    for (j=0; j < GEN_CHUNK_CACHE_Y; ++j) {
       for (i=0; i < GEN_CHUNK_CACHE_X; ++i) {
          if (gen_cache[j][i].chunk != NULL)
@@ -1044,11 +996,11 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
       if (z0 > gc->highest_z+1) {
          for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
             for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
-               memset(gcp->block[j][0], BT_empty, Z_SEGMENT_SIZE);
+               memset(gcp->block[j][i], BT_empty, Z_SEGMENT_SIZE);
       } else if (z1+1 < gc->lowest_z) {
          for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
             for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
-               memset(gcp->block[j][0], BT_stone, Z_SEGMENT_SIZE);
+               memset(gcp->block[j][i], BT_stone, Z_SEGMENT_SIZE);
       } else {
          for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
             for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
@@ -1566,11 +1518,9 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
       map->lighting  = &bd->segment_lighting[1][1][1-z];
       //map->rotate    = &bd->segment_rotate[1][1][1-z];
 
-      {
-         stbvox_set_input_range(mm, 0,0,z0, 64,64,z1);
-         stbvox_set_default_mesh(mm, 0);
-         stbvox_make_mesh(mm);
-      }
+      stbvox_set_input_range(mm, 0,0,z0, 64,64,z1);
+      stbvox_set_default_mesh(mm, 0);
+      stbvox_make_mesh(mm);
 
       // copy the bottom two rows of data up to the top
       for (b=0; b < 66; ++b) {
@@ -1594,32 +1544,6 @@ void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i wo
    mc->num_quads = stbvox_get_quad_count(mm, 0);
 }
 
-void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc)
-{
-   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
-   int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
-   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
-   mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
-   if (mc && mc->vbuf) {
-      free_mesh_chunk(mc);
-   }
-
-   c_mesh_cache[slot_y][slot_x] = new_mc;
-   c_mesh_cache[slot_y][slot_x]->dirty = False;
-}
-
-void force_update_for_block_raw(int x, int y, int z)
-{
-   int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
-   int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
-   int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
-   mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
-   if (mc && mc->chunk_x == cx && mc->chunk_y == cy)
-      mc->dirty = True;
-}
-
 void force_update_for_block(int x, int y, int z)
 {
    force_update_for_block_raw(x,y,z);
@@ -1635,13 +1559,10 @@ static uint8 face_buffer[4*1024*1024];
 
 static build_data static_build_data;
 
-mesh_chunk *build_mesh_chunk_for_coord(int x, int y)
+mesh_chunk *build_mesh_chunk_for_coord(mesh_chunk *mc, int x, int y)
 {
    int cx = C_MESH_CHUNK_X_FOR_WORLD_X(x);
-   int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
    int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
-   int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
-   mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
 
    if (mc->vbuf) {
       assert(mc->chunk_x != cx || mc->chunk_y != cy);
