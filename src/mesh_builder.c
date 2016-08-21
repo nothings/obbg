@@ -260,13 +260,11 @@ void finished_caching_mesh_chunk(int x, int y, Bool needs_triangles)
    SDL_LockMutex(manager_mutex);
    mcs = get_chunk_status(x, y, needs_triangles);
    if (mcs != NULL) {
-      int i,j;
       assert(mcs->status == CHUNK_STATUS_processing);
-      for (j=0; j < 4; ++j)
-         for (i=0; i < 4; ++i)
-            assert(mcs->chunk_set_valid[j][i] == 0);
-      //ods("Invalidating %d,%d", mcs->chunk_x, mcs->chunk_y);
       mcs->status = CHUNK_STATUS_invalid;
+      ++mcs->chunk_x; // make chunk_x invalid for this direct-mapped cache slot
+      memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
+      memset(&mcs->cs, 0, sizeof(mcs->cs));
    }
    SDL_UnlockMutex(manager_mutex);
 }
@@ -1774,8 +1772,8 @@ FILE * volatile df;
 Bool get_next_task(task *t, int thread_id)
 {
    Bool found_task_flag = True;
-   int i,n;
-
+   int i;
+   Uint64 start = SDL_GetPerformanceCounter();
 
    SDL_LockMutex(manager_mutex);
 
@@ -1786,8 +1784,8 @@ Bool get_next_task(task *t, int thread_id)
    #endif
 
    SDL_LockMutex(swap_renderer_request_mutex);
-   //fprintf(df,"== Processing\n");
    if (swap_current_processing()) {
+      int n=0;
       // delete any requests that are already in the mesh-building stage by rebuilding list in-place
 
       #if 1
@@ -1795,7 +1793,6 @@ Bool get_next_task(task *t, int thread_id)
          mesh_status[0][0][i].in_new_list = False;
       #endif
 
-      n=0;
       for (i=0; i < MAX_BUILT_MESHES; ++i) {
          requested_mesh *rm = &current_processing_meshes[i];
          mesh_chunk_status *mcs;
@@ -1807,11 +1804,12 @@ Bool get_next_task(task *t, int thread_id)
          if (mcs->status == CHUNK_STATUS_processing)
             ; // delete
          else {
-            //fprintf(df, "rm:%p _alloc mcs:%p\n", &current_processing_meshes[n], mcs);
             mcs->in_new_list = True;
             current_processing_meshes[n++] = *rm;
          }
       }
+      if (n < MAX_BUILT_MESHES)
+         current_processing_meshes[n].state = RMS_invalid;
 
       #if 1
       // delete any old mesh status requests that are no longer requested, but only if
@@ -1847,14 +1845,15 @@ Bool get_next_task(task *t, int thread_id)
    }
    SDL_UnlockMutex(swap_renderer_request_mutex);
 
-   for (i=0; i < n; ++i) { // @TODO: just loop to 'n' and don't look at rm->state
+   for (i=0; i < MAX_BUILT_MESHES; ++i) { // @TODO: just loop to 'n' and don't look at rm->state
       requested_mesh *rm = &current_processing_meshes[i];
-
       int k,j;
       int valid_chunks=0;
-      mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
+      mesh_chunk_status *mcs;
+      if (rm->state == RMS_invalid)
+         break;
 
-      //fprintf(df, "reload rm:%p query mcs:%p\n", rm, mcs);
+      mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
 
       assert(mcs != NULL);
       assert(mcs->in_new_list);
@@ -1962,6 +1961,9 @@ Bool get_next_task(task *t, int thread_id)
 
   found_task:
    SDL_UnlockMutex(manager_mutex);
+
+   add_time(thread_id, start, 9);
+
    return found_task_flag;
 }
 
@@ -1995,28 +1997,25 @@ int mesh_worker_handler(void *data)
             return 0;
          }
 
+         start = SDL_GetPerformanceCounter();
          waiter_wait(&manager_monitor);
          did_wait = True;
+         add_time(thread_id, start, 10);
       }
 
       // if we got some work, but we HAD been idle, then wake up the
       // next thread so it can see if it also has work to do
       waiter_wake(&manager_monitor);
 
-      #if 0
-      if ((int) data == 2) {
-         ods("Task %d\n", t.task_type);
-      }
-      #endif
-
       switch (t.task_type) {
          case JOB_build_mesh: {
             stbvox_mesh_maker mm;
-            mesh_chunk *mc = obbg_malloc(sizeof(*mc), "/mesh/chunk");
+            mesh_chunk *mc;
             built_mesh out_mesh;
             vec3i wc = { t.world_x, t.world_y, 0 };
-            start = SDL_GetPerformanceCounter();
 
+            start = SDL_GetPerformanceCounter();
+            mc = obbg_malloc(sizeof(*mc), "/mesh/chunk");
 
             memset(mc, 0, sizeof(*mc));
 
@@ -2036,13 +2035,6 @@ int mesh_worker_handler(void *data)
             SDL_LockMutex(manager_mutex);
             {
                int i;
-               #if 0
-               mesh_chunk_status *mcs = get_chunk_status(t.world_x, t.world_y, False);
-               if (mcs)
-                  ods("[%d] Added built mesh %d,%d %p %d", thread_id, mc->chunk_x, mc->chunk_y, mcs, mcs->status);
-               else
-                  ods("[%d] Mesh chunk status for %d,%d is missing", thread_id, mc->chunk_x, mc->chunk_y);
-               #endif
                for (i=0; i < 16; ++i)
                   release_gen_chunk(t.cs.chunk[0][i], REF_mesh_chunk_status);
             }
@@ -2050,7 +2042,6 @@ int mesh_worker_handler(void *data)
             out_mesh.mc = mc;
             out_mesh.mc->has_triangles = True;
             if (!add_to_queue(&built_meshes, &out_mesh)) {
-               //ods("Failed to add %d,%d", mc->chunk_x, mc->chunk_y);
                free(out_mesh.vertex_build_buffer);
                free(out_mesh.face_buffer);
                free(out_mesh.mc);

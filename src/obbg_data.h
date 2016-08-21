@@ -1,7 +1,7 @@
 #ifndef INCLUDE_OBBG_DATA_H
 #define INCLUDE_OBBG_DATA_H
 
-#define MINIMIZE_MEMORY
+//#define MINIMIZE_MEMORY
 
 #include "stb.h"
 
@@ -223,7 +223,7 @@ enum
 };
 
 
-#define MAX_BUILT_MESHES   (16+16)
+#define MAX_BUILT_MESHES   256
 
 typedef struct
 {

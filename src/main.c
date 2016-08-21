@@ -521,14 +521,20 @@ void draw_stats(void)
    print("Gen chunks: %4d", num_gen_chunk_alloc);
    print("Mesh data: requested in-cache %dMB, total in cache %dMB", mesh_cache_requested_in_use >> 20, c_mesh_cache_in_use >> 20);
    for (i=0; i < MAX_MESH_WORKERS; ++i) {
-      static char *task[32] = { "mesh", "gencache", "heightf", "fill", "ore", "trees", "edits", "light" };
+      static char *task[32] = { "mesh", "gencache", "heightf", "fill", "ore", "trees", "edits", "light", "physics", "scan", "idle" };
       char buffer[1024];
       int pos=0,j;
+      float total=0;
       pos += sprintf(buffer+pos, "Thread %d - ", i);
-      for (j=0; j < 8; ++j) {
+      for (j=0; j < 32; ++j)
+         total += thread_timing[i].time[j];
+      pos += sprintf(buffer+pos, "%4dms - ", (int) (1000*total));
+      for (j=0; j < 11; ++j) {
          if (0==strcmp(task[j], "ore")) continue;
          if (0==strcmp(task[j], "edits")) continue;
-         pos += sprintf(buffer+pos, "%s:%3g/%4.2fms ", task[j], thread_timing[i].count[j], thread_timing[i].time[j]);
+         if (0==strcmp(task[j], "physics")) continue;
+         if (0==strcmp(task[j], "scan")) continue;
+         pos += sprintf(buffer+pos, "%s:%3g/%3dms ", task[j], thread_timing[i].count[j], (int) (1000*thread_timing[i].time[j]));
       }
       print(buffer);
    }

@@ -1,3 +1,4 @@
+   -  why are job threads spending 10-40% idle waiting for work?!?!?!
    -  add mesh cache with explicit storing of coordinates & call function to access it instead of accessing inline
    -  why is set_mesh_chunk_for_coord either
       - (a) not just getting x & y from the mesh_chunk
