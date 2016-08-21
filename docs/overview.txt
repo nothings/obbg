@@ -12,7 +12,7 @@ obbg:
 Done in today's stream (34)
    -  put MB limit on vertex buffer cache
 
-Done in today's stream (33)
+Previous stream (33)
    -  write a real memory monitor
    -  write a real performance monitor
    -  merge linux pull request
