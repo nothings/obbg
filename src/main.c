@@ -383,6 +383,7 @@ int screen_x, screen_y;
 int is_synchronous_debug;
 int sort_order;
 
+size_t mesh_cache_requested_in_use;
 int chunk_locations, chunks_considered, chunks_in_frustum;
 int quads_considered, quads_rendered;
 int chunk_storage_rendered, chunk_storage_considered, chunk_storage_total;
@@ -482,7 +483,6 @@ void update_thread_times(void)
    }
 }
 
-
 Bool show_memory;
 void draw_stats(void)
 {
@@ -519,6 +519,7 @@ void draw_stats(void)
    print("Frame time: %6.2fms, CPU frame render time: %5.2fms", frame_time*1000, render_time*1000);
    print("Tris: %4.1fM drawn of %4.1fM in range", 2*quads_rendered/1000000.0f, 2*quads_considered/1000000.0f);
    print("Gen chunks: %4d", num_gen_chunk_alloc);
+   print("Mesh data: requested in-cache %dMB, total in cache %dMB", mesh_cache_requested_in_use >> 20, c_mesh_cache_in_use >> 20);
    for (i=0; i < MAX_MESH_WORKERS; ++i) {
       static char *task[32] = { "mesh", "gencache", "heightf", "fill", "ore", "trees", "edits", "light" };
       char buffer[1024];

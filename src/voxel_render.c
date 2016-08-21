@@ -14,10 +14,21 @@
 
 #include "stb_voxel_render.h"
 
-size_t mesh_cache_max_storage = 1 << 29; // 512 MB
+//size_t mesh_cache_max_storage = 1 << 29; // 512 MB
+size_t mesh_cache_max_storage = 1 << 23; // 8 MB
 
 static mesh_chunk *c_mesh_cache[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
-static size_t c_mesh_cache_in_use;
+size_t c_mesh_cache_in_use;
+
+mesh_chunk *create_placeholder_mesh_chunk(int cx, int cy)
+{
+   mesh_chunk *mc = obbg_malloc(sizeof(*mc), "/mesh/chunk/dummy");
+   memset(mc, 0, sizeof(*mc));
+   mc->chunk_x = cx;
+   mc->chunk_y = cy;
+   mc->placeholder_for_size_info = True;
+   return mc;
+}
 
 void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc)
 {
@@ -26,12 +37,16 @@ void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc)
    int cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(y);
    int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
    mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
-   if (mc && mc->vbuf) {
+   if (mc) {
+      if (!mc->placeholder_for_size_info)
+         c_mesh_cache_in_use -= mc->total_size;
       free_mesh_chunk(mc);
    }
 
    c_mesh_cache[slot_y][slot_x] = new_mc;
    c_mesh_cache[slot_y][slot_x]->dirty = False;
+   if (!new_mc->placeholder_for_size_info)
+      c_mesh_cache_in_use += new_mc->total_size;
 }
 
 void force_update_for_block_raw(int x, int y, int z)
@@ -51,6 +66,7 @@ void init_mesh_cache(void)
    for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j)
       for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i)
          c_mesh_cache[j][i] = 0;
+   c_mesh_cache_in_use = 0;
 }
 
 mesh_chunk *get_mesh_chunk_for_coord(int x, int y)
@@ -77,13 +93,47 @@ void free_mesh_chunk_physics(mesh_chunk *mc)
 
 void free_mesh_chunk(mesh_chunk *mc)
 {
-   glDeleteTextures(1, &mc->fbuf_tex);
-   glDeleteBuffersARB(1, &mc->vbuf);
-   glDeleteBuffersARB(1, &mc->fbuf);
+   if (mc->placeholder_for_size_info) {
+      obbg_free(mc);
+   } else {
+      glDeleteTextures(1, &mc->fbuf_tex);
+      glDeleteBuffersARB(1, &mc->vbuf);
+      glDeleteBuffersARB(1, &mc->fbuf);
 
-   free_mesh_chunk_physics(mc);
-   obbg_free(mc);
+      free_mesh_chunk_physics(mc);
+      obbg_free(mc);
+   }
 }
+
+Bool discard_lowest_priority_from_mesh_cache(float min_priority)
+{
+   int i,j,worst_i=-1,worst_j;
+   float worst_found = 0;
+   for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j) {
+      for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i) {
+         mesh_chunk *mc = c_mesh_cache[j][i];
+         if (mc != NULL && !mc->placeholder_for_size_info && mc->priority > worst_found) {
+            worst_found = c_mesh_cache[j][i]->priority;
+            worst_i = i;
+            worst_j = j;
+         }
+      }
+   }
+
+   if (worst_i < 0)
+      return False;
+   if (worst_found <= min_priority)
+      return False;
+
+   ods("Free priority %f (%d) to create %f\n", c_mesh_cache[worst_j][worst_i]->priority, c_mesh_cache[worst_j][worst_i]->total_size, min_priority);
+   assert(!c_mesh_cache[worst_j][worst_i]->placeholder_for_size_info);
+   c_mesh_cache_in_use -= c_mesh_cache[worst_j][worst_i]->total_size;
+   free_mesh_chunk(c_mesh_cache[worst_j][worst_i]);
+   c_mesh_cache[worst_j][worst_i] = NULL;
+   return True;
+}
+
+
 
 GLuint main_prog;
 
@@ -224,7 +274,7 @@ void setup_uniforms(float pos[3])
 
                // fog color
                table4[3][0] = 0.6f, table4[3][1] = 0.7f, table4[3][2] = 0.9f;
-               table4[3][3] = 1.0f / (view_distance - MESH_CHUNK_SIZE_X);
+               table4[3][3] = 1.0f / (2*view_distance - MESH_CHUNK_SIZE_X);
                table4[3][3] *= table4[3][3];
 
                data = table4;
@@ -301,15 +351,20 @@ static int is_box_in_frustum(float *bmin, float *bmax)
    return 1;
 }
 
-void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer)
+void compute_mesh_sizes(mesh_chunk *mc)
 {
    mc->vbuf_size = mc->num_quads*4*sizeof(uint32);
+   mc->fbuf_size = mc->num_quads*sizeof(uint32);
+   mc->total_size = mc->fbuf_size + mc->vbuf_size;
+}
+
+void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer)
+{
    glGenBuffersARB(1, &mc->vbuf);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, mc->vbuf);
    glBufferDataARB(GL_ARRAY_BUFFER_ARB, mc->vbuf_size, vertex_build_buffer, GL_STATIC_DRAW_ARB);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
 
-   mc->fbuf_size = mc->num_quads*sizeof(uint32);
    glGenBuffersARB(1, &mc->fbuf);
    glBindBufferARB(GL_TEXTURE_BUFFER_ARB, mc->fbuf);
    glBufferDataARB(GL_TEXTURE_BUFFER_ARB, mc->fbuf_size, face_buffer , GL_STATIC_DRAW_ARB);
@@ -319,8 +374,6 @@ void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer)
    glBindTexture(GL_TEXTURE_BUFFER_ARB, mc->fbuf_tex);
    glTexBufferARB(GL_TEXTURE_BUFFER_ARB, GL_RGBA8UI, mc->fbuf);
    glBindTexture(GL_TEXTURE_BUFFER_ARB, 0);
-
-   mc->total_size = mc->fbuf_size + mc->vbuf_size;
 }
 
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
@@ -345,15 +398,13 @@ void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
 {
    size_t storage=0;
    int i,j, n=0, m=0;
-   int rad = (view_distance >> MESH_CHUNK_SIZE_X_LOG2) + 1;
+   int rad = (view_distance >> MESH_CHUNK_SIZE_X_LOG2);// + 1;
    requested_mesh *rm = get_requested_mesh_alternate();
 
-   #if 0
    for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j)
       for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i)
          if (c_mesh_cache[j][i] != NULL)
             c_mesh_cache[j][i]->priority = PRIORITY_unused;
-   #endif
 
    for (j=-rad; j <= rad; ++j) {
       for (i=-rad; i <= rad; ++i) {
@@ -365,17 +416,20 @@ void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
             int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
             int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
             mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
-            Bool is_valid = !(mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0 || mc->dirty);
+            Bool needs_building = (mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->dirty);
             assert(n < MAX_CONSIDER_MESHES);
-            consider_mesh[n].mc = is_valid ? mc : NULL;
+            //assert(mc != NULL && !mc->placeholder_for_size_info);
+            consider_mesh[n].mc = needs_building ? NULL : mc;
+            //assert(consider_mesh[n].mc != NULL && !consider_mesh[n].mc->placeholder_for_size_info);
             consider_mesh[n].x = wx;
             consider_mesh[n].y = wy;  
-            consider_mesh[n].priority = ((float) i*i + (float) j*j);
-            consider_mesh[n].dirty = !is_valid && mc != NULL && mc->dirty;
+            consider_mesh[n].priority = ((float) (i+0.15f)*(i+0.15f) + (float) (j+0.21f)*(j+0.21f));
+            consider_mesh[n].dirty = needs_building && mc != NULL && mc->dirty; // @TODO: is && mc->dirty redundant?
             if (mc != NULL)
-               if (is_valid)
+               if (!needs_building) {
                   mc->priority = consider_mesh[n].priority;
-               else
+                  //assert(mc != NULL && !mc->placeholder_for_size_info);
+               } else
                   mc->priority = PRIORITY_discard;
             ++n;
          }
@@ -392,25 +446,30 @@ void request_mesh_generation(int qchunk_x, int qchunk_y, int cam_x, int cam_y)
             n=i;
             break;
          }
+         if (consider_mesh[i].mc->placeholder_for_size_info)
+            ods("Include placeholder %f size %d after %d\n", consider_mesh[i].mc->priority, consider_mesh[i].mc->total_size, storage);
          storage = new_storage;
       }
    }
+   mesh_cache_requested_in_use = storage;
+   ods("Estimated storage: %d\n", storage);
 
-   // at this point, mesh consider list is cut off at point that an upper bound
-   // of the number of meshes we need, assuming all unbuilt meshes are size 0.
-   // so it may still overestimate the meshes that will fit in the cache.
+   // at this point, mesh consider list is cut off at point that all extent
+   // meshes and placeholder meshes in priority order fit in cache and the
+   // next in priority order does not.
 
    // fill out start of requested_meshes with physics meshes, which are always higher priority
    m = physics_set_player_coord(rm, MAX_BUILT_MESHES, cam_x, cam_y);
 
    // now add the rendering meshes we want built
    for (i=0; i < n && m < MAX_BUILT_MESHES; ++i) {
-      if (consider_mesh[i].mc == NULL) {
+      if (consider_mesh[i].mc == NULL || consider_mesh[i].mc->placeholder_for_size_info) {
          rm[m].x = consider_mesh[i].x;
          rm[m].y = consider_mesh[i].y;
          rm[m].state = RMS_requested;
          rm[m].needs_triangles = True;
          rm[m].rebuild_chunks = consider_mesh[i].dirty;
+         rm[m].priority = consider_mesh[i].priority;
          ++m;
       }
    }
@@ -431,6 +490,7 @@ void render_voxel_world(float campos[3])
    int qchunk_x, qchunk_y;
    int cam_x, cam_y;
    int i,j, rad;
+   built_mesh bm;
 
 #ifdef SINGLE_THREADED_MESHBUILD
    num_build_remaining = 1;
@@ -494,7 +554,7 @@ void render_voxel_world(float campos[3])
             if (i*i + j*j > rad*rad)
                continue;
 
-            if (mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
+            if (mc == NULL || mc->placeholder_for_size_info || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0) {
                float estimated_bounds[2][3];
                if (num_build_remaining == 0)
                   continue;
@@ -516,7 +576,7 @@ void render_voxel_world(float campos[3])
             quads_considered += mc->num_quads;
             chunk_storage_considered += mc->num_quads * 20;
 
-            if (mc->num_quads) {
+            if (mc->num_quads && !mc->placeholder_for_size_info) {
                if (is_box_in_frustum(mc->bounds[0], mc->bounds[1])) {
                   // @TODO if in range, frustum cull
                   stbglUniform3fv(stbgl_find_uniform(main_prog, "transform"), 3, mc->transform[0]);
@@ -543,7 +603,7 @@ void render_voxel_world(float campos[3])
             int slot_x = cx & (C_MESH_CHUNK_CACHE_X-1);
             int slot_y = cy & (C_MESH_CHUNK_CACHE_Y-1);
             mesh_chunk *mc = c_mesh_cache[slot_y][slot_x];
-            if (mc == NULL || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0 || mc->dirty) {
+            if (mc == NULL || mc->placeholder_for_size_info || mc->chunk_x != cx || mc->chunk_y != cy || mc->vbuf == 0 || mc->dirty) {
                mc = build_mesh_chunk_for_coord(mc, cx * C_MESH_CHUNK_CACHE_X, cy * C_MESH_CHUNK_CACHE_Y);
                --num_build_remaining;
                if (num_build_remaining == 0)
@@ -555,34 +615,57 @@ void render_voxel_world(float campos[3])
       ;
    }
 
-   {
-      built_mesh bm;
-      while (get_next_built_mesh(&bm)) {
-         if (!bm.mc->has_triangles) {
-            // server:
-            physics_process_mesh_chunk(bm.mc);
-            // don't free the physics data below, because the above call copies them
-            bm.mc->allocs = NULL;
-            finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, False);
-            free_mesh_chunk(bm.mc);
-         } else {
-            //s_process_mesh_chunk(bm.mc);
-            // client:
-            //ods("Received chunk: %d,%d", bm.mc->chunk_x, bm.mc->chunk_y);
+   // process new meshes from the job system
+   while (get_next_built_mesh(&bm)) {
+      if (!bm.mc->has_triangles) { // is it a physics mesh_chunk?
+         // server:
+         physics_process_mesh_chunk(bm.mc);
+         // don't free the physics data below, because the above call copies them
+         bm.mc->allocs = NULL;
+         finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, False);
+         free_mesh_chunk(bm.mc);
+      } else {
+         // it's a rendering mesh_chunk
+         Bool add_mesh_to_cache = True;
+         //s_process_mesh_chunk(bm.mc);
+         // client:
+         //ods("Received chunk: %d,%d", bm.mc->chunk_x, bm.mc->chunk_y);
+
+         compute_mesh_sizes(bm.mc);
+
+         for(;;) {
+            size_t old_size = c_mesh_cache_in_use;
+            if (c_mesh_cache_in_use + bm.mc->total_size <= mesh_cache_max_storage)
+               break;
+            if (!discard_lowest_priority_from_mesh_cache(bm.mc->priority)) {
+               add_mesh_to_cache = False;
+               break;
+            }
+            assert(c_mesh_cache_in_use < old_size);
+         }
+
+         if (add_mesh_to_cache) {
             upload_mesh(bm.mc, bm.vertex_build_buffer, bm.face_buffer);
             set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, bm.mc);
-            obbg_free(bm.face_buffer);
-            obbg_free(bm.vertex_build_buffer);
-            finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, True);
-            bm.mc = NULL;
+            ods("Creating: %f\n", bm.mc->priority);
+         } else {
+            mesh_chunk *mc = create_placeholder_mesh_chunk(bm.mc->chunk_x, bm.mc->chunk_y);
+            mc->priority = bm.mc->priority;
+            mc->total_size = bm.mc->total_size;
+            set_mesh_chunk_for_coord(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, mc   );
+            ods("Failed to add: %f (installed dummy %p size %d)\n", mc->priority, mc, mc->total_size);
          }
+         obbg_free(bm.face_buffer);
+         obbg_free(bm.vertex_build_buffer);
+         finished_caching_mesh_chunk(bm.mc->chunk_x * MESH_CHUNK_SIZE_X, bm.mc->chunk_y * MESH_CHUNK_SIZE_Y, True);
+         bm.mc = NULL;
       }
    }
 
    chunk_storage_total = 0;
    for (j=0; j < C_MESH_CHUNK_CACHE_Y; ++j)
       for (i=0; i < C_MESH_CHUNK_CACHE_X; ++i)
-         if (c_mesh_cache[j][i] != NULL && c_mesh_cache[j][i]->vbuf)
+         if (c_mesh_cache[j][i] != NULL && c_mesh_cache[j][i]->vbuf && !c_mesh_cache[j][i]->placeholder_for_size_info)
             chunk_storage_total += c_mesh_cache[j][i]->num_quads * 20;
 
    stbglDisableVertexAttribArray(0);

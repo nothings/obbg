@@ -1605,6 +1605,7 @@ typedef struct
 
    // build_mesh:
    chunk_set cs;
+   float priority;
 
    // generate_terrain:
 } task;
@@ -1769,14 +1770,23 @@ int get_next_built_mesh(built_mesh *bm)
    return get_from_queue_nonblocking(&built_meshes, bm);
 }
 
+FILE * volatile df;
 Bool get_next_task(task *t, int thread_id)
 {
    Bool found_task_flag = True;
    int i,n;
 
+
    SDL_LockMutex(manager_mutex);
 
+   #if 0
+   if (df == NULL) {
+      df = fopen("mesh_log.txt", "w");
+   }
+   #endif
+
    SDL_LockMutex(swap_renderer_request_mutex);
+   //fprintf(df,"== Processing\n");
    if (swap_current_processing()) {
       // delete any requests that are already in the mesh-building stage by rebuilding list in-place
 
@@ -1797,12 +1807,11 @@ Bool get_next_task(task *t, int thread_id)
          if (mcs->status == CHUNK_STATUS_processing)
             ; // delete
          else {
+            //fprintf(df, "rm:%p _alloc mcs:%p\n", &current_processing_meshes[n], mcs);
             mcs->in_new_list = True;
             current_processing_meshes[n++] = *rm;
          }
       }
-      if (n < MAX_BUILT_MESHES)
-         current_processing_meshes[n].state = RMS_invalid;
 
       #if 1
       // delete any old mesh status requests that are no longer requested, but only if
@@ -1814,7 +1823,7 @@ Bool get_next_task(task *t, int thread_id)
 
       // scan old list for things that we were building but aren't in the list now,
       // and discard them
-      for (i=0; i < MAX_BUILT_MESHES; ++i) {
+      /*for (i=0; i < MAX_BUILT_MESHES; ++i) {
          mesh_chunk_status *mcs;
          requested_mesh *rm = &most_recent_renderer_meshes[i];
          if (rm->state == RMS_invalid)
@@ -1833,114 +1842,118 @@ Bool get_next_task(task *t, int thread_id)
             break;
          mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
          mcs->in_new_list = False;
-      }
+      } */
       #endif
    }
    SDL_UnlockMutex(swap_renderer_request_mutex);
 
-   for (i=0; i < MAX_BUILT_MESHES; ++i) {
+   for (i=0; i < n; ++i) { // @TODO: just loop to 'n' and don't look at rm->state
       requested_mesh *rm = &current_processing_meshes[i];
 
-      if (rm->state == RMS_requested) {
-         int k,j;
-         int valid_chunks=0;
-         mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
+      int k,j;
+      int valid_chunks=0;
+      mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
 
-         // if the mesh is being rebuilt, we have to invalidate all the corresponding gen chunks--
-         // @TODO is to do this properly with timestamps
-         if (mcs->rebuild_chunks) {
-            for (k=0; k < 4; ++k) {
-               for (j=0; j < 4; ++j) {
-                  int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X;
-                  int cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
-                  invalidate_gen_chunk_cache(cx, cy);
-               }
-            }
-            mcs->rebuild_chunks = False;
-         }
+      //fprintf(df, "reload rm:%p query mcs:%p\n", rm, mcs);
 
-         // go through all the chunks and see if they're created, and if not, request them
-         if (mcs->status == CHUNK_STATUS_processing)
-            continue;
+      assert(mcs != NULL);
+      assert(mcs->in_new_list);
 
+      // if the mesh is being rebuilt, we have to invalidate all the corresponding gen chunks--
+      // @TODO is to do this properly with timestamps
+      if (mcs->rebuild_chunks) {
          for (k=0; k < 4; ++k) {
             for (j=0; j < 4; ++j) {
-               if (!mcs->chunk_set_valid[k][j]) {
-                  int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X;
-                  int cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
-                  gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(cx, cy);
-                  if (gcc) {
-                     assert(mcs->status == CHUNK_STATUS_nonempty_chunk_set || mcs->status == CHUNK_STATUS_empty_chunk_set);
-                     mcs->status = CHUNK_STATUS_nonempty_chunk_set;
-                     mcs->cs.chunk[k][j] = gcc->chunk;
-                     mcs->chunk_set_valid[k][j] = True;
-                     assert(gcc->chunk != 0);
-                     add_ref_count(gcc->chunk, REF_mesh_chunk_status);
-                     // @TODO
-                     //++valid_chunks;
-                  } else {
-                     if (is_in_progress(cx, cy)) {
-                        // it's already in progress, so do nothing
-                     } else if (can_start_procgen(cx, cy)) {
-                        start_procgen(cx,cy);
-                        t->world_x = cx;
-                        t->world_y = cy;
-                        t->task_type = JOB_generate_terrain;
-                        goto found_task;
-                     }
-                  }
-               } else {
-                  ++valid_chunks;
-               }
+               int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X;
+               int cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
+               invalidate_gen_chunk_cache(cx, cy);
             }
          }
+         mcs->rebuild_chunks = False;
+      }
 
-         if (valid_chunks == 16) {
-            int i,j;
-            //mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
-            #if 0
-            if (rm->needs_triangles)
-               ods("[%d] Accepting: %d,%d %p %d", thread_id, C_MESH_CHUNK_X_FOR_WORLD_X(rm->x), C_MESH_CHUNK_Y_FOR_WORLD_Y(rm->y), mcs, mcs->status);
-            #endif
-            for (j=0; j < 4; ++j)
-               for (i=0; i < 4; ++i)
-                  assert(mcs->chunk_set_valid[j][i]);
-            if (rm->needs_triangles) {
-               t->cs = mcs->cs;
-               memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
-               memset(&mcs->cs, 0, sizeof(mcs->cs));
-               mcs->status = CHUNK_STATUS_processing;
-               assert(rm->state == RMS_requested);
-               rm->state = RMS_invalid;
-               t->task_type = JOB_build_mesh;
-               t->world_x = rm->x;
-               t->world_y = rm->y;
-               goto found_task;
+      // go through all the chunks and see if they're created, and if not, request them
+      if (mcs->status == CHUNK_STATUS_processing)
+         continue;
+
+      for (k=0; k < 4; ++k) {
+         for (j=0; j < 4; ++j) {
+            if (!mcs->chunk_set_valid[k][j]) {
+               int cx = rm->x + (j-1) * GEN_CHUNK_SIZE_X;
+               int cy = rm->y + (k-1) * GEN_CHUNK_SIZE_Y;
+               gen_chunk_cache *gcc = get_gen_chunk_cache_for_coord(cx, cy);
+               if (gcc) {
+                  assert(mcs->status == CHUNK_STATUS_nonempty_chunk_set || mcs->status == CHUNK_STATUS_empty_chunk_set);
+                  mcs->status = CHUNK_STATUS_nonempty_chunk_set;
+                  mcs->cs.chunk[k][j] = gcc->chunk;
+                  mcs->chunk_set_valid[k][j] = True;
+                  assert(gcc->chunk != 0);
+                  add_ref_count(gcc->chunk, REF_mesh_chunk_status);
+                  // @TODO
+                  //++valid_chunks;
+               } else {
+                  if (is_in_progress(cx, cy)) {
+                     // it's already in progress, so do nothing
+                  } else if (can_start_procgen(cx, cy)) {
+                     start_procgen(cx,cy);
+                     t->world_x = cx;
+                     t->world_y = cy;
+                     t->task_type = JOB_generate_terrain;
+                     goto found_task;
+                  }
+               }
             } else {
-               mesh_chunk *mc = obbg_malloc(sizeof(*mc), "/mesh/chunk");
-               built_mesh out_mesh;
-               memset(mc, 0, sizeof(*mc));
-               mc->chunk_x = rm->x >> MESH_CHUNK_SIZE_X_LOG2;
-               mc->chunk_y = rm->y >> MESH_CHUNK_SIZE_Y_LOG2;
-
-               build_phys_chunk(mc, &mcs->cs, rm->x, rm->y);
-
-               memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
-               for (i=0; i < 16; ++i)
-                  release_gen_chunk(mcs->cs.chunk[0][i], REF_mesh_chunk_status);
-               memset(&mcs->cs, 0, sizeof(mcs->cs));
-
-               mcs->status = CHUNK_STATUS_processing;
-
-               out_mesh.vertex_build_buffer = 0;
-               out_mesh.face_buffer  = 0;
-               out_mesh.mc = mc;
-               out_mesh.mc->has_triangles = False;
-               if (!add_to_queue(&built_meshes, &out_mesh))
-                  obbg_free(out_mesh.mc);
-               assert(rm->state == RMS_requested);
-               rm->state = RMS_invalid;
+               ++valid_chunks;
             }
+         }
+      }
+
+      if (valid_chunks == 16) {
+         int i,j;
+         //mesh_chunk_status *mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
+         #if 0
+         if (rm->needs_triangles)
+            ods("[%d] Accepting: %d,%d %p %d", thread_id, C_MESH_CHUNK_X_FOR_WORLD_X(rm->x), C_MESH_CHUNK_Y_FOR_WORLD_Y(rm->y), mcs, mcs->status);
+         #endif
+         for (j=0; j < 4; ++j)
+            for (i=0; i < 4; ++i)
+               assert(mcs->chunk_set_valid[j][i]);
+         if (rm->needs_triangles) {
+            t->cs = mcs->cs;
+            memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
+            memset(&mcs->cs, 0, sizeof(mcs->cs));
+            mcs->status = CHUNK_STATUS_processing;
+            assert(rm->state == RMS_requested);
+            rm->state = RMS_invalid;
+            t->task_type = JOB_build_mesh;
+            t->world_x = rm->x;
+            t->world_y = rm->y;
+            t->priority = rm->priority;
+            goto found_task;
+         } else {
+            mesh_chunk *mc = obbg_malloc(sizeof(*mc), "/mesh/chunk");
+            built_mesh out_mesh;
+            memset(mc, 0, sizeof(*mc));
+            mc->chunk_x = rm->x >> MESH_CHUNK_SIZE_X_LOG2;
+            mc->chunk_y = rm->y >> MESH_CHUNK_SIZE_Y_LOG2;
+
+            build_phys_chunk(mc, &mcs->cs, rm->x, rm->y);
+
+            memset(mcs->chunk_set_valid, 0, sizeof(mcs->chunk_set_valid));
+            for (i=0; i < 16; ++i)
+               release_gen_chunk(mcs->cs.chunk[0][i], REF_mesh_chunk_status);
+            memset(&mcs->cs, 0, sizeof(mcs->cs));
+
+            mcs->status = CHUNK_STATUS_processing;
+
+            out_mesh.vertex_build_buffer = 0;
+            out_mesh.face_buffer  = 0;
+            out_mesh.mc = mc;
+            out_mesh.mc->has_triangles = False;
+            if (!add_to_queue(&built_meshes, &out_mesh))
+               obbg_free(out_mesh.mc);
+            assert(rm->state == RMS_requested);
+            rm->state = RMS_invalid;
          }
       }
    }
@@ -2005,12 +2018,13 @@ int mesh_worker_handler(void *data)
             start = SDL_GetPerformanceCounter();
 
 
-            memset(mc, 0, sizeof(mc));
+            memset(mc, 0, sizeof(*mc));
 
             stbvox_init_mesh_maker(&mm);
 
             mc->chunk_x = t.world_x >> MESH_CHUNK_SIZE_X_LOG2;
             mc->chunk_y = t.world_y >> MESH_CHUNK_SIZE_Y_LOG2;
+            mc->priority = t.priority;
 
             generate_mesh_for_chunk_set(&mm, mc, wc, &t.cs, vert_buf_size, bd);
 

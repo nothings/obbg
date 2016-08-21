@@ -147,6 +147,7 @@ typedef struct
 
    size_t vbuf_size, fbuf_size;
    size_t total_size;
+   Bool placeholder_for_size_info;
 
    float transform[3][3];
    float bounds[2][3];
@@ -244,11 +245,15 @@ typedef struct
    int state;
    Bool needs_triangles;
    Bool rebuild_chunks;
+   float priority;
+   void *mcs;
 } requested_mesh;
 
 extern int face_dir[6][3];
 extern float camloc[3];
 
+extern size_t c_mesh_cache_in_use;
+extern size_t mesh_cache_requested_in_use;
 extern int chunk_locations, chunks_considered, chunks_in_frustum;
 extern int quads_considered, quads_rendered;
 extern int chunk_storage_rendered, chunk_storage_considered, chunk_storage_total;

@@ -1,3 +1,9 @@
+   -  add mesh cache with explicit storing of coordinates & call function to access it instead of accessing inline
+   -  why is set_mesh_chunk_for_coord either
+      - (a) not just getting x & y from the mesh_chunk
+      - (b) or writing mc->cx & mc->y with the passed-in-coordinates
+      - (c) or at least asserting that they match
+   -  num_gen_chunk_alloc is statistics output but is accessed thread-unsafely
    -  do you need the diagonal gen_chunk neighbors to the mesh chunks?!???
 
 Possible tasks to work on next:
