@@ -111,6 +111,7 @@ void init_mesh_building(void)
    geom_for_blocktype[BT_ore_drill] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_ore_eater] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_picker   ] = 0;
+   geom_for_blocktype[BT_splitter ] = 0;
 
    for (i=0; i < 256; ++i)
       texture_scales[i] = 1.0f/4;// textures[i].scale;
@@ -1303,9 +1304,14 @@ void copy_chunk_set_to_segment(chunk_set *chunks, int z_seg, build_data *bd)
             for (x=x0; x < x1; ++x) {
                memcpy(bt + sizeof(bd->segment_blocktype[0][0])*x, &gcp->block   [y][x][0], 16);
                memcpy(lt + sizeof(bd->segment_lighting [0][0])*x, &gcp->lighting[y][x][0], 16);
-               for (a=0; a < 16; ++a)
+               for (a=0; a < 16; ++a) {
                   if ((bt + sizeof(bd->segment_blocktype[0][0])*x)[a] == BT_picker)
                      (bt + sizeof(bd->segment_blocktype[0][0])*x)[a] = BT_empty;
+                  if ((bt + sizeof(bd->segment_blocktype[0][0])*x)[a] == BT_splitter)
+                     (bt + sizeof(bd->segment_blocktype[0][0])*x)[a] = BT_empty;
+                  if ((bt + sizeof(bd->segment_blocktype[0][0])*x)[a] == BT_balancer)
+                     (bt + sizeof(bd->segment_blocktype[0][0])*x)[a] = BT_empty;
+               }
             }
          }
       }
@@ -2054,9 +2060,9 @@ int mesh_worker_handler(void *data)
             out_mesh.mc = mc;
             out_mesh.mc->has_triangles = True;
             if (!add_to_queue(&built_meshes, &out_mesh)) {
-               free(out_mesh.vertex_build_buffer);
-               free(out_mesh.face_buffer);
-               free(out_mesh.mc);
+               obbg_free(out_mesh.vertex_build_buffer);
+               obbg_free(out_mesh.face_buffer);
+               obbg_free(out_mesh.mc);
             }
             add_time(thread_id, start, 0);
             break;

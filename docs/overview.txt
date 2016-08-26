@@ -3,11 +3,11 @@ obbg:
 
   exercise all interesting
     features of voxel stuff:
-  - mesh generation/rendering
-  - procedural gen
-  - user create/destroy
-  - save/load to disk
-  - networking
+  + mesh generation/rendering
+  + procedural gen
+  : user create/destroy
+  : save/load to disk
+  : networking
 
 Done in today's stream (34)
    -  put MB limit on vertex buffer cache

@@ -56,6 +56,18 @@ typedef struct
    uint8 rot:2;          // 0 bytes
 } machine_info;  // 8 bytes
 
+typedef struct
+{
+   logi_chunk_coord pos;   // 2
+   uint8 type;             // 1
+   uint8 rot:2;            // 1
+   uint8 state:6;          // 1
+   uint8 slots[2];         // 2
+   uint16 input_id;        // 2
+   uint16 output_id[2];    // 4
+} belt_machine_info;  // 12 bytes
+
+
 // 32 * 32 * 8 => 2^(5+5+3) = 2^13
 typedef struct
 {
@@ -90,6 +102,7 @@ typedef struct
    uint8 rot[LOGI_CHUNK_SIZE_Z][LOGI_CHUNK_SIZE_Y][LOGI_CHUNK_SIZE_X];
    belt_run *belts; // obarr 
    machine_info *machine;
+   belt_machine_info *belt_machine;
    picker_info *pickers;
    ore_info *ore;
 } logi_chunk;
@@ -615,6 +628,7 @@ void create_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot, in
 
    d = logistics_get_chunk_alloc(bx+ox,by+oy,bz+oz-1);
    ore_z = (oz-1) & (LOGI_CHUNK_SIZE_Z-1);
+   // @TODO only do followign test for BT_ore_driller
    if (d->type[ore_z][oy][ox] == BT_stone) {
       int id = find_ore(d, ox,oy,ore_z);
       if (id < 0) {
@@ -626,24 +640,29 @@ void create_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot, in
    }
 }
 
-int find_machine(logi_chunk *c, int ox, int oy, int oz)
+void create_belt_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot, int bx, int by, int bz)
 {
-   int i;
-   logi_chunk_coord sc;
-   sc.unpacked.x = ox;
-   sc.unpacked.y = oy;
-   sc.unpacked.z = oz;
-   for (i=0; i < obarr_len(c->machine); ++i)
-      if (c->machine[i].pos.packed == sc.packed)
-         return i;
-   return -1;
-}
+   //int belt_z;
+   //logi_chunk *d;
+   belt_machine_info bmi = { 0 };
+   bmi.pos  = coord(ox,oy,oz);
+   bmi.type = type;
+   bmi.rot = rot;
+   obarr_push(c->belt_machine, bmi, "/logi/machinelist");
 
-void destroy_machine(logi_chunk *c, int ox, int oy, int oz)
-{
-   int n = find_machine(c, ox,oy,oz);
-   if (n >= 0)
-      obarr_fastdelete(c->machine, n);
+   #if 0
+   d = logistics_get_chunk_alloc(bx+ox,by+oy,bz+oz-1);
+   belt_z = (oz-1) & (LOGI_CHUNK_SIZE_Z-1);
+   if (d->type[belt_z][oy][ox] == BT_conveyor) {
+      int id = get_belt_id_noramp(d, ox,oy,belt_z);
+      if (id < 0) {
+         ore_info ore;
+         ore.pos = coord(ox,oy,ore_z);
+         ore.count = 5;
+         obarr_push(d->ore, ore, "/logi/orelist");
+      }
+   }
+   #endif
 }
 
 static int get_belt_id_noramp(int x, int y, int z)
@@ -662,6 +681,62 @@ static int get_belt_id_noramp(int x, int y, int z)
             if (does_belt_intersect(&c->belts[j], ox,oy,oz))
                return j;
    return -1;
+}
+
+static int get_chunk_belt_id_noramp(logi_chunk *c, int x, int y, int z)
+{
+   int j;
+
+   int ox = x & (LOGI_CHUNK_SIZE_X-1);
+   int oy = y & (LOGI_CHUNK_SIZE_Y-1);
+   int oz = z & (LOGI_CHUNK_SIZE_Z-1);
+
+   for (j=0; j < obarr_len(c->belts); ++j)
+      if (c->belts[j].end_dz == 0 && c->belts[j].turn == 0)
+         if (does_belt_intersect(&c->belts[j], ox,oy,oz))
+            return j;
+
+   return -1;
+}
+
+static int find_machine(logi_chunk *c, int ox, int oy, int oz)
+{
+   int i;
+   logi_chunk_coord sc;
+   sc.unpacked.x = ox;
+   sc.unpacked.y = oy;
+   sc.unpacked.z = oz;
+   for (i=0; i < obarr_len(c->machine); ++i)
+      if (c->machine[i].pos.packed == sc.packed)
+         return i;
+   return -1;
+}
+
+static int find_belt_machine(logi_chunk *c, int ox, int oy, int oz)
+{
+   int i;
+   logi_chunk_coord sc;
+   sc.unpacked.x = ox;
+   sc.unpacked.y = oy;
+   sc.unpacked.z = oz;
+   for (i=0; i < obarr_len(c->belt_machine); ++i)
+      if (c->belt_machine[i].pos.packed == sc.packed)
+         return i;
+   return -1;
+}
+
+static void destroy_machine(logi_chunk *c, int ox, int oy, int oz)
+{
+   int n = find_machine(c, ox,oy,oz);
+   if (n >= 0)
+      obarr_fastdelete(c->machine, n);
+}
+
+static void destroy_belt_machine(logi_chunk *c, int ox, int oy, int oz)
+{
+   int n = find_belt_machine(c,ox,oy,oz);
+   if (n >= 0)
+      obarr_fastdelete(c->belt_machine, n);
 }
 
 static int get_machine_id(int x, int y, int z)
@@ -709,7 +784,7 @@ void logistics_update_chunk(int x, int y, int z)
                   if (d->belts[j].dir == outdir || (d->belts[j].turn==0 && d->belts[j].end_dz==0)) {
                      if (does_belt_intersect(&d->belts[j], ex,ey,ez)) {
                         b->target_id = j;
-                        if (d->belts[j].dir == outdir) {
+                        if (d->belts[j].dir == outdir && b->target_is_neighbor) {
                            d->belts[j].input_id = i;
                            d->belts[j].input_dz = b->end_dz;
                         }
@@ -764,10 +839,24 @@ void logistics_update_chunk(int x, int y, int z)
          if (m->type == BT_ore_drill) {
             int ore_z = base_z + m->pos.unpacked.z - 1;
             logi_chunk *d = logistics_get_chunk_alloc(base_x + m->pos.unpacked.x, base_y + m->pos.unpacked.y, ore_z);
-            if (d->type[ore_z & (LOGI_CHUNK_SIZE_Z-1)][m->pos.unpacked.y][m->pos.unpacked.x] == BT_stone) {
+            if (d->type[ore_z & (LOGI_CHUNK_SIZE_Z-1)][m->pos.unpacked.y][m->pos.unpacked.x] == BT_stone)
                m->input_flags = 1;
-            } else
+            else
                m->input_flags = 0;
+         }
+      }
+      for (i=0; i < obarr_len(c->belt_machine); ++i) {
+         belt_machine_info *m = &c->belt_machine[i];
+         int belt_z = base_z + m->pos.unpacked.z - 1;
+         logi_chunk *d = logistics_get_chunk_alloc(base_x + m->pos.unpacked.x, base_y + m->pos.unpacked.y, belt_z);
+         if (d->type[belt_z & (LOGI_CHUNK_SIZE_Z-1)][m->pos.unpacked.y][m->pos.unpacked.x] == BT_conveyor) {
+            int id = get_chunk_belt_id_noramp(d, m->pos.unpacked.x, m->pos.unpacked.y, belt_z & (LOGI_CHUNK_SIZE_Z-1));
+            if (id >= 0 && d->belts[id].turn==0)
+               m->input_id = (uint16) id;
+            else
+               m->input_id = TARGET_none;
+         } else {
+            m->input_id = TARGET_none;
          }
       }
    }
@@ -779,7 +868,7 @@ void logistics_update_chunk(int x, int y, int z)
 
 //
 //  
-//  /
+//
 
 void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool alloc)
 {
@@ -799,6 +888,8 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool al
 
    if (oldtype >= BT_picker && oldtype <= BT_picker)
       destroy_picker(c, ox,oy,oz);
+   else if (oldtype >= BT_belt_machines)
+      destroy_belt_machine(c, ox,oy,oz);
    else if (oldtype >= BT_machines)
       destroy_machine(c, ox,oy,oz);
    else if (oldtype == BT_conveyor && type != BT_conveyor)
@@ -812,6 +903,8 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool al
 
    if (type >= BT_picker && type <= BT_picker)
       create_picker(c, ox,oy,oz, type,rot);
+   else if (type >= BT_belt_machines)
+      create_belt_machine(c, ox,oy,oz, type, rot, x-ox,y-oy,z-oz);
    else if (type >= BT_machines)
       create_machine(c, ox,oy,oz, type, rot, x-ox,y-oy,z-oz);
 
@@ -903,6 +996,7 @@ static int get_interaction_pos(belt_run *b, int x, int y, int z)
    return abs(x-b->x_off) + abs(y-b->y_off);
 }
 
+#if 0
 static belt_run *get_interaction_belt(int x, int y, int z, int facing, int *pos)
 {
    int j;
@@ -932,6 +1026,7 @@ static belt_run *get_interaction_belt(int x, int y, int z, int facing, int *pos)
 
    return NULL;
 }
+#endif
 
 typedef struct
 {
@@ -1364,6 +1459,7 @@ static void visit(belt_ref *ref)
          target.belt_id = br->target_id;
          target.cid = tc.cid;
          target.slice = tc.s;
+         assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
          visit(&target);
       }
       if (br->mark == M_temporary) {
@@ -1379,6 +1475,7 @@ static void visit(belt_ref *ref)
             target.belt_id = br->input_id;
             target.cid = tc.cid;
             target.slice = tc.s;
+            assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
             c = tc.c;
             br = &c->belts[target.belt_id];
             if (br->mark == M_permanent)
@@ -1458,6 +1555,40 @@ belt_run *find_belt_slot_for_picker(int belt_id, int ix, int iy, int iz, int rot
 void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, int base_z)
 {
    int m;
+   int i;
+
+   for (i=0; i < obarr_len(c->belt_machine); ++i) {
+      belt_machine_info *m = &c->belt_machine[i];
+      if (m->input_id != TARGET_none) {
+         int off;
+         logi_chunk *d = logistics_get_chunk(base_x, base_y, base_z + m->pos.unpacked.z - 1, 0);
+         belt_run *br = &d->belts[m->input_id];
+         off = get_interaction_pos(br, m->pos.unpacked.x, m->pos.unpacked.y, (m->pos.unpacked.z-1)&(LOGI_CHUNK_SIZE_Z-1));
+         switch (m->type) {
+            case BT_splitter:
+               break;
+            case BT_balancer: {
+               beltside_item i_left  = br->items[off*ITEMS_PER_BELT_SIDE*2+1*2+0];
+               beltside_item i_right = br->items[off*ITEMS_PER_BELT_SIDE*2+1*2+1];
+               if (i_left.type != 0 && i_right.type != 0) {
+                  // if both sides are occupied, let them pass as-is
+               } else if (i_left.type != 0 || i_right.type != 0) {
+                  uint8 cur_side = i_left.type != 0 ? 0 : 1;
+                  uint8 side = m->state;
+                  assert(br->items[off*ITEMS_PER_BELT_SIDE*2+1*2+ cur_side].type != 0);
+                  assert(br->items[off*ITEMS_PER_BELT_SIDE*2+1*2+!cur_side].type == 0);
+                  if (side != cur_side) {
+                     beltside_item temp = br->items[off*ITEMS_PER_BELT_SIDE*2+1*2+0];
+                     br->items[off*ITEMS_PER_BELT_SIDE*2+1*2+0] = br->items[off*ITEMS_PER_BELT_SIDE*2+1*2+1];
+                     br->items[off*ITEMS_PER_BELT_SIDE*2+1*2+1] = temp;
+                  }
+                  m->state = !m->state;
+               }
+               break;
+            }
+         }
+      }
+   }
 
    for (m=0; m < obarr_len(c->machine); ++m) {
       machine_info *x = &c->machine[m];
@@ -1466,21 +1597,22 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
          --x->timer;
          went_to_zero = (x->timer == 0);
       }
-      if (x->type == BT_ore_eater) {
-         if (went_to_zero) {
-            x->output = 0;
-         }
-         if (x->output != 0 && x->timer == 0)
-            x->timer = 7;
-      }
-      if (x->type == BT_ore_drill) {
-         if (went_to_zero && x->input_flags) {
-            assert(x->output == 0);
-            x->output = 1 + (stb_rand() % 2);
-         }
-         if (x->timer == 0 && x->output == 0 && x->input_flags) {
-            x->timer = 7; // start drilling
-         }
+      switch (x->type) {
+         case BT_ore_eater:
+            if (went_to_zero)
+               x->output = 0;
+            if (x->output != 0 && x->timer == 0)
+               x->timer = 7;
+            break;
+
+         case BT_ore_drill:
+            if (went_to_zero && x->input_flags) {
+               assert(x->output == 0);
+               x->output = 1 + (stb_rand() % 2);
+            }
+            if (x->timer == 0 && x->output == 0 && x->input_flags)
+               x->timer = 7; // start drilling
+            break;
       }
    }
 
@@ -1580,6 +1712,7 @@ void logistics_do_long_tick(void)
 
    for (i=0; i < obarr_len(belts); ++i) {
       belt_run *br = &belts[i].slice->chunk[belts[i].cid]->belts[belts[i].belt_id];
+      assert(belts[i].belt_id < obarr_len(belts[i].slice->chunk[belts[i].cid]->belts));
       if (br->mark == M_unmarked) {
          visit(&belts[i]);
       }
@@ -1589,6 +1722,9 @@ void logistics_do_long_tick(void)
    for (i=0; i < obarr_len(sorted_ref); ++i) {
       logi_slice *s = sorted_ref[i].slice;
       belt_run *br = &s->chunk[sorted_ref[i].cid]->belts[sorted_ref[i].belt_id];
+      int obarrlen = obarr_len(s->chunk[sorted_ref[i].cid]->belts);
+      int belt_id = sorted_ref[i].belt_id;
+      assert(belt_id < obarrlen);
       logistics_belt_tick(sorted_ref[i].slice, sorted_ref[i].cid, br);
       br->mark = M_unmarked;
       if (1) {
@@ -1663,7 +1799,37 @@ void logistics_render(void)
                   glMatrixMode(GL_MODELVIEW);
                   glDisable(GL_TEXTURE_2D);
                   glColor3f(1,1,1);
+                  for (a=0; a < obarr_len(c->machine); ++a) {
+                     machine_info *m = &c->machine[a];
+                     switch (m->type) {
+                        case BT_ore_drill:
+                        case BT_ore_eater:
+                           break;
+                        default:
+                           glPushMatrix();
+                           glTranslatef(base_x+m->pos.unpacked.x+0.5, base_y+m->pos.unpacked.y+0.5, base_z+m->pos.unpacked.z);
+                           glRotatef(90*m->rot, 0,0,1);
+                           stbgl_drawBox(0,0,0.25, 1,1,0.5, 1);
+                           glPopMatrix();
+                           break;
+                     }
+                  }
+                   
+                  for (a=0; a < obarr_len(c->belt_machine); ++a) {
+                     belt_machine_info *m = &c->belt_machine[a];
+                     switch (m->type) {
+                        default:
+                           glPushMatrix();
+                           glTranslatef(base_x+m->pos.unpacked.x+0.5, base_y+m->pos.unpacked.y+0.5, base_z+m->pos.unpacked.z);
+                           glRotatef(90*m->rot, 0,0,1);
+                           stbgl_drawBox(0,0,0.75, 1,1,0.5, 1);
+                           glPopMatrix();
+                           break;
+                     }
+                  }
+
                   for (a=0; a < obarr_len(c->pickers); ++a) {
+                     int b = 0;
                      picker_info *pi = &c->pickers[a];
                      float pos=0;
                      float bone_state[4]= {0,0,0,0};
@@ -1720,7 +1886,7 @@ void logistics_render(void)
                                      rot, bone_state);
                      #if 0
                      for (b=1; b < 500; ++b) {
-                        bone_state[0] = fmod(b*0.237,0.2);
+                        bone_state[0] = fmod(b*0.237,0.5);
                         add_draw_picker(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z+b,
                                         pi->rot, bone_state);
                      }

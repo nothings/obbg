@@ -1,35 +1,33 @@
-   -  why are job threads spending 10-40% idle waiting for work?!?!?!
-   -  do we need a gen_chunk_status to make sure we don't generate the same gen_chunk more than once?
+
    -  add mesh cache with explicit storing of coordinates & call function to access it instead of accessing inline
    -  why is set_mesh_chunk_for_coord either
       - (a) not just getting x & y from the mesh_chunk
       - (b) or writing mc->cx & mc->y with the passed-in-coordinates
       - (c) or at least asserting that they match
    -  num_gen_chunk_alloc is statistics output but is accessed thread-unsafely
-   -  do you need the diagonal gen_chunk neighbors to the mesh chunks?!???
 
 Possible tasks to work on next:
    -  store 'promises' on conveyor belts
    -  passive splitter (split sides in opposite directions)
    -  balancer
 
-
-
 Factorio-esque features:
    -  basic pickers (factorio "inserters")
-   -  conveyor belts - factorio & factoryidle
+   -  conveyor belts - factorio & factoryidle & infinifactory
    -  drills - factorio & modded minecraft
       +  real driller machines (attached to specific block types that have ore)
    -  furnaces - factorio & minecraft
    -  assemblers - factorio & factoryidle
    -  liquid - factorio & minecraft
    -  power - factorio & infinifactory-ish
+   -  control circuits - factorio & infinifactory
    -  enemies & tower defense-ish gameplay - factorio?
 
 
 
 Ideas:
    -  iron initially, but need steel for higher-speed things? (i.e. more exact gears)
+   -  coal - minecraft & factorio
    -  copper + iron => bronze (and brass)
    -  can animate pickers like current pickers but w/ lowering grabbers w/ skinned animation system
       - animation implementation:
@@ -41,7 +39,7 @@ Ideas:
         - each vertex gets 4 *signed* bone weights
            - four diagonal teeth use bone #3 & #4 in all combinations of signs
       - above implementation can almost be used for 'flexible pickers'
-        - flexible picker uses two-joint fake IK 
+        * flexible picker uses two-joint fake IK 
           - we don't bother will angling a joint
           - just draw two rods, one from base to midpoint, one from midpoint to endpoint
           - bone #1, #2, #3: position of grabber x/y/z
@@ -64,8 +62,8 @@ Ideas:
         - maybe just run pickers *before* belts? may need to adjust where they pick from
    -  do fast belts soon, run everything but slow belts on fast tick
    -  maybe don't allow destroying the procgen blocks (i.e 'natural blocks')
-      initially, and make the world gen very 3d, so you have to work a lot to
-      deal with the verticality and do sub-ideal placement initially
+        initially, and make the world gen very 3d, so you have to work a lot to
+        deal with the verticality and do sub-ideal placement initially
 
    Factorio-esque:
    +  player block placement
@@ -89,16 +87,16 @@ Ideas:
    *  save changes to disk
    -  conveyor belts (special physics)
       * factorio-style two-rows-of-sprite-sized stuff per conveyor
-      - or just one row of block-sized stuff
-      - maybe require multi-block things to be supported by multiple conveyors
+      x or just one row of block-sized stuff
+      x maybe require multi-block things to be supported by multiple conveyors
       * factorio-style stuff stops at end of conveyor, not infinifactory falling-off-esque
    *  basic pickers (factorio "inserters")
    -  speed up texture loading
    -  fixed "objects" can be blocks
       - any machinery that you can have a lot of should be (geometrically) blocks
       * machinery that is rare can go through a simpler polygon engine (same as 'moving object' system?)
-         - actually have a better instanced system
-   -  can build multi-block machines by infinifactory-style welding??
+         - actually have a better instanced system w/animation
+   x  can build multi-block machines by infinifactory-style welding??
    +  mine ore from ore blocks
       - gradual process that slowly depletes ore
         - graphical representation how?!?
@@ -115,6 +113,9 @@ Ideas:
       - ?1,000 block-like things with animation
       - ?1,000 block surface decals
       - 500 polygonal objects
+
+   Factorio-esque cleanup:
+      - forbid you from placing belts under ramps (cause bug with ramp outputing to start of lower belt run instead of middle)
 
    Game features:
    -  object system

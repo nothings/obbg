@@ -518,9 +518,9 @@ void draw_stats(void)
    text_color[0] = text_color[1] = text_color[2] = 1.0f;
    print("Frame time: %6.2fms, CPU frame render time: %5.2fms", frame_time*1000, render_time*1000);
    print("Tris: %4.1fM drawn of %4.1fM in range", 2*quads_rendered/1000000.0f, 2*quads_considered/1000000.0f);
-   print("Gen chunks: %4d", num_gen_chunk_alloc);
    print("Mesh data: requested in-cache %dMB, total in cache %dMB", mesh_cache_requested_in_use >> 20, c_mesh_cache_in_use >> 20);
    if (debug_render) {
+      print("Gen chunks: %4d", num_gen_chunk_alloc);
       for (i=0; i < MAX_MESH_WORKERS; ++i) {
          static char *task[32] = { "mesh", "gencache", "heightf", "fill", "ore", "trees", "edits", "light", "physics", "scan", "idle" };
          char buffer[1024];
@@ -1054,7 +1054,7 @@ void process_event(SDL_Event *e)
          if (k == '6') block_base = BT_ore_drill;
          if (k == '7') block_base = BT_ore_eater;
          if (k == '8') block_base = BT_picker;
-         if (k == '9') block_base = BT_conveyor_90_right;
+         if (k == '9') block_base = BT_balancer;
          if (k == '0') block_base = BT_stone;
          //if (k == '6') block_base = BT_conveyor_up_east_low;
          if (s == SDL_SCANCODE_H) global_hack = !global_hack;
@@ -1263,7 +1263,7 @@ int SDL_main(int argc, char **argv)
    if (program_mode != MODE_single_player)
       networking = net_init(program_mode == MODE_server, server_port);
 
-   SDL_GL_SetSwapInterval(0);
+   //SDL_GL_SetSwapInterval(0);
    game_init();
    render_init();
 
@@ -1285,7 +1285,7 @@ int SDL_main(int argc, char **argv)
       SDLNet_Quit();
 
    #ifdef _DEBUG
-   stop_manager();
+   //stop_manager();
    #endif
 
    return 0;
