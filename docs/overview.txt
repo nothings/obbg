@@ -1,5 +1,5 @@
 obbg:
-  open block building game
+  Open Block Building Game (OBBG)
 
   exercise all interesting
     features of voxel stuff:
