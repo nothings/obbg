@@ -520,25 +520,25 @@ void draw_stats(void)
    print("Tris: %4.1fM drawn of %4.1fM in range", 2*quads_rendered/1000000.0f, 2*quads_considered/1000000.0f);
    print("Gen chunks: %4d", num_gen_chunk_alloc);
    print("Mesh data: requested in-cache %dMB, total in cache %dMB", mesh_cache_requested_in_use >> 20, c_mesh_cache_in_use >> 20);
-   for (i=0; i < MAX_MESH_WORKERS; ++i) {
-      static char *task[32] = { "mesh", "gencache", "heightf", "fill", "ore", "trees", "edits", "light", "physics", "scan", "idle" };
-      char buffer[1024];
-      int pos=0,j;
-      float total=0;
-      pos += sprintf(buffer+pos, "Thread %d - ", i);
-      for (j=0; j < 32; ++j)
-         total += thread_timing[i].time[j];
-      pos += sprintf(buffer+pos, "%4dms - ", (int) (1000*total));
-      for (j=0; j < 11; ++j) {
-         if (0==strcmp(task[j], "ore")) continue;
-         if (0==strcmp(task[j], "edits")) continue;
-         if (0==strcmp(task[j], "physics")) continue;
-         if (0==strcmp(task[j], "scan")) continue;
-         pos += sprintf(buffer+pos, "%s:%3g/%3dms ", task[j], thread_timing[i].count[j], (int) (1000*thread_timing[i].time[j]));
-      }
-      print(buffer);
-   }
    if (debug_render) {
+      for (i=0; i < MAX_MESH_WORKERS; ++i) {
+         static char *task[32] = { "mesh", "gencache", "heightf", "fill", "ore", "trees", "edits", "light", "physics", "scan", "idle" };
+         char buffer[1024];
+         int pos=0,j;
+         float total=0;
+         pos += sprintf(buffer+pos, "Thread %d - ", i);
+         for (j=0; j < 32; ++j)
+            total += thread_timing[i].time[j];
+         pos += sprintf(buffer+pos, "%4dms - ", (int) (1000*total));
+         for (j=0; j < 11; ++j) {
+            if (0==strcmp(task[j], "ore")) continue;
+            if (0==strcmp(task[j], "edits")) continue;
+            if (0==strcmp(task[j], "physics")) continue;
+            if (0==strcmp(task[j], "scan")) continue;
+            pos += sprintf(buffer+pos, "%s:%3g/%3dms ", task[j], thread_timing[i].count[j], (int) (1000*thread_timing[i].time[j]));
+         }
+         print(buffer);
+      }
       print("Vbuf storage: %dMB in frustum of %dMB in range of %dMB in cache", chunk_storage_rendered>>20, chunk_storage_considered>>20, chunk_storage_total>>20);
       print("Num mesh builds started this frame: %d; num uploaded this frame: %d\n", num_meshes_started, num_meshes_uploaded);
       print("QChunks: %3d in frustum of %3d valid of %3d in range", chunks_in_frustum, chunks_considered, chunk_locations);

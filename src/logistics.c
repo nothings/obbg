@@ -1948,7 +1948,7 @@ void logistics_debug_render(void)
    }
 
 
-   {
+   if (0) {
       vec pos = obj[player_id].position;
       int x,y,z;
       x = (int) floor(pos.x);
