@@ -18,7 +18,7 @@
 #ifdef MINIMIZE_MEMORY
 size_t mesh_cache_max_storage = 1 << 25; // 32 MB
 #else
-size_t mesh_cache_max_storage = 1 << 29; // 512 MB
+size_t mesh_cache_max_storage = 1 << 30; // 1 GB
 #endif
 
 static mesh_chunk *c_mesh_cache[C_MESH_CHUNK_CACHE_Y][C_MESH_CHUNK_CACHE_X];
@@ -169,7 +169,7 @@ void init_voxel_render(int voxel_tex[2])
 #if VIEW_DIST_LOG2 < 11
 int view_distance=300;
 #else
-int view_distance=1500;
+int view_distance=1800;
 #endif
 
 float table3[128][3];

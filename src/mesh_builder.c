@@ -1774,6 +1774,7 @@ Bool get_next_task(task *t, int thread_id)
    Bool found_task_flag = True;
    int i;
    Uint64 start = SDL_GetPerformanceCounter();
+   int counter[8] = { 0 };
 
    SDL_LockMutex(manager_mutex);
 
@@ -1845,6 +1846,9 @@ Bool get_next_task(task *t, int thread_id)
    }
    SDL_UnlockMutex(swap_renderer_request_mutex);
 
+   for (i=0; i < MAX_BUILT_MESHES && current_processing_meshes[i].state != RMS_invalid; ++i)
+         ;
+
    for (i=0; i < MAX_BUILT_MESHES; ++i) { // @TODO: just loop to 'n' and don't look at rm->state
       requested_mesh *rm = &current_processing_meshes[i];
       int k,j;
@@ -1852,6 +1856,8 @@ Bool get_next_task(task *t, int thread_id)
       mesh_chunk_status *mcs;
       if (rm->state == RMS_invalid)
          break;
+      if (rm->state == RMS_finished)
+         continue;
 
       mcs = get_chunk_status(rm->x, rm->y, rm->needs_triangles);
 
@@ -1872,8 +1878,11 @@ Bool get_next_task(task *t, int thread_id)
       }
 
       // go through all the chunks and see if they're created, and if not, request them
-      if (mcs->status == CHUNK_STATUS_processing)
+      if (mcs->status == CHUNK_STATUS_processing) {
+         rm->state = RMS_finished;
+	      ++counter[0];
          continue;
+      }
 
       for (k=0; k < 4; ++k) {
          for (j=0; j < 4; ++j) {
@@ -1888,10 +1897,12 @@ Bool get_next_task(task *t, int thread_id)
                   mcs->chunk_set_valid[k][j] = True;
                   assert(gcc->chunk != 0);
                   add_ref_count(gcc->chunk, REF_mesh_chunk_status);
+                  ++counter[1];
                   // @TODO
                   //++valid_chunks;
                } else {
                   if (is_in_progress(cx, cy)) {
+                     ++counter[2];
                      // it's already in progress, so do nothing
                   } else if (can_start_procgen(cx, cy)) {
                      start_procgen(cx,cy);
@@ -1902,6 +1913,7 @@ Bool get_next_task(task *t, int thread_id)
                   }
                }
             } else {
+               ++counter[3];
                ++valid_chunks;
             }
          }
@@ -1923,7 +1935,7 @@ Bool get_next_task(task *t, int thread_id)
             memset(&mcs->cs, 0, sizeof(mcs->cs));
             mcs->status = CHUNK_STATUS_processing;
             assert(rm->state == RMS_requested);
-            rm->state = RMS_invalid;
+            rm->state = RMS_finished;
             t->task_type = JOB_build_mesh;
             t->world_x = rm->x;
             t->world_y = rm->y;

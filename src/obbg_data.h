@@ -216,10 +216,8 @@ extern objid max_obj_id, max_player_id;
 enum
 {
    RMS_invalid,
-   
    RMS_requested,
-
-   //RMS_chunks_completed_waiting_for_meshing,
+   RMS_finished
 };
 
 

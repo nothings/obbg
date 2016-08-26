@@ -1210,6 +1210,7 @@ int SDL_main(int argc, char **argv)
    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
    #endif
 
+   SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1); // @TODO doesn't seem to be necessary
    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
    #if 0
