@@ -199,6 +199,11 @@ logi_chunk *logistics_get_chunk(int x, int y, int z, logi_slice **r_s)
    return s->chunk[chunk_z];
 }
 
+static logi_chunk *get_chunk(int x, int y, int z)
+{
+   return logistics_get_chunk(x,y,z,NULL);
+}
+
 static void logistics_free_chunk(logi_chunk *c)
 {
    obarr_free(c->machine);
@@ -265,30 +270,6 @@ static logi_chunk *logistics_get_chunk_alloc(int x, int y, int z)
    return c;
 }
 
-static void compute_mobile_slots(belt_run *br)
-{
-   int j;
-   int blocked[2] = { 1,1 };
-   if (br->len == 0)
-      return;
-   br->mobile_slots[0] = br->mobile_slots[1] = 0;
-   for (j=br->len*ITEMS_PER_BELT_SIDE-1; j >= 0; --j) {
-      if (blocked[0]) {
-         if (br->items[j*2+0].type == 0) {
-            blocked[0] = 0;
-            br->mobile_slots[0] = j;
-         }
-      }
-
-      if (blocked[1]) {
-         if (br->items[j*2+1].type == 0) {
-            blocked[1] = 0;
-            br->mobile_slots[1] = j;
-         }
-      }
-   }
-}
-
 static int right_offset(belt_run *a)
 {
    return 0;
@@ -304,6 +285,26 @@ static int offset_for_side(belt_run *a, int side)
       return right_offset(a);
    else
       return left_offset(a);
+}
+
+static void compute_mobile_slots(belt_run *br)
+{
+   int j;
+   int left_off = left_offset(br);
+   int len = br->len * ITEMS_PER_BELT_SIDE;
+   if (br->len == 0)
+      return;
+   br->mobile_slots[0] = br->mobile_slots[1] = 0;
+
+   for (j=len; j >= 0; --j)
+      if (br->items[j].type == 0)
+         break;
+   br->mobile_slots[0] = j < 0 ? 0 : j;
+
+   for (j=len; j >= 0; --j)
+      if (br->items[left_off+j].type == 0)
+         break;
+   br->mobile_slots[1] = j < 0 ? 0 : j;
 }
 
 static void split_belt_raw(belt_run *a, belt_run *b, int num_a)

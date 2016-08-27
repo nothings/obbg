@@ -8,6 +8,7 @@ Refactor belt logitistics:
       - premature optimization
    -  refactor belts to use shared logic as much as possible
       - except animation, which can be unique for each type
+   -  change mobile_slots to be consistenly inclusive or exclusive (currently '0' has two meanings)
 
 
 
