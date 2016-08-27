@@ -780,7 +780,7 @@ static int get_belt_id_noramp(int x, int y, int z)
 {
    int j;
 
-   logi_chunk *c = logistics_get_chunk(x,y,z, NULL);
+   logi_chunk *c = get_chunk(x,y,z);
 
    int ox = x & (LOGI_CHUNK_SIZE_X-1);
    int oy = y & (LOGI_CHUNK_SIZE_Y-1);
@@ -851,7 +851,7 @@ static int get_machine_id(int x, int y, int z)
 int get_belt_id(int x, int y, int z, int dir)
 {
    int j;
-   logi_chunk *d = logistics_get_chunk(x,y,z,0);
+   logi_chunk *d = get_chunk(x,y,z);
    int base_x = x & ~(LOGI_CHUNK_SIZE_X-1);
    int base_y = y & ~(LOGI_CHUNK_SIZE_Y-1);
    int base_z = z & ~(LOGI_CHUNK_SIZE_Z-1);
@@ -879,7 +879,7 @@ int get_belt_id(int x, int y, int z, int dir)
 
 void logistics_update_chunk(int x, int y, int z)
 {
-   logi_chunk *c = logistics_get_chunk(x,y,z,0);
+   logi_chunk *c = get_chunk(x,y,z);
    if (c != NULL) {
       int base_x = x & ~(LOGI_CHUNK_SIZE_X-1);
       int base_y = y & ~(LOGI_CHUNK_SIZE_Y-1);
@@ -895,7 +895,7 @@ void logistics_update_chunk(int x, int y, int z)
             int ey = b->y_off + b->len * face_dir[outdir][1];
             int ez = b->z_off + b->end_dz, is_neighbor=0;
             if (ex < 0 || ey < 0 || ex >= LOGI_CHUNK_SIZE_X || ey >= LOGI_CHUNK_SIZE_Y || ez < 0 || ez >= LOGI_CHUNK_SIZE_Z) {
-               d = logistics_get_chunk(base_x + ex, base_y + ey, base_z + ez,0);
+               d = get_chunk(base_x + ex, base_y + ey, base_z + ez);
                ex = LOGI_CHUNK_MASK_X(ex);
                ey = LOGI_CHUNK_MASK_Y(ey);
                b->target_is_neighbor = 1;
@@ -929,7 +929,7 @@ void logistics_update_chunk(int x, int y, int z)
                ey = b->y_off + b->len * face_dir[outdir][1];
                ez = b->z_off + b->end_dz, is_neighbor=0;
                if (ex < 0 || ey < 0 || ex >= LOGI_CHUNK_SIZE_X || ey >= LOGI_CHUNK_SIZE_Y || ez < 0 || ez >= LOGI_CHUNK_SIZE_Z) {
-                  d = logistics_get_chunk(base_x + ex, base_y + ey, base_z + ez,0);
+                  d = get_chunk(base_x + ex, base_y + ey, base_z + ez);
                   ex = LOGI_CHUNK_MASK_X(ex);
                   ey = LOGI_CHUNK_MASK_Y(ey);
                }
@@ -1165,8 +1165,6 @@ typedef struct
 {
    int off_x, off_y, off_z;
    logi_chunk *c;
-   logi_slice *s;
-   int cid;
 } target_chunk;
 
 static vec3i get_target(int x, int y, int z, belt_run *br)
@@ -1179,6 +1177,19 @@ static vec3i get_target(int x, int y, int z, belt_run *br)
    return result;
 }
 
+static void get_chunk_in_dir(target_chunk *tc, int x, int y, int z, int dir)
+{
+   int outdir = dir;
+   int ex = x + face_dir[outdir][0];
+   int ey = y + face_dir[outdir][1];
+   int ez = z;
+   logi_chunk *c = get_chunk(ex,ey,ez);
+   tc->c = c;
+   tc->off_x = (ex & ~(LOGI_CHUNK_SIZE_X-1)) - ((x) & ~(LOGI_CHUNK_SIZE_X-1));
+   tc->off_y = (ey & ~(LOGI_CHUNK_SIZE_Y-1)) - ((x) & ~(LOGI_CHUNK_SIZE_Y-1));
+   tc->off_z = (ez & ~(LOGI_CHUNK_SIZE_Z-1)) - ((x) & ~(LOGI_CHUNK_SIZE_Z-1));
+}
+
 // return off_x, off_y, off_z relative to bx,by,bz
 static void get_target_chunk(target_chunk *tc, int x, int y, int z, belt_run *br)
 {
@@ -1189,26 +1200,20 @@ static void get_target_chunk(target_chunk *tc, int x, int y, int z, belt_run *br
    int ex = target.x;
    int ey = target.y;
    int ez = target.z;
-   logi_chunk *c = logistics_get_chunk(target.x,target.y,target.z, &tc->s);
-   tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
+   logi_chunk *c = get_chunk(target.x,target.y,target.z);
    tc->c = c;
    tc->off_x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) - bx;
    tc->off_y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) - by;
    tc->off_z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) - bz;
 }
 
-static void get_chunk_in_dir(target_chunk *tc, int x, int y, int z, int dir)
+static void get_input_chunk(target_chunk *tc, int x, int y, int z, logi_chunk *c, belt_run *br)
 {
-   int outdir = dir;
-   int ex = x + face_dir[outdir][0];
-   int ey = y + face_dir[outdir][1];
-   int ez = z;
-   logi_chunk *c = logistics_get_chunk(ex,ey,ez, &tc->s);
-   tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
-   tc->c = c;
-   tc->off_x = (ex & ~(LOGI_CHUNK_SIZE_X-1)) - ((x) & ~(LOGI_CHUNK_SIZE_X-1));
-   tc->off_y = (ey & ~(LOGI_CHUNK_SIZE_Y-1)) - ((x) & ~(LOGI_CHUNK_SIZE_Y-1));
-   tc->off_z = (ez & ~(LOGI_CHUNK_SIZE_Z-1)) - ((x) & ~(LOGI_CHUNK_SIZE_Z-1));
+   int ex = x - face_dir[br->dir][0];
+   int ey = y - face_dir[br->dir][1];
+   int ez = z - br->input_dz;
+   logi_chunk *nc = get_chunk(ex,ey,ez);
+   tc->c = nc;
 }
 
 static belt_run *get_belt_run_in_direction(int x, int y, int z, int dir, int id, int *off)
@@ -1216,21 +1221,11 @@ static belt_run *get_belt_run_in_direction(int x, int y, int z, int dir, int id,
    logi_chunk *c;
    x = x + face_dir[dir][0];
    y = y + face_dir[dir][1];
-   c = logistics_get_chunk(x,y,z, NULL);   
+   c = get_chunk(x,y,z);
    *off = get_interaction_pos(&c->belts[id], x,y,z);
    assert(id != TARGET_none);
    assert(id < obarr_len(c->belts));
    return &c->belts[id];
-}
-
-static void get_input_chunk(target_chunk *tc, int bx, int by, int bz, logi_chunk *c, belt_run *br)
-{
-   int ex = bx + br->x_off - face_dir[br->dir][0];
-   int ey = by + br->y_off - face_dir[br->dir][1];
-   int ez = bz + br->z_off - br->input_dz;
-   logi_chunk *nc = logistics_get_chunk(ex,ey,ez, &tc->s);
-   tc->c = nc;
-   tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
 }
 
 #define BELT_SLOT_IS_EMPTY_NEXT_TICK(b,slot,pos,side) \
@@ -1848,6 +1843,41 @@ typedef struct
 
 static belt_ref *sorted_ref;
 
+typedef struct
+{
+   int off_x, off_y, off_z;
+   logi_chunk *c;
+   logi_slice *s;
+   int cid;
+} vtarget_chunk;
+
+static void vget_target_chunk(vtarget_chunk *tc, int x, int y, int z, belt_run *br)
+{
+   int bx = (x & ~(LOGI_CHUNK_SIZE_X-1));
+   int by = (y & ~(LOGI_CHUNK_SIZE_Y-1));
+   int bz = (z & ~(LOGI_CHUNK_SIZE_Z-1));
+   vec3i target = get_target(x,y,z, br);
+   int ex = target.x;
+   int ey = target.y;
+   int ez = target.z;
+   logi_chunk *c = logistics_get_chunk(target.x,target.y,target.z, &tc->s);
+   tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
+   tc->c = c;
+   tc->off_x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) - bx;
+   tc->off_y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) - by;
+   tc->off_z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) - bz;
+}
+
+static void vget_input_chunk(vtarget_chunk *tc, int x, int y, int z, logi_chunk *c, belt_run *br)
+{
+   int ex = x - face_dir[br->dir][0];
+   int ey = y - face_dir[br->dir][1];
+   int ez = z - br->input_dz;
+   logi_chunk *nc = logistics_get_chunk(ex,ey,ez, &tc->s);
+   tc->c = nc;
+   tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
+}
+
 static void visit(belt_ref *ref)
 {
    logi_chunk *c = ref->slice->chunk[ref->cid];
@@ -1856,10 +1886,10 @@ static void visit(belt_ref *ref)
    if (br->mark == M_unmarked) {
       br->mark = M_temporary;
       if (br->target_id != TARGET_none) {
-         target_chunk tc;
+         vtarget_chunk tc;
          belt_ref target;
          if (br->type != BR_splitter) {
-            get_target_chunk(&tc, ref->slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, ref->slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off, ref->cid * LOGI_CHUNK_SIZE_Z+br->z_off, br);
+            vget_target_chunk(&tc, ref->slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, ref->slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off, ref->cid * LOGI_CHUNK_SIZE_Z+br->z_off, br);
             target.belt_id = br->target_id;
             target.cid = tc.cid;
             target.slice = tc.s;
@@ -1875,8 +1905,8 @@ static void visit(belt_ref *ref)
       {
          belt_ref target = *ref;
          while (br->input_id != TARGET_none) {
-            target_chunk tc;
-            get_input_chunk(&tc,  target.slice->slice_x * LOGI_CHUNK_SIZE_X, target.slice->slice_y * LOGI_CHUNK_SIZE_Y, target.cid * LOGI_CHUNK_SIZE_Z, c, br);
+            vtarget_chunk tc;
+            vget_input_chunk(&tc,  target.slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, target.slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off, target.cid * LOGI_CHUNK_SIZE_Z+br->z_off, c, br);
             target.belt_id = br->input_id;
             target.cid = tc.cid;
             target.slice = tc.s;
