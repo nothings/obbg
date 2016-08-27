@@ -1161,38 +1161,6 @@ static int get_interaction_pos(belt_run *b, int x, int y, int z)
    return abs(x-b->x_off) + abs(y-b->y_off);
 }
 
-#if 0
-static belt_run *get_interaction_belt(int x, int y, int z, int facing, int *pos)
-{
-   int j;
-
-   int ex = x + face_dir[facing][0];
-   int ey = y + face_dir[facing][1];
-   int ez = z;
-
-   logi_slice *s;
-   logi_chunk *c = logistics_get_chunk(ex,ey,ez, &s);
-
-   int ox = ex & (LOGI_CHUNK_SIZE_X-1);
-   int oy = ey & (LOGI_CHUNK_SIZE_Y-1);
-   int oz = ez & (LOGI_CHUNK_SIZE_Z-1);
-
-   for (j=0; j < obarr_len(c->belts); ++j) {
-      if (c->belts[j].end_dz == 0) {
-         if (does_belt_intersect(&c->belts[j], ox,oy,oz)) {
-            ox = s->slice_x * LOGI_CHUNK_SIZE_X + c->belts[j].x_off;
-            oy = s->slice_y * LOGI_CHUNK_SIZE_Y + c->belts[j].y_off;
-            oz = (z & ~(LOGI_CHUNK_SIZE_Z-1)) + c->belts[j].z_off;
-            *pos = abs(ex - ox) + abs(ey - oy);
-            return &c->belts[j];
-         }
-      }
-   }
-
-   return NULL;
-}
-#endif
-
 typedef struct
 {
    int off_x, off_y, off_z;
@@ -1201,19 +1169,32 @@ typedef struct
    int cid;
 } target_chunk;
 
-// return off_x, off_y, off_z relative to bx,by,bz
-static void get_target_chunk(target_chunk *tc, int bx, int by, int bz, belt_run *br)
+static vec3i get_target(int x, int y, int z, belt_run *br)
 {
    int outdir = (br->dir + br->turn) & 3;
-   int ex = bx + br->x_off + br->len * face_dir[outdir][0];
-   int ey = by + br->y_off + br->len * face_dir[outdir][1];
-   int ez = bz + br->z_off + br->end_dz;
-   logi_chunk *c = logistics_get_chunk(ex,ey,ez, &tc->s);
+   vec3i result;
+   result.x = x + br->len * face_dir[outdir][0];
+   result.y = y + br->len * face_dir[outdir][1];
+   result.z = z + br->end_dz;
+   return result;
+}
+
+// return off_x, off_y, off_z relative to bx,by,bz
+static void get_target_chunk(target_chunk *tc, int x, int y, int z, belt_run *br)
+{
+   int bx = (x & ~(LOGI_CHUNK_SIZE_X-1));
+   int by = (y & ~(LOGI_CHUNK_SIZE_Y-1));
+   int bz = (z & ~(LOGI_CHUNK_SIZE_Z-1));
+   vec3i target = get_target(x,y,z, br);
+   int ex = target.x;
+   int ey = target.y;
+   int ez = target.z;
+   logi_chunk *c = logistics_get_chunk(target.x,target.y,target.z, &tc->s);
    tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
    tc->c = c;
-   tc->off_x = (ex & ~(LOGI_CHUNK_SIZE_X-1)) - bx;
-   tc->off_y = (ey & ~(LOGI_CHUNK_SIZE_Y-1)) - by;
-   tc->off_z = (ez & ~(LOGI_CHUNK_SIZE_Z-1)) - bz;
+   tc->off_x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) - bx;
+   tc->off_y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) - by;
+   tc->off_z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) - bz;
 }
 
 static void get_chunk_in_dir(target_chunk *tc, int x, int y, int z, int dir)
@@ -1258,11 +1239,11 @@ static void get_input_chunk(target_chunk *tc, int bx, int by, int bz, logi_chunk
 #define SHORT_SIDE  1
 #define LONG_SIDE   5
 
-void logistics_belt_turn_tick(logi_slice *s, int cid, belt_run *br)
+void logistics_belt_turn_tick(int x, int y, int z, belt_run *br)
 {
    int j;
    int force_mobile[2] = { 0,0 };
-   logi_chunk *c = s->chunk[cid];
+   logi_chunk *c = get_chunk(x,y,z);
    int allow_new_frontmost_to_move[2] = { 0,0 };
    int left_start, left_len, right_start, right_len, right_end, left_end;
    int outdir = (br->dir + br->turn) & 3;
@@ -1283,7 +1264,7 @@ void logistics_belt_turn_tick(logi_slice *s, int cid, belt_run *br)
       int relative_facing;
       target_chunk tc;
       belt_run *tb;
-      get_target_chunk(&tc, s->slice_x * LOGI_CHUNK_SIZE_X, s->slice_y * LOGI_CHUNK_SIZE_Y, cid * LOGI_CHUNK_SIZE_Z, br);
+      get_target_chunk(&tc, x,y,z, br);
       assert(tc.c != NULL);
       tb = &tc.c->belts[br->target_id];
       relative_facing = (tb->dir - outdir) & 3;
@@ -1436,11 +1417,11 @@ void logistics_belt_turn_tick(logi_slice *s, int cid, belt_run *br)
       br->last_slot_filled_next_tick[1] = 1;
 }
 
-void logistics_belt_splitter_tick(logi_slice *s, int cid, belt_run *br)
+void logistics_belt_splitter_tick(int x, int y, int z, belt_run *br)
 {
    int j;
    int force_mobile[2] = { 0,0 };
-   logi_chunk *c = s->chunk[cid];
+   logi_chunk *c = get_chunk(x,y,z);
    int allow_new_frontmost_to_move[2] = { 0,0 };
    int left_start, left_len, right_start, right_len, right_end, left_end;
    int outdir = (br->dir + 3) & 3;
@@ -1456,7 +1437,7 @@ void logistics_belt_splitter_tick(logi_slice *s, int cid, belt_run *br)
       int relative_facing;
       target_chunk tc;
       belt_run *tb;
-      get_chunk_in_dir(&tc, s->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, s->slice_y * LOGI_CHUNK_SIZE_Y + br->y_off, cid * LOGI_CHUNK_SIZE_Z + br->z_off, outdir);
+      get_chunk_in_dir(&tc, x,y,z, outdir);
       assert(tc.c != NULL);
       tb = &tc.c->belts[br->target_id];
       relative_facing = (tb->dir - outdir) & 3;
@@ -1534,7 +1515,7 @@ void logistics_belt_splitter_tick(logi_slice *s, int cid, belt_run *br)
       int relative_facing;
       target_chunk tc;
       belt_run *tb;
-      get_chunk_in_dir(&tc, s->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, s->slice_y * LOGI_CHUNK_SIZE_Y + br->y_off, cid * LOGI_CHUNK_SIZE_Z + br->z_off, outdir);
+      get_chunk_in_dir(&tc, x,y,z, outdir);
       assert(tc.c != NULL);
       assert(br->target2_id < obarr_len(tc.c->belts));
       tb = &tc.c->belts[br->target2_id];
@@ -1655,9 +1636,11 @@ void logistics_belt_splitter_tick(logi_slice *s, int cid, belt_run *br)
 }
 
 
-void logistics_belt_tick(logi_slice *s, int cid, belt_run *br)
+void logistics_belt_tick(int x, int y, int z, belt_run *br)
 {
-   logi_chunk *c = s->chunk[cid];
+   //logi_slice *s, int cid, 
+
+   logi_chunk *c = get_chunk(x,y,z);
    int j, leftbase;
    int len;
    int force_mobile[2] = { 0,0 };
@@ -1672,11 +1655,11 @@ void logistics_belt_tick(logi_slice *s, int cid, belt_run *br)
    }
 
    if (br->turn) {
-      logistics_belt_turn_tick(s, cid, br);
+      logistics_belt_turn_tick(x,y,z, br);
       return;
    }
    if (br->type == BR_splitter) {
-      logistics_belt_splitter_tick(s, cid, br);
+      logistics_belt_splitter_tick(x,y,z, br);
       return;
    }
 
@@ -1687,9 +1670,9 @@ void logistics_belt_tick(logi_slice *s, int cid, belt_run *br)
       int turn;
       int right_end_slot = left_offset(br)-1;
       int left_end_slot = len-1;
-      target_chunk tc;
       belt_run *tb;
-      get_target_chunk(&tc, s->slice_x * LOGI_CHUNK_SIZE_X, s->slice_y * LOGI_CHUNK_SIZE_Y, cid * LOGI_CHUNK_SIZE_Z, br);
+      target_chunk tc;
+      get_target_chunk(&tc, x,y,z, br);
       assert(tc.c != NULL);
       tb = &tc.c->belts[br->target_id];
       turn = (tb->dir - br->dir) & 3;
@@ -1876,7 +1859,7 @@ static void visit(belt_ref *ref)
          target_chunk tc;
          belt_ref target;
          if (br->type != BR_splitter) {
-            get_target_chunk(&tc, ref->slice->slice_x * LOGI_CHUNK_SIZE_X, ref->slice->slice_y * LOGI_CHUNK_SIZE_Y, ref->cid * LOGI_CHUNK_SIZE_Z, br);
+            get_target_chunk(&tc, ref->slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, ref->slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off, ref->cid * LOGI_CHUNK_SIZE_Z+br->z_off, br);
             target.belt_id = br->target_id;
             target.cid = tc.cid;
             target.slice = tc.s;
@@ -2151,21 +2134,19 @@ void logistics_do_long_tick(void)
 
    sort_order = -1; // selected belt
    for (i=0; i < obarr_len(sorted_ref); ++i) {
-      logi_slice *s = sorted_ref[i].slice;
-      belt_run *br = &s->chunk[sorted_ref[i].cid]->belts[sorted_ref[i].belt_id];
-      int obarrlen = obarr_len(s->chunk[sorted_ref[i].cid]->belts);
-      int belt_id = sorted_ref[i].belt_id;
+      belt_ref *r = &sorted_ref[i];
+      logi_slice *s = r->slice;
+      belt_run *br = &s->chunk[r->cid]->belts[r->belt_id];
+      int obarrlen = obarr_len(s->chunk[r->cid]->belts);
+      int belt_id = r->belt_id;
+      int base_x = s->slice_x * LOGI_CHUNK_SIZE_X;
+      int base_y = s->slice_y * LOGI_CHUNK_SIZE_Y;
+      int base_z = r->cid     * LOGI_CHUNK_SIZE_Z;
       assert(belt_id < obarrlen);
-      logistics_belt_tick(sorted_ref[i].slice, sorted_ref[i].cid, br);
+      logistics_belt_tick(base_x+br->x_off,base_y+br->y_off,base_z+br->z_off, br);
       br->mark = M_unmarked;
-      if (1) {
-         int base_x = s->slice_x * LOGI_CHUNK_SIZE_X;
-         int base_y = s->slice_y * LOGI_CHUNK_SIZE_Y;
-         int base_z = sorted_ref[i].cid * LOGI_CHUNK_SIZE_Z;
-
-         if (does_belt_intersect(br, selected_block[0]-base_x, selected_block[1]-base_y, selected_block[2]-base_z))
-            sort_order = i;
-      }
+      if (does_belt_intersect(br, selected_block[0]-base_x, selected_block[1]-base_y, selected_block[2]-base_z))
+         sort_order = i;
    }
 
    obarr_free(belts);
