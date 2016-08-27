@@ -721,8 +721,12 @@ void destroy_picker(int x, int y, int z)
    }
 }
 
-int find_ore(logi_chunk *c, int ox, int oy, int oz)
+int find_ore(int x, int y, int z)
 {
+   logi_chunk *c = get_chunk(x,y,z);
+   int ox = LOGI_CHUNK_MASK_X(x);
+   int oy = LOGI_CHUNK_MASK_Y(y);
+   int oz = LOGI_CHUNK_MASK_Z(z);
    int i;
    logi_chunk_coord sc = coord(ox,oy,oz);
    for (i=0; i < obarr_len(c->ore); ++i)
@@ -731,8 +735,12 @@ int find_ore(logi_chunk *c, int ox, int oy, int oz)
    return -1;
 }
 
-void create_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot, int bx, int by, int bz)
+void create_machine(int x, int y, int z, int type, int rot, int bx, int by, int bz)
 {
+   logi_chunk *c = get_chunk(x,y,z);
+   int ox = LOGI_CHUNK_MASK_X(x);
+   int oy = LOGI_CHUNK_MASK_Y(y);
+   int oz = LOGI_CHUNK_MASK_Z(z);
    int ore_z;
    logi_chunk *d;
    machine_info mi = { 0 };
@@ -745,7 +753,7 @@ void create_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot, in
    ore_z = (oz-1) & (LOGI_CHUNK_SIZE_Z-1);
    // @TODO only do followign test for BT_ore_driller
    if (d->type[ore_z][oy][ox] == BT_stone) {
-      int id = find_ore(d, ox,oy,ore_z);
+      int id = find_ore(x,y,z-1);
       if (id < 0) {
          ore_info ore;
          ore.pos = coord(ox,oy,ore_z);
@@ -755,29 +763,17 @@ void create_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot, in
    }
 }
 
-void create_belt_machine(logi_chunk *c, int ox, int oy, int oz, int type, int rot, int bx, int by, int bz)
+void create_belt_machine(int x, int y, int z, int type, int rot, int bx, int by, int bz)
 {
-   //int belt_z;
-   //logi_chunk *d;
+   logi_chunk *c = get_chunk(x,y,z);
+   int ox = LOGI_CHUNK_MASK_X(x);
+   int oy = LOGI_CHUNK_MASK_Y(y);
+   int oz = LOGI_CHUNK_MASK_Z(z);
    belt_machine_info bmi = { 0 };
    bmi.pos  = coord(ox,oy,oz);
    bmi.type = type;
    bmi.rot = rot;
    obarr_push(c->belt_machine, bmi, "/logi/machinelist");
-
-   #if 0
-   d = logistics_get_chunk_alloc(bx+ox,by+oy,bz+oz-1);
-   belt_z = (oz-1) & (LOGI_CHUNK_SIZE_Z-1);
-   if (d->type[belt_z][oy][ox] == BT_conveyor) {
-      int id = get_belt_id_noramp(d, ox,oy,belt_z);
-      if (id < 0) {
-         ore_info ore;
-         ore.pos = coord(ox,oy,ore_z);
-         ore.count = 5;
-         obarr_push(d->ore, ore, "/logi/orelist");
-      }
-   }
-   #endif
 }
 
 static int get_belt_id_noramp(int x, int y, int z)
@@ -798,74 +794,55 @@ static int get_belt_id_noramp(int x, int y, int z)
    return -1;
 }
 
-static int get_chunk_belt_id_noramp(logi_chunk *c, int x, int y, int z)
+static int find_machine(int x, int y, int z)
 {
-   int j;
-
-   int ox = x & (LOGI_CHUNK_SIZE_X-1);
-   int oy = y & (LOGI_CHUNK_SIZE_Y-1);
-   int oz = z & (LOGI_CHUNK_SIZE_Z-1);
-
-   for (j=0; j < obarr_len(c->belts); ++j)
-      if (c->belts[j].end_dz == 0 && c->belts[j].turn == 0)
-         if (does_belt_intersect(&c->belts[j], ox,oy,oz))
-            return j;
-
-   return -1;
-}
-
-static int find_machine(logi_chunk *c, int ox, int oy, int oz)
-{
+   logi_chunk *c = get_chunk(x,y,z);
    int i;
    logi_chunk_coord sc;
-   sc.unpacked.x = ox;
-   sc.unpacked.y = oy;
-   sc.unpacked.z = oz;
+   sc.unpacked.x = (uint8) LOGI_CHUNK_MASK_X(x);
+   sc.unpacked.y = (uint8) LOGI_CHUNK_MASK_Y(y);
+   sc.unpacked.z = (uint8) LOGI_CHUNK_MASK_Z(z);
    for (i=0; i < obarr_len(c->machine); ++i)
       if (c->machine[i].pos.packed == sc.packed)
          return i;
    return -1;
 }
 
-static int find_belt_machine(logi_chunk *c, int ox, int oy, int oz)
+static int find_belt_machine(int x, int y, int z)
 {
+   logi_chunk *c = get_chunk(x,y,z);
    int i;
    logi_chunk_coord sc;
-   sc.unpacked.x = ox;
-   sc.unpacked.y = oy;
-   sc.unpacked.z = oz;
+   sc.unpacked.x = (uint8) LOGI_CHUNK_MASK_X(x);
+   sc.unpacked.y = (uint8) LOGI_CHUNK_MASK_Y(y);
+   sc.unpacked.z = (uint8) LOGI_CHUNK_MASK_Z(z);
    for (i=0; i < obarr_len(c->belt_machine); ++i)
       if (c->belt_machine[i].pos.packed == sc.packed)
          return i;
    return -1;
 }
 
-static void destroy_machine(logi_chunk *c, int ox, int oy, int oz)
+static void destroy_machine(int x, int y, int z)
 {
-   int n = find_machine(c, ox,oy,oz);
-   if (n >= 0)
+   int n = find_machine(x,y,z);
+   if (n >= 0) {
+      logi_chunk *c = get_chunk(x,y,z);
       obarr_fastdelete(c->machine, n);
+   }
 }
 
-static void destroy_belt_machine(logi_chunk *c, int ox, int oy, int oz)
+static void destroy_belt_machine(int x, int y, int z)
 {
-   int n = find_belt_machine(c,ox,oy,oz);
-   if (n >= 0)
+   int n = find_belt_machine(x,y,z);
+   if (n >= 0) {
+      logi_chunk *c = get_chunk(x,y,z);
       obarr_fastdelete(c->belt_machine, n);
+   }
 }
 
 static int get_machine_id(int x, int y, int z)
 {
-   logi_chunk *c = logistics_get_chunk(x,y,z, NULL);
-
-   int ox = x & (LOGI_CHUNK_SIZE_X-1);
-   int oy = y & (LOGI_CHUNK_SIZE_Y-1);
-   int oz = z & (LOGI_CHUNK_SIZE_Z-1);
-
-   if (c)
-      return find_machine(c, ox,oy,oz);
-   else
-      return -1;
+   return find_machine(x,y,z);
 }
 
 // @TODO what happens if we point a conveyor at the side of a turn
@@ -1034,7 +1011,7 @@ void logistics_update_chunk(int x, int y, int z)
          int y = base_y + m->pos.unpacked.y;
          logi_chunk *d = logistics_get_chunk_alloc(base_x, base_y, belt_z);
          if (d->type[belt_z & (LOGI_CHUNK_SIZE_Z-1)][m->pos.unpacked.y][m->pos.unpacked.x] == BT_conveyor) {
-            int id = get_chunk_belt_id_noramp(d, m->pos.unpacked.x, m->pos.unpacked.y, belt_z & (LOGI_CHUNK_SIZE_Z-1));
+            int id = get_belt_id_noramp(x,y,belt_z);
             if (id >= 0) {
                m->input_id = (uint16) id;
             } else
@@ -1073,9 +1050,9 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool al
    if (oldtype >= BT_picker && oldtype <= BT_picker)
       destroy_picker(x,y,z);
    else if (oldtype >= BT_belt_machines)
-      destroy_belt_machine(c, ox,oy,oz);
+      destroy_belt_machine(x,y,z);
    else if (oldtype >= BT_machines)
-      destroy_machine(c, ox,oy,oz);
+      destroy_machine(x,y,z);
    else if (oldtype == BT_conveyor && type != BT_conveyor)
       destroy_belt(x,y,z);
 
@@ -1088,9 +1065,9 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool al
    if (type >= BT_picker && type <= BT_picker)
       create_picker(x,y,z, type,rot);
    else if (type >= BT_belt_machines)
-      create_belt_machine(c, ox,oy,oz, type, rot, x-ox,y-oy,z-oz);
+      create_belt_machine(x,y,z, type, rot, x-ox,y-oy,z-oz);
    else if (type >= BT_machines)
-      create_machine(c, ox,oy,oz, type, rot, x-ox,y-oy,z-oz);
+      create_machine(x,y,z, type, rot, x-ox,y-oy,z-oz);
 
    if (type == BT_conveyor_90_left || type == BT_conveyor_90_right) {
       if (oldtype == BT_conveyor_90_left || oldtype == BT_conveyor_90_right) {
