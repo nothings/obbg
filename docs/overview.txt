@@ -9,7 +9,14 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (34)
+Done in today's stream (36)
+
+Previous stream (35)
+   -  fix idle threads
+   -  add balancer
+   -  start adding splitter
+
+Previous stream (34)
    -  put MB limit on vertex buffer cache
 
 Previous stream (33)

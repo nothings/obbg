@@ -160,6 +160,7 @@ void add_sprite(float x, float y, float z, int id)
    s->pos.y = y;
    s->pos.z = z;
    s->size = 0.25;
+   assert(id >= 1 && id <= 3);
    s->id = 0;
    s->color.x = (id == 1) ? 1 : 0;
    s->color.y = (id == 2) ? 1 : 0;

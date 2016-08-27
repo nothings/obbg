@@ -1,3 +1,15 @@
+Refactor belt logitistics:
+   -  straight belt is interleaved items, other belts are concatenated lists
+          R1, L1, R2, L2, R3, L3...
+          R1, R2, L1, L2, L3, L4, L5
+   -  passing around logistics_chunk
+      - premature optimization
+   -  always need global coordinates
+      - premature optimization
+   -  refactor belts to use shared logic as much as possible
+      - except animation, which can be unique for each type
+
+
 
    -  add mesh cache with explicit storing of coordinates & call function to access it instead of accessing inline
    -  why is set_mesh_chunk_for_coord either
