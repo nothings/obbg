@@ -93,6 +93,7 @@ enum
    BT_conveyor_ramp_down_low,
    BT_conveyor_90_left,
    BT_conveyor_90_right,
+   BT_splitter,
 
    BT_picker = 49,
    BT_machines = 50,
@@ -100,7 +101,6 @@ enum
    BT_ore_eater,
 
    BT_belt_machines=250,
-   BT_splitter=251,
    BT_balancer=252,
    BT_down_marker=255,
    BT_no_change=255,
