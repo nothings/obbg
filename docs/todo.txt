@@ -4,6 +4,7 @@ Refactor belt logitistics:
           R1, R2, L1, L2, L3, L4, L5
    -  passing around logistics_chunk
       - premature optimization
+      - get rid of, except if passing belt_id or similar logi_chunk-relative id
    -  always need global coordinates
       - premature optimization
    -  refactor belts to use shared logic as much as possible

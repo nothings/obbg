@@ -362,9 +362,13 @@ int does_belt_intersect(belt_run *a, int x, int y, int z)
    return 0;
 }
 
-void split_belt(logi_chunk *c, int x, int y, int z, int dir)
+void split_belt(int x, int y, int z, int dir)
 {
+   logi_chunk *c = get_chunk(x,y,z);
    int i, pos;
+   x = LOGI_CHUNK_MASK_X(x);
+   y = LOGI_CHUNK_MASK_Y(y);
+   z = LOGI_CHUNK_MASK_Z(z);
    for (i=0; i < obarr_len(c->belts); ++i) {
       belt_run *a = &c->belts[i];
       if (a->z_off == z && a->dir == dir) {
@@ -462,11 +466,11 @@ void split_belt(logi_chunk *c, int x, int y, int z, int dir)
    }
 }
 
-void destroy_belt_raw(logi_chunk *c, int i)
+void destroy_belt_raw(logi_chunk *c, int belt_id)
 {
-   belt_run *b = &c->belts[i];
+   belt_run *b = &c->belts[belt_id];
    obarr_free(b->items);
-   obarr_fastdelete(c->belts, i);
+   obarr_fastdelete(c->belts, belt_id);
 }
 
 #if 0
@@ -494,9 +498,13 @@ void cleanup_input_pointers_to_belt_run(logi_chunk *c, int x, int y, int z, int 
 }
 #endif
 
-void destroy_belt(logi_chunk *c, int x, int y, int z)
+void destroy_belt(int x, int y, int z)
 {
+   logi_chunk *c = get_chunk(x,y,z);
    int i;
+   x = LOGI_CHUNK_MASK_X(x);
+   y = LOGI_CHUNK_MASK_Y(y);
+   z = LOGI_CHUNK_MASK_Z(z);
    for (i=0; i < obarr_len(c->belts); ++i) {
       belt_run *b = &c->belts[i];
       if (b->x_off == x && b->y_off == y && b->z_off == z) {
@@ -507,10 +515,10 @@ void destroy_belt(logi_chunk *c, int x, int y, int z)
    }
 }
 
-int merge_run(logi_chunk *c, int i, int j)
+int merge_run(logi_chunk *c, int belt_i, int belt_j)
 {
-   belt_run *a = &c->belts[i];
-   belt_run *b = &c->belts[j];
+   belt_run *a = &c->belts[belt_i];
+   belt_run *b = &c->belts[belt_j];
    int total = a->len + b->len;
    const size_t itemsize = sizeof(a->items[0]);
    assert(a->dir == b->dir);
@@ -535,21 +543,22 @@ int merge_run(logi_chunk *c, int i, int j)
    a->input_id = TARGET_none;
 
    // delete b
-   destroy_belt_raw(c, j);
+   destroy_belt_raw(c, belt_j);
 
    // return the merged belt
-   if (i == obarr_len(c->belts)) // did i get swapped down over j?
-      return j;
+   if (belt_i == obarr_len(c->belts)) // did i get swapped down over j?
+      return belt_j;
    else
-      return i;
+      return belt_i;
 }
 
-void create_ramp(logi_chunk *c, int x, int y, int z, int dir, int dz)
+void create_ramp(int x, int y, int z, int dir, int dz)
 {
+   logi_chunk *c = get_chunk(x,y,z);
    belt_run nb;
-   nb.x_off = x;
-   nb.y_off = y;
-   nb.z_off = z;
+   nb.x_off = (uint8) LOGI_CHUNK_MASK_X(x);
+   nb.y_off = (uint8) LOGI_CHUNK_MASK_Y(y);
+   nb.z_off = (uint8) LOGI_CHUNK_MASK_Z(z);
    nb.len = 2;
    nb.dir = dir;
    nb.turn = 0;
@@ -562,12 +571,13 @@ void create_ramp(logi_chunk *c, int x, int y, int z, int dir, int dz)
    obarr_push(c->belts, nb, "/logi/beltlist");
 }
 
-void create_splitter(logi_chunk *c, int x, int y, int z, int dir)
+void create_splitter(int x, int y, int z, int dir)
 {
+   logi_chunk *c = get_chunk(x,y,z);
    belt_run nb;
-   nb.x_off = x;
-   nb.y_off = y;
-   nb.z_off = z;
+   nb.x_off = (uint8) LOGI_CHUNK_MASK_X(x);
+   nb.y_off = (uint8) LOGI_CHUNK_MASK_Y(y);
+   nb.z_off = (uint8) LOGI_CHUNK_MASK_Z(z);
    nb.type = BR_splitter;
    nb.len = 1;
    nb.dir = dir;
@@ -581,9 +591,13 @@ void create_splitter(logi_chunk *c, int x, int y, int z, int dir)
    obarr_push(c->belts, nb, "/logi/beltlist");
 }
 
-void destroy_ramp_or_turn(logi_chunk *c, int x, int y, int z)
+void destroy_ramp_or_turn(int x, int y, int z)
 {
+   logi_chunk *c = get_chunk(x,y,z);
    int i;
+   x = LOGI_CHUNK_MASK_X(x);
+   y = LOGI_CHUNK_MASK_Y(y);
+   z = LOGI_CHUNK_MASK_Z(z);
    for (i=0; i < obarr_len(c->belts); ++i) {
       if (c->belts[i].x_off == x && c->belts[i].y_off == y && c->belts[i].z_off == z) {
          assert(c->belts[i].end_dz != 0 || c->belts[i].turn != 0 || c->belts[i].type != 0);
@@ -593,12 +607,13 @@ void destroy_ramp_or_turn(logi_chunk *c, int x, int y, int z)
    }
 }
 
-void create_turn(logi_chunk *c, int x, int y, int z, int dir, int turn)
+void create_turn(int x, int y, int z, int dir, int turn)
 {
+   logi_chunk *c = get_chunk(x,y,z);
    belt_run nb;
-   nb.x_off = x;
-   nb.y_off = y;
-   nb.z_off = z;
+   nb.x_off = (uint8) LOGI_CHUNK_MASK_X(x);
+   nb.y_off = (uint8) LOGI_CHUNK_MASK_Y(y);
+   nb.z_off = (uint8) LOGI_CHUNK_MASK_Z(z);
    nb.len = 1;
    nb.dir = dir;
    nb.turn = turn;
@@ -677,8 +692,12 @@ static logi_chunk_coord coord(int x, int y, int z)
    return lcc;
 }
 
-void create_picker(logi_chunk *c, int ox, int oy, int oz, int type, int rot)
+void create_picker(int x, int y, int z, int type, int rot)
 {
+   logi_chunk *c = get_chunk(x,y,z);
+   int ox = LOGI_CHUNK_MASK_X(x);
+   int oy = LOGI_CHUNK_MASK_Y(y);
+   int oz = LOGI_CHUNK_MASK_Z(z);
    picker_info pi = { 0 };
    pi.pos = coord(ox,oy,oz);
    pi.type = type;
@@ -686,21 +705,20 @@ void create_picker(logi_chunk *c, int ox, int oy, int oz, int type, int rot)
    obarr_push(c->pickers, pi, "/logi/pickerlist");
 }
 
-int find_picker(logi_chunk *c, int ox, int oy, int oz)
+void destroy_picker(int x, int y, int z)
 {
+   logi_chunk *c = get_chunk(x,y,z);
+   int ox = LOGI_CHUNK_MASK_X(x);
+   int oy = LOGI_CHUNK_MASK_Y(y);
+   int oz = LOGI_CHUNK_MASK_Z(z);
    int i;
    logi_chunk_coord sc = coord(ox,oy,oz);
-   for (i=0; i < obarr_len(c->pickers); ++i)
-      if (c->pickers[i].pos.packed == sc.packed)
-         return i;
-   return -1;
-}
-
-void destroy_picker(logi_chunk *c, int ox, int oy, int oz)
-{
-   int n = find_picker(c, ox,oy,oz);
-   if (n >= 0)
-      obarr_fastdelete(c->pickers, n);
+   for (i=0; i < obarr_len(c->pickers); ++i) {
+      if (c->pickers[i].pos.packed == sc.packed) {
+         obarr_fastdelete(c->pickers, i);
+         break;
+      }
+   }
 }
 
 int find_ore(logi_chunk *c, int ox, int oy, int oz)
@@ -1050,16 +1068,16 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool al
    oldtype = c->type[oz][oy][ox];
 
    if (oldtype == BT_conveyor)
-      split_belt(c, ox,oy,oz, c->rot[oz][oy][ox]);
+      split_belt(x,y,z, c->rot[oz][oy][ox]);
 
    if (oldtype >= BT_picker && oldtype <= BT_picker)
-      destroy_picker(c, ox,oy,oz);
+      destroy_picker(x,y,z);
    else if (oldtype >= BT_belt_machines)
       destroy_belt_machine(c, ox,oy,oz);
    else if (oldtype >= BT_machines)
       destroy_machine(c, ox,oy,oz);
    else if (oldtype == BT_conveyor && type != BT_conveyor)
-      destroy_belt(c, ox,oy,oz);
+      destroy_belt(x,y,z);
 
    c->type[oz][oy][ox] = type;
    c->rot[oz][oy][ox] = rot;
@@ -1068,7 +1086,7 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool al
       create_belt(c, ox,oy,oz, rot);
 
    if (type >= BT_picker && type <= BT_picker)
-      create_picker(c, ox,oy,oz, type,rot);
+      create_picker(x,y,z, type,rot);
    else if (type >= BT_belt_machines)
       create_belt_machine(c, ox,oy,oz, type, rot, x-ox,y-oy,z-oz);
    else if (type >= BT_machines)
@@ -1077,30 +1095,30 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool al
    if (type == BT_conveyor_90_left || type == BT_conveyor_90_right) {
       if (oldtype == BT_conveyor_90_left || oldtype == BT_conveyor_90_right) {
          // @TODO changing turn types
-         destroy_ramp_or_turn(c,ox,oy,oz);
-         create_turn(c, ox,oy,oz, rot, type == BT_conveyor_90_left ? 1 : -1);
+         destroy_ramp_or_turn(x,y,z);
+         create_turn(x,y,z, rot, type == BT_conveyor_90_left ? 1 : -1);
       } else {
-         create_turn(c, ox,oy,oz, rot, type == BT_conveyor_90_left ? 1 : -1);
+         create_turn(x,y,z, rot, type == BT_conveyor_90_left ? 1 : -1);
       }
    } else if (oldtype == BT_conveyor_90_left || oldtype == BT_conveyor_90_right) {
-      destroy_ramp_or_turn(c, ox,oy,oz);
+      destroy_ramp_or_turn(x,y,z);
    }
 
    if (oldtype == BT_splitter)
-      destroy_ramp_or_turn(c, ox,oy,oz);
+      destroy_ramp_or_turn(x,y,z);
    if (type == BT_splitter)
-      create_splitter(c, ox,oy,oz, rot);
+      create_splitter(x,y,z, rot);
 
    if (IS_RAMP_HEAD(type)) {
       if (IS_RAMP_HEAD(oldtype)) {
          // @TODO changing ramp types
-         destroy_ramp_or_turn(c, ox,oy,oz);
-         create_ramp(c, ox,oy,oz, rot, type == BT_conveyor_ramp_up_low ? 1 : -1);
+         destroy_ramp_or_turn(x,y,z);
+         create_ramp(x,y,z, rot, type == BT_conveyor_ramp_up_low ? 1 : -1);
       } else {
-         create_ramp(c, ox,oy,oz, rot, type == BT_conveyor_ramp_up_low ? 1 : -1);
+         create_ramp(x,y,z, rot, type == BT_conveyor_ramp_up_low ? 1 : -1);
       }
    } else if (IS_RAMP_HEAD(oldtype)) {
-      destroy_ramp_or_turn(c, ox,oy,oz);
+      destroy_ramp_or_turn(x,y,z);
    }
 
    logistics_update_chunk(x,y,z);

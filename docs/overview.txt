@@ -10,6 +10,7 @@ obbg:
   : networking
 
 Done in today's stream (36)
+   - deinterleave straight belts
 
 Previous stream (35)
    -  fix idle threads
