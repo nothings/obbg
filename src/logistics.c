@@ -1262,6 +1262,7 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
       // so, we move item[len-1] out to some other spot
 
       if (br->target_id != TARGET_none) {
+         int old_end = end;
          int target_side, target_pos;
          vec3i target = get_target(x,y,z, br);
          logi_chunk *tc = get_chunk_v(&target);
@@ -1326,6 +1327,7 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
                else
                   end = left_offset(br) + br->len * ITEMS_PER_BELT_SIDE;
             }
+            assert(end == old_end);
    
             assert(slot < obarr_len(tb->items));
             if (br->items[end-1].type != 0) {
@@ -1334,8 +1336,14 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
                   br->items[end-1].type = 0;
                }
             }
+
+            // frontmost object goes to 'slot', so check if 'slot' will be open next
+            // time, by checking if 'slot-1' is open now, and that 'slot' is moving
+            if (target_pos == 0)
+               allow_new_frontmost_to_move = False;//!tb->last_slot_filled_next_tick;
+            else if (tb->items[(slot)-1].type == 0 && target_pos < tb->mobile_slots[target_side]) 
+               allow_new_frontmost_to_move = True;
          }
-         allow_new_frontmost_to_move = BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot,target_pos,target_side);
       }
 
       // at this moment, item[len-2] has just animated all the way to the farthest
