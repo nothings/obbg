@@ -1163,7 +1163,13 @@ static int get_interaction_pos(belt_run *b, int x, int y, int z)
 
 typedef struct
 {
-   int off_x, off_y, off_z;
+   int x,y,z;
+   logi_chunk *c;
+} new_target_chunk;
+
+typedef struct
+{
+   int off_x,off_y,off_z;
    logi_chunk *c;
 } target_chunk;
 
@@ -1191,7 +1197,7 @@ static void get_chunk_in_dir(target_chunk *tc, int x, int y, int z, int dir)
 }
 
 // return off_x, off_y, off_z relative to bx,by,bz
-static void get_target_chunk(target_chunk *tc, int x, int y, int z, belt_run *br)
+static void get_target_chunk(new_target_chunk *tc, int x, int y, int z, belt_run *br)
 {
    int bx = (x & ~(LOGI_CHUNK_SIZE_X-1));
    int by = (y & ~(LOGI_CHUNK_SIZE_Y-1));
@@ -1202,9 +1208,9 @@ static void get_target_chunk(target_chunk *tc, int x, int y, int z, belt_run *br
    int ez = target.z;
    logi_chunk *c = get_chunk(target.x,target.y,target.z);
    tc->c = c;
-   tc->off_x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) - bx;
-   tc->off_y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) - by;
-   tc->off_z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) - bz;
+   tc->x = target.x;
+   tc->y = target.y;
+   tc->z = target.z;
 }
 
 static void get_input_chunk(target_chunk *tc, int x, int y, int z, logi_chunk *c, belt_run *br)
@@ -1257,11 +1263,15 @@ void logistics_belt_turn_tick(int x, int y, int z, belt_run *br)
 
    if (br->target_id != TARGET_none) {
       int relative_facing;
-      target_chunk tc;
+      new_target_chunk tc;
+      vec3i target_belt_coords;
       belt_run *tb;
       get_target_chunk(&tc, x,y,z, br);
       assert(tc.c != NULL);
       tb = &tc.c->belts[br->target_id];
+      target_belt_coords.x = (tc.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
+      target_belt_coords.y = (tc.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
+      target_belt_coords.z = (tc.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
       relative_facing = (tb->dir - outdir) & 3;
       switch (relative_facing) {
          case 0: {
@@ -1294,10 +1304,10 @@ void logistics_belt_turn_tick(int x, int y, int z, belt_run *br)
             //  [0] X X X X -> O  O
             //                 O  O
 
-            int ex = br->x_off + face_dir[outdir][0];
-            int ey = br->y_off + face_dir[outdir][1];
+            int ex = x + face_dir[outdir][0];
+            int ey = y + face_dir[outdir][1];
             // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
-            int pos = abs(ex - (tc.off_x + tb->x_off)) + abs(ey - (tc.off_y + tb->y_off));
+            int pos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
             int itembase = pos * ITEMS_PER_BELT_SIDE;
             int itempos;
             itempos = (itembase + (ITEMS_PER_BELT_SIDE/4-1))*2+1;
@@ -1334,10 +1344,10 @@ void logistics_belt_turn_tick(int x, int y, int z, belt_run *br)
             //   O  O
             //   O  O <- X X X X [1]
             //   O  O
-            int ex = br->x_off + face_dir[outdir][0];
-            int ey = br->y_off + face_dir[outdir][1];
+            int ex = x + face_dir[outdir][0];
+            int ey = y + face_dir[outdir][1];
             // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
-            int pos = abs(ex - (tc.off_x + tb->x_off)) + abs(ey - (tc.off_y + tb->y_off));
+            int pos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
             int itembase = pos * ITEMS_PER_BELT_SIDE;
             int itempos = (itembase + (ITEMS_PER_BELT_SIDE-1))*2+0;
 
@@ -1665,11 +1675,15 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
       int turn;
       int right_end_slot = left_offset(br)-1;
       int left_end_slot = len-1;
+      vec3i target_belt_coords;
       belt_run *tb;
-      target_chunk tc;
+      new_target_chunk tc;
       get_target_chunk(&tc, x,y,z, br);
       assert(tc.c != NULL);
       tb = &tc.c->belts[br->target_id];
+      target_belt_coords.x = (tc.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
+      target_belt_coords.y = (tc.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
+      target_belt_coords.z = (tc.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
       turn = (tb->dir - br->dir) & 3;
       switch (turn) {
          case 0: {
@@ -1701,10 +1715,10 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
             //  [0] X X X X -> O  O
             //                 O  O
 
-            int ex = br->x_off + br->len*face_dir[br->dir][0];
-            int ey = br->y_off + br->len*face_dir[br->dir][1];
+            int ex = x + br->len*face_dir[br->dir][0];
+            int ey = y + br->len*face_dir[br->dir][1];
             // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
-            int basepos = abs(ex - (tc.off_x + tb->x_off)) + abs(ey - (tc.off_y + tb->y_off));
+            int basepos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
             int itempos = basepos * ITEMS_PER_BELT_SIDE + 1;
             int slot = left_offset(tb) + itempos;
 
@@ -1743,10 +1757,10 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
             //   O  O
             //   O  O <- X X X X [1]
             //   O  O
-            int ex = br->x_off + br->len*face_dir[br->dir][0];
-            int ey = br->y_off + br->len*face_dir[br->dir][1];
+            int ex = x + br->len*face_dir[br->dir][0];
+            int ey = y + br->len*face_dir[br->dir][1];
             // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
-            int basepos = abs(ex - (tc.off_x + tb->x_off)) + abs(ey - (tc.off_y + tb->y_off));
+            int basepos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
             int itempos = basepos*ITEMS_PER_BELT_SIDE + ITEMS_PER_BELT_SIDE-1;
             int slot = 0 + itempos;
             assert(slot < obarr_len(tb->items));
