@@ -5,8 +5,12 @@
 
 #define ITEMS_PER_BELT_SIDE   4
 #define BELT_SIDES   2
-//   0 = right
-//   1 = left
+
+enum
+{
+   RIGHT=0,
+   LEFT=1
+};
 
 #define ITEMS_PER_BELT (ITEMS_PER_BELT_SIDE * BELT_SIDES)
 
@@ -1456,69 +1460,43 @@ void check(belt_run *br)
 //   O  O <- X X X X [1]
 //   O  O
 
-Bool update_belt_end_right(belt_run *br, int x, int y, int z, belt_run *tb, vec3i *target, int right_target_side, int right_target_pos)
+Bool update_belt_end(int side, belt_run *br, int x, int y, int z, belt_run *tb, vec3i *target, int target_side, int target_pos)
 {
-   int len = br->len * ITEMS_PER_BELT_SIDE;
+   int blockdist;
    vec3i target_belt_coords;
    int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
-   int target_right_start = 0, blockdist;
-   int slot_right, right_end;
+   int target_right_start = 0;
+   int slot,end;
    target_belt_coords.x = (target->x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
    target_belt_coords.y = (target->y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
    target_belt_coords.z = (target->z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
    blockdist = abs(target->x - target_belt_coords.x) + abs(target->y - target_belt_coords.y);
-   right_target_pos += blockdist * ITEMS_PER_BELT_SIDE;
+   target_pos += blockdist * ITEMS_PER_BELT_SIDE;
 
-   slot_right = (right_target_side ? target_left_start : target_right_start) + right_target_pos;
+   slot = (target_side ? target_left_start : target_right_start) + target_pos;
 
-   if (br->turn)
-      right_end = (br->turn > 0) ? LONG_SIDE : SHORT_SIDE;
-   else
-      right_end = len;
+   if (side == RIGHT) {
+      if (br->turn)
+         end = (br->turn > 0) ? LONG_SIDE : SHORT_SIDE;
+      else
+         end = br->len * ITEMS_PER_BELT_SIDE;
+   } else {
+      if (br->turn)
+         end = SHORT_SIDE+LONG_SIDE;
+      else
+         end = left_offset(br) + br->len * ITEMS_PER_BELT_SIDE;
+   }
    
-
-   assert(slot_right < obarr_len(tb->items));
-   if (br->items[right_end-1].type != 0) {
-      if (tb->items[slot_right].type == 0) {
-         tb->items[slot_right] = br->items[right_end-1];
-         br->items[right_end-1].type = 0;
+   assert(slot < obarr_len(tb->items));
+   if (br->items[end-1].type != 0) {
+      if (tb->items[slot].type == 0) {
+         tb->items[slot] = br->items[end-1];
+         br->items[end-1].type = 0;
       }
    }
 
-   return BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_right,right_target_pos,right_target_side);
+   return BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot,target_pos,target_side);
 }
-
-Bool update_belt_end_left(belt_run *br, int x, int y, int z, belt_run *tb, vec3i *target, int left_target_side, int left_target_pos)
-{
-   int len = br->len * ITEMS_PER_BELT_SIDE;
-   vec3i target_belt_coords;
-   int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
-   int target_right_start = 0, blockdist;
-   int slot_left, left_end;
-   target_belt_coords.x = (target->x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
-   target_belt_coords.y = (target->y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
-   target_belt_coords.z = (target->z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
-   blockdist = abs(target->x - target_belt_coords.x) + abs(target->y - target_belt_coords.y);
-
-   left_target_pos += blockdist * ITEMS_PER_BELT_SIDE;
-
-   if (br->turn)
-      left_end = SHORT_SIDE+LONG_SIDE;
-   else
-      left_end = left_offset(br) + len;
-
-   slot_left  = ( left_target_side ? target_left_start : target_right_start) +  left_target_pos;
-
-   assert(slot_left < obarr_len(tb->items));
-   if (br->items[left_end-1].type != 0) {
-      if (tb->items[slot_left].type == 0) {
-         tb->items[slot_left] = br->items[left_end-1];
-         br->items[left_end-1].type = 0;
-      }
-   }
-   return BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_left,left_target_pos,left_target_side);
-}
-
 
 void logistics_belt_tick(int x, int y, int z, belt_run *br)
 {
@@ -1577,18 +1555,18 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
       if (relative_facing != 2) {
          switch (relative_facing) {
             case 0: {
-               allow_new_frontmost_to_move[0] = update_belt_end_right(br,x,y,z,tb,&target, 0,0);
-               allow_new_frontmost_to_move[1] = update_belt_end_left (br,x,y,z,tb,&target, 1,0);
+               allow_new_frontmost_to_move[0] = update_belt_end(RIGHT, br,x,y,z,tb,&target, RIGHT,0);
+               allow_new_frontmost_to_move[1] = update_belt_end(LEFT , br,x,y,z,tb,&target, LEFT ,0);
                break;
             }
             case 1: {
-               allow_new_frontmost_to_move[0] = update_belt_end_right(br,x,y,z,tb,&target, 1,1);
-               allow_new_frontmost_to_move[1] = update_belt_end_left (br,x,y,z,tb,&target, 1,ITEMS_PER_BELT_SIDE-1);
+               allow_new_frontmost_to_move[0] = update_belt_end(RIGHT, br,x,y,z,tb,&target, LEFT ,1);
+               allow_new_frontmost_to_move[1] = update_belt_end(LEFT , br,x,y,z,tb,&target, LEFT ,ITEMS_PER_BELT_SIDE-1);
                break;
             }
             case 3: {
-               allow_new_frontmost_to_move[0] = update_belt_end_right(br,x,y,z,tb,&target, 0,ITEMS_PER_BELT_SIDE-1);
-               allow_new_frontmost_to_move[1] = update_belt_end_left (br,x,y,z,tb,&target, 0,1);
+               allow_new_frontmost_to_move[0] = update_belt_end(RIGHT, br,x,y,z,tb,&target, RIGHT,ITEMS_PER_BELT_SIDE-1);
+               allow_new_frontmost_to_move[1] = update_belt_end(LEFT , br,x,y,z,tb,&target, RIGHT,1);
                break;
             }
          }
