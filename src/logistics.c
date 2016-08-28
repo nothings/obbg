@@ -1456,6 +1456,70 @@ void check(belt_run *br)
 //   O  O <- X X X X [1]
 //   O  O
 
+Bool update_belt_end_right(belt_run *br, int x, int y, int z, belt_run *tb, vec3i *target, int right_target_side, int right_target_pos)
+{
+   int len = br->len * ITEMS_PER_BELT_SIDE;
+   vec3i target_belt_coords;
+   int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
+   int target_right_start = 0, blockdist;
+   int slot_right, right_end;
+   target_belt_coords.x = (target->x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
+   target_belt_coords.y = (target->y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
+   target_belt_coords.z = (target->z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
+   blockdist = abs(target->x - target_belt_coords.x) + abs(target->y - target_belt_coords.y);
+   right_target_pos += blockdist * ITEMS_PER_BELT_SIDE;
+
+   slot_right = (right_target_side ? target_left_start : target_right_start) + right_target_pos;
+
+   if (br->turn)
+      right_end = (br->turn > 0) ? LONG_SIDE : SHORT_SIDE;
+   else
+      right_end = len;
+   
+
+   assert(slot_right < obarr_len(tb->items));
+   if (br->items[right_end-1].type != 0) {
+      if (tb->items[slot_right].type == 0) {
+         tb->items[slot_right] = br->items[right_end-1];
+         br->items[right_end-1].type = 0;
+      }
+   }
+
+   return BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_right,right_target_pos,right_target_side);
+}
+
+Bool update_belt_end_left(belt_run *br, int x, int y, int z, belt_run *tb, vec3i *target, int left_target_side, int left_target_pos)
+{
+   int len = br->len * ITEMS_PER_BELT_SIDE;
+   vec3i target_belt_coords;
+   int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
+   int target_right_start = 0, blockdist;
+   int slot_left, left_end;
+   target_belt_coords.x = (target->x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
+   target_belt_coords.y = (target->y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
+   target_belt_coords.z = (target->z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
+   blockdist = abs(target->x - target_belt_coords.x) + abs(target->y - target_belt_coords.y);
+
+   left_target_pos += blockdist * ITEMS_PER_BELT_SIDE;
+
+   if (br->turn)
+      left_end = SHORT_SIDE+LONG_SIDE;
+   else
+      left_end = left_offset(br) + len;
+
+   slot_left  = ( left_target_side ? target_left_start : target_right_start) +  left_target_pos;
+
+   assert(slot_left < obarr_len(tb->items));
+   if (br->items[left_end-1].type != 0) {
+      if (tb->items[slot_left].type == 0) {
+         tb->items[slot_left] = br->items[left_end-1];
+         br->items[left_end-1].type = 0;
+      }
+   }
+   return BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_left,left_target_pos,left_target_side);
+}
+
+
 void logistics_belt_tick(int x, int y, int z, belt_run *br)
 {
    //logi_slice *s, int cid, 
@@ -1503,70 +1567,31 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
 
    if (br->target_id != TARGET_none) {
       int relative_facing;
-      vec3i target_belt_coords;
       belt_run *tb;
       logi_chunk *tc;
       vec3i target = get_target(x,y,z, br);
       tc = get_chunk_v(&target);
       assert(tc != NULL);
       tb = &tc->belts[br->target_id];
-      target_belt_coords.x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
-      target_belt_coords.y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
-      target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
       relative_facing = (tb->dir - outdir) & 3;
       if (relative_facing != 2) {
-         int ex = x + br->len*face_dir[br->dir][0];
-         int ey = y + br->len*face_dir[br->dir][1];
-         int basepos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
-         int left_target_pos, right_target_pos;
-         int slot_left, slot_right;
-         int left_target_side, right_target_side;
-         int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
-         int target_right_start = 0;
          switch (relative_facing) {
             case 0: {
-               right_target_side = 0;
-               left_target_side = 1;
-               right_target_pos = 0;
-               left_target_pos = 0;
+               allow_new_frontmost_to_move[0] = update_belt_end_right(br,x,y,z,tb,&target, 0,0);
+               allow_new_frontmost_to_move[1] = update_belt_end_left (br,x,y,z,tb,&target, 1,0);
                break;
             }
             case 1: {
-               // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
-               right_target_side = left_target_side = 1;
-               right_target_pos = basepos * ITEMS_PER_BELT_SIDE + 1;
-               left_target_pos = basepos * ITEMS_PER_BELT_SIDE + ITEMS_PER_BELT_SIDE-1;
+               allow_new_frontmost_to_move[0] = update_belt_end_right(br,x,y,z,tb,&target, 1,1);
+               allow_new_frontmost_to_move[1] = update_belt_end_left (br,x,y,z,tb,&target, 1,ITEMS_PER_BELT_SIDE-1);
                break;
             }
             case 3: {
-               right_target_side = left_target_side = 0;
-               right_target_pos = basepos*ITEMS_PER_BELT_SIDE + ITEMS_PER_BELT_SIDE-1;
-               left_target_pos = basepos*ITEMS_PER_BELT_SIDE + 1;
+               allow_new_frontmost_to_move[0] = update_belt_end_right(br,x,y,z,tb,&target, 0,ITEMS_PER_BELT_SIDE-1);
+               allow_new_frontmost_to_move[1] = update_belt_end_left (br,x,y,z,tb,&target, 0,1);
                break;
             }
          }
-         slot_right = (right_target_side ? target_left_start : target_right_start) + right_target_pos;
-         slot_left  = ( left_target_side ? target_left_start : target_right_start) +  left_target_pos;
-
-         assert(slot_right < obarr_len(tb->items));
-         if (br->items[right_end-1].type != 0) {
-            if (tb->items[slot_right].type == 0) {
-               tb->items[slot_right] = br->items[right_end-1];
-               br->items[right_end-1].type = 0;
-            }
-         }
-
-         assert(slot_left < obarr_len(tb->items));
-         if (br->items[left_end-1].type != 0) {
-            if (tb->items[slot_left].type == 0) {
-               tb->items[slot_left] = br->items[left_end-1];
-               br->items[left_end-1].type = 0;
-            }
-         }
-         if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_right,right_target_pos,1)) 
-            allow_new_frontmost_to_move[0] = 1;
-         if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_left,left_target_pos,1)) 
-            allow_new_frontmost_to_move[1] = 1;
       }
    }
 
