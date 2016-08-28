@@ -1166,10 +1166,14 @@ static int get_interaction_pos(belt_run *b, int x, int y, int z)
    return abs(x-b->x_off) + abs(y-b->y_off);
 }
 
-typedef struct
+static vec3i get_coord_in_dir(int x, int y, int z, int dir)
 {
-   vec3i coord;
-} target_chunk;
+   vec3i result;
+   result.x = x + face_dir[dir][0];
+   result.y = y + face_dir[dir][1];
+   result.z = z;
+   return result;
+}
 
 static vec3i get_target(int x, int y, int z, belt_run *br)
 {
@@ -1179,36 +1183,6 @@ static vec3i get_target(int x, int y, int z, belt_run *br)
    result.y = y + br->len * face_dir[outdir][1];
    result.z = z + br->end_dz;
    return result;
-}
-
-static void get_chunk_in_dir(target_chunk *tc, int x, int y, int z, int dir)
-{
-   int outdir = dir;
-   int ex = x + face_dir[outdir][0];
-   int ey = y + face_dir[outdir][1];
-   int ez = z;
-   //logi_chunk *c = get_chunk(ex,ey,ez);
-   //tc->c = c;
-   tc->coord.x = ex;
-   tc->coord.y = ey;
-   tc->coord.z = ez;
-}
-
-// return off_x, off_y, off_z relative to bx,by,bz
-static void get_target_chunk(target_chunk *tc, int x, int y, int z, belt_run *br)
-{
-   int bx = (x & ~(LOGI_CHUNK_SIZE_X-1));
-   int by = (y & ~(LOGI_CHUNK_SIZE_Y-1));
-   int bz = (z & ~(LOGI_CHUNK_SIZE_Z-1));
-   vec3i target = get_target(x,y,z, br);
-   int ex = target.x;
-   int ey = target.y;
-   int ez = target.z;
-   //logi_chunk *c = get_chunk(target.x,target.y,target.z);
-   //tc->c = c;
-   tc->coord.x = target.x;
-   tc->coord.y = target.y;
-   tc->coord.z = target.z;
 }
 
 static belt_run *get_belt_run_in_direction(int x, int y, int z, int dir, int id, int *off)
@@ -1252,17 +1226,16 @@ void logistics_belt_turn_tick(int x, int y, int z, belt_run *br)
 
    if (br->target_id != TARGET_none) {
       int relative_facing;
-      target_chunk tc2;
       logi_chunk *tc;
       vec3i target_belt_coords;
       belt_run *tb;
-      get_target_chunk(&tc2, x,y,z, br);
-      tc = get_chunk_v(&tc2.coord);
+      vec3i target = get_target(x,y,z, br);
+      tc = get_chunk_v(&target);
       assert(tc != NULL);
       tb = &tc->belts[br->target_id];
-      target_belt_coords.x = (tc2.coord.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
-      target_belt_coords.y = (tc2.coord.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
-      target_belt_coords.z = (tc2.coord.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
+      target_belt_coords.x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
+      target_belt_coords.y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
+      target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
       relative_facing = (tb->dir - outdir) & 3;
       switch (relative_facing) {
          case 0: {
@@ -1433,15 +1406,14 @@ void logistics_belt_splitter_tick(int x, int y, int z, belt_run *br)
       int relative_facing;
       logi_chunk *tc;
       vec3i target_belt_coords;
-      target_chunk tc2;
       belt_run *tb;
-      get_chunk_in_dir(&tc2, x,y,z, outdir);
-      tc = get_chunk_v(&tc2.coord);
+      vec3i target = get_coord_in_dir(x,y,z, outdir);
+      tc = get_chunk_v(&target);
       assert(tc != NULL);
       tb = &tc->belts[br->target_id];
-      target_belt_coords.x = (tc2.coord.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
-      target_belt_coords.y = (tc2.coord.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
-      target_belt_coords.z = (tc2.coord.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
+      target_belt_coords.x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
+      target_belt_coords.y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
+      target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
       relative_facing = (tb->dir - outdir) & 3;
       switch (relative_facing) {
          case 0: {
@@ -1515,18 +1487,17 @@ void logistics_belt_splitter_tick(int x, int y, int z, belt_run *br)
    if (br->target2_id != TARGET_none) {
       int outdir = (br->dir + 1) & 3;
       int relative_facing;
-      target_chunk tc2;
       vec3i target_belt_coords;
       belt_run *tb;
       logi_chunk *tc;
-      get_chunk_in_dir(&tc2, x,y,z, outdir);
-      tc = get_chunk_v(&tc2.coord);
+      vec3i target = get_coord_in_dir(x,y,z, outdir);
+      tc = get_chunk_v(&target);
       assert(tc != NULL);
       assert(br->target2_id < obarr_len(tc->belts));
       tb = &tc->belts[br->target2_id];
-      target_belt_coords.x = (tc2.coord.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
-      target_belt_coords.y = (tc2.coord.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
-      target_belt_coords.z = (tc2.coord.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
+      target_belt_coords.x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
+      target_belt_coords.y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
+      target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
       relative_facing = (tb->dir - outdir) & 3;
       switch (relative_facing) {
          case 0: {
@@ -1680,15 +1651,14 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
       int left_end_slot = len-1;
       vec3i target_belt_coords;
       belt_run *tb;
-      target_chunk tc2;
       logi_chunk *tc;
-      get_target_chunk(&tc2, x,y,z, br);
-      tc = get_chunk_v(&tc2.coord);
+      vec3i target = get_target(x,y,z, br);
+      tc = get_chunk_v(&target);
       assert(tc != NULL);
       tb = &tc->belts[br->target_id];
-      target_belt_coords.x = (tc2.coord.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
-      target_belt_coords.y = (tc2.coord.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
-      target_belt_coords.z = (tc2.coord.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
+      target_belt_coords.x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
+      target_belt_coords.y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
+      target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
       turn = (tb->dir - br->dir) & 3;
       switch (turn) {
          case 0: {
