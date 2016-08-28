@@ -10,6 +10,8 @@ obbg:
   : networking
 
 Done in today's stream (37)
+   - more belt tick refactoring
+   - fix belt animation between ticks
 
 Previous stream (36)
    - deinterleave straight belts

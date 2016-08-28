@@ -33,13 +33,15 @@ typedef struct
    uint8 mark:2;              // 0 bytes             // 2
    int8  end_dz:2;            // 0 bytes             // 2
    int8  input_dz:2;          // 0 bytes             // 2
-   uint8 mobile_slots[2];     // 2 bytes             // 7,7
-   uint8 last_slot_filled_next_tick[2];  // 2 bytes  // 1,1
+   uint8 mobile_slots[2];     // 2 bytes             // 7,7    // number of slots that can move including frontmost empty slot
    uint16 target_id;          // 2 bytes             // 16
    uint16 target2_id;
    uint16 input_id;           // 2 bytes
    beltside_item *items;      // 4 bytes  (8 bytes in 64-bit)
-} belt_run; // 16 bytes, temporarily 18 bytes
+} belt_run; // 16 bytes
+
+#define IS_ITEM_MOBILE(br,pos,side)  \
+      ((pos) < (br)->mobile_slots[side]-1)
 
 // @TODO add type field to belt run that's large enough to have BR_turn and BR_ramp
 enum
@@ -296,24 +298,34 @@ static int offset_for_side(belt_run *a, int side)
       return left_offset(a);
 }
 
+// lengths for turning conveyor
+#define SHORT_SIDE  1
+#define LONG_SIDE   5
+
 static void compute_mobile_slots(belt_run *br)
 {
-   int j;
-   int left_off = left_offset(br);
-   int len = br->len * ITEMS_PER_BELT_SIDE;
-   if (br->len == 0)
-      return;
-   br->mobile_slots[0] = br->mobile_slots[1] = 0;
+   int side, start, len, end, j;
+   if (br->len == 0) return;
+   for (side=0; side < 2; ++side) {
+      if (br->turn) {
+         int right_len = br->turn > 0 ? LONG_SIDE : SHORT_SIDE;
+         if (br->turn > 0)
+            len = side ? SHORT_SIDE : LONG_SIDE;
+         else
+            len = side ? LONG_SIDE : SHORT_SIDE;
+         start = side ? right_len : 0;
+         end = start + len;
+      } else {
+         start = side ? left_offset(br) : 0;
+         len = br->len * ITEMS_PER_BELT_SIDE;
+         end = start + len;
+      }
 
-   for (j=len; j >= 0; --j)
-      if (br->items[j].type == 0)
-         break;
-   br->mobile_slots[0] = j < 0 ? 0 : j;
-
-   for (j=len; j >= 0; --j)
-      if (br->items[left_off+j].type == 0)
-         break;
-   br->mobile_slots[1] = j < 0 ? 0 : j;
+      for (j=len-1; j >= 0; --j)
+         if (br->items[j].type == 0)
+            break;
+      br->mobile_slots[0] = j+1;
+   }
 }
 
 static void split_belt_raw(belt_run *a, belt_run *b, int num_a)
@@ -1201,13 +1213,6 @@ static belt_run *get_belt_run_in_direction(int x, int y, int z, int dir, int id,
    return &c->belts[id];
 }
 
-#define BELT_SLOT_IS_EMPTY_NEXT_TICK(b,slot,pos,side) \
-      ((slot)-1 >= 0 ? b->items[(slot)-1].type == 0 && (pos)-1 < b->mobile_slots[side] : !tb->last_slot_filled_next_tick[side])
-
-// lengths for turning conveyor
-#define SHORT_SIDE  1
-#define LONG_SIDE   5
-
 void check(belt_run *br)
 {
    int i;
@@ -1232,6 +1237,7 @@ void check(belt_run *br)
 //   O  O
 //   O  O <- X X X X [1]
 //   O  O
+void add_item_to_belt_pos(belt_run *b, int slot, int side, int pos, int type);
 
 void logistics_belt_tick(int x, int y, int z, belt_run *br)
 {
@@ -1262,8 +1268,7 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
       // so, we move item[len-1] out to some other spot
 
       if (br->target_id != TARGET_none) {
-         int old_end = end;
-         int target_side, target_pos;
+         int target_side, target_pos, target_start;
          vec3i target = get_target(x,y,z, br);
          logi_chunk *tc = get_chunk_v(&target);
          belt_run *tb = &tc->belts[br->target_id];
@@ -1272,7 +1277,7 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
          vec3i target_belt_coords;
          int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
          int target_right_start = 0;
-         int slot,end;
+         int target_slot;
 
          int relative_facing = (tb->dir - outdir) & 3;
          if (relative_facing != 2) {
@@ -1313,42 +1318,38 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
             target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
             blockdist = abs(target.x - target_belt_coords.x) + abs(target.y - target_belt_coords.y);
             target_pos += blockdist * ITEMS_PER_BELT_SIDE;
+            target_start = (target_side ? target_left_start : target_right_start);
 
-            slot = (target_side ? target_left_start : target_right_start) + target_pos;
+            target_slot = target_start + target_pos;
 
-            if (side == RIGHT) {
-               if (br->turn)
-                  end = (br->turn > 0) ? LONG_SIDE : SHORT_SIDE;
-               else
-                  end = br->len * ITEMS_PER_BELT_SIDE;
-            } else {
-               if (br->turn)
-                  end = SHORT_SIDE+LONG_SIDE;
-               else
-                  end = left_offset(br) + br->len * ITEMS_PER_BELT_SIDE;
-            }
-            assert(end == old_end);
-   
-            assert(slot < obarr_len(tb->items));
+            assert(target_slot < obarr_len(tb->items));
             if (br->items[end-1].type != 0) {
-               if (tb->items[slot].type == 0) {
-                  tb->items[slot] = br->items[end-1];
+               if (tb->items[target_slot].type == 0) {
+                  add_item_to_belt_pos(tb, target_slot, target_side, target_pos, br->items[end-1].type);
                   br->items[end-1].type = 0;
                }
             }
 
-            // frontmost object goes to 'slot', so check if 'slot' will be open next
-            // time, by checking if 'slot-1' is open now, and that 'slot' is moving
-            if (target_pos == 0)
-               allow_new_frontmost_to_move = False;//!tb->last_slot_filled_next_tick;
-            else if (tb->items[(slot)-1].type == 0 && target_pos < tb->mobile_slots[target_side]) 
-               allow_new_frontmost_to_move = True;
+            if (target_pos == 0) {
+               if (IS_ITEM_MOBILE(tb,target_pos,side) || tb->items[target_slot].type == 0)
+                  allow_new_frontmost_to_move = True;
+            } else {
+               // frontmost object goes to 'target_pos', so check if 'target_pos' will be open next
+               // time, by checking if 'target_pos-1' is open now, and that 'slot-1' can move
+               if (IS_ITEM_MOBILE(tb,target_pos-1,target_side)) {
+                  if (tb->items[target_slot-1].type == 0)
+                     allow_new_frontmost_to_move = True;
+               } else {
+                  assert(!IS_ITEM_MOBILE(tb,target_pos,target_side));
+                  if (tb->items[target_slot  ].type == 0)
+                     allow_new_frontmost_to_move = True;
+               }
+            }
          }
       }
 
       // at this moment, item[len-2] has just animated all the way to the farthest
       // position that's still on the belt, i.e. it becomes item[len-1]
-      br->last_slot_filled_next_tick[side] = 0;
       for (j=end-2; j >= start; --j)
          if (br->items[j].type != 0 && br->items[j+1].type == 0) {
             br->items[j+1] = br->items[j];
@@ -1357,17 +1358,13 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
 
       // determine which slots are animating
       if (allow_new_frontmost_to_move)
-         br->mobile_slots[side] = len;
+         br->mobile_slots[side] = len+1;
       else {
          for (j=len-1; j >= 0; --j)
             if (br->items[start+j].type == 0)
                break;
-         br->mobile_slots[side] = j < 0 ? 0 : j;
+         br->mobile_slots[side] = j+1;
       }
-
-      // determine whether things are allowed to move into the last slot
-      if (br->mobile_slots[side] == 0 && br->items[start].type != 0)
-         br->last_slot_filled_next_tick[side] = 1;
 
       if (global_hack && (stb_rand() % 10 < 2))
          if (br->items[start].type == 0 && stb_rand() % 9 < 2)
@@ -1483,8 +1480,8 @@ void remove_item_from_belt(belt_run *b, int slot)
    offset = offset_for_slot(b, slot);
    side = (offset!=0);
    pos = slot - offset;
-   if (pos > b->mobile_slots[side])
-      b->mobile_slots[side] = pos;
+   if (pos+1 > b->mobile_slots[side])
+      b->mobile_slots[side] = pos+1;
 }
 
 Bool try_remove_item_from_belt(belt_run *b, int slot, int type1, int type2)
@@ -1506,12 +1503,28 @@ void add_item_to_belt(belt_run *b, int slot, int type)
    offset = offset_for_slot(b, slot);
    side = (offset != 0);
    pos = slot - offset;
-   if (b->mobile_slots[side] == pos) {
+   if (b->mobile_slots[side]-1 == pos) {
       int j;
       for (j=pos-1; j >= 0; --j)
          if (b->items[offset+j].type == 0)
             break;
-      b->mobile_slots[side] = j < 0 ? 0 : j;
+      b->mobile_slots[side] = j+1;
+   }
+}
+
+void add_item_to_belt_pos(belt_run *b, int slot, int side, int pos, int type)
+{
+   int offset;
+   assert(slot < obarr_len(b->items));
+   assert(b->items[slot].type == 0);
+   b->items[slot].type = type;
+   offset = offset_for_side(b, side);
+   if (b->mobile_slots[side]-1 == pos) {
+      int j;
+      for (j=pos-1; j >= 0; --j)
+         if (b->items[offset+j].type == 0)
+            break;
+      b->mobile_slots[side] = j+1;
    }
 }
 
@@ -1933,7 +1946,7 @@ void logistics_render(void)
                            float ax,ay,az;
                            if (b->items[e+0].type != 0) {
                               ax = x1, ay = y1, az=z;
-                              if (e < b->mobile_slots[0]*2) {
+                              if (IS_ITEM_MOBILE(b,e,RIGHT)) {
                                  ax += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
                                  ay += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
                                  az += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE) * offset;
@@ -1943,7 +1956,7 @@ void logistics_render(void)
                            }
                            if (b->items[e+len].type != 0) {
                               ax = x2, ay = y2, az=z;
-                              if (e < b->mobile_slots[1]*2) {
+                              if (IS_ITEM_MOBILE(b,e,LEFT)) {
                                  ax += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
                                  ay += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
                                  az += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE) * offset;
@@ -1990,7 +2003,7 @@ void logistics_render(void)
                            if (b->items[0+e].type != 0) {
                               float bx,by,ax,ay;
                               float ang = e, s,c;
-                              if (e < b->mobile_slots[0])
+                              if (IS_ITEM_MOBILE(b,e,RIGHT))
                                  ang += offset;
                               ang = (ang / right_len) * 3.141592/2;
                               if (b->turn > 0) ang = -ang;
@@ -2007,7 +2020,7 @@ void logistics_render(void)
                            if (b->items[right_len+e].type != 0) {
                               float bx,by,ax,ay;
                               float ang = e, s,c;
-                              if (e < b->mobile_slots[1])
+                              if (IS_ITEM_MOBILE(b,e,LEFT))
                                  ang += offset;
                               ang = (ang / left_len) * 3.141592/2;
                               if (b->turn > 0) ang = -ang;
