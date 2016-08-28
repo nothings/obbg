@@ -1626,7 +1626,6 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
    logi_chunk *c = get_chunk(x,y,z);
    int j;
    int len;
-   int force_mobile[2] = { 0,0 };
    int allow_new_frontmost_to_move[2] = { 0,0 };
    int left_start, left_len, right_start, right_len, right_end, left_end;
    int outdir = (br->dir + br->turn) & 3;
@@ -1680,19 +1679,26 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
       relative_facing = (tb->dir - outdir) & 3;
       switch (relative_facing) {
          case 0: {
+            int target_left_pos = 0;
+            int target_right_pos = 0;
             int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
             int target_right_start = 0;
+            int slot_right, slot_left;
+            slot_right = target_right_start;
+            slot_left = target_left_start;
 
-            if (tb->items[target_right_start].type == 0) {
-               tb->items[target_right_start] = br->items[right_end-1];
-               br->items[right_end-1].type = 0;
+            if (br->items[right_end-1].type != 0) {
+               if (tb->items[slot_right].type == 0) {
+                  tb->items[slot_right] = br->items[right_end-1];
+                  br->items[right_end-1].type = 0;
+               }
             }
-            if (tb->items[target_left_start].type == 0) {
-               tb->items[target_left_start] = br->items[left_end-1];
-               br->items[left_end-1].type = 0;
+            if (br->items[left_end-1].type != 0) {
+               if (tb->items[slot_left].type == 0) {
+                  tb->items[slot_left] = br->items[left_end-1];
+                  br->items[left_end-1].type = 0;
+               }
             }
-            force_mobile[0] = (tb->mobile_slots[0] > 0);
-            force_mobile[1] = (tb->mobile_slots[1] > 0);
 
             allow_new_frontmost_to_move[0] = !tb->last_slot_filled_next_tick[0]; // (tb->mobile_slots[0] > 0);
             allow_new_frontmost_to_move[1] = !tb->last_slot_filled_next_tick[1]; // (tb->mobile_slots[0] > 0);
@@ -1711,30 +1717,30 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
             int ey = y + br->len*face_dir[br->dir][1];
             // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
             int basepos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
-            int itempos = basepos * ITEMS_PER_BELT_SIDE + 1;
-            int slot = left_offset(tb) + itempos;
-
-            assert(slot < obarr_len(tb->items));
+            int right_target_pos = basepos * ITEMS_PER_BELT_SIDE + 1;
+            int left_target_pos = basepos * ITEMS_PER_BELT_SIDE + ITEMS_PER_BELT_SIDE-1;
+            int slot_right, slot_left;
+            slot_right = left_offset(tb) + right_target_pos;
+            slot_left = 0 + left_target_pos;
+            
+            assert(slot_right < obarr_len(tb->items));
             if (br->items[right_end-1].type != 0) {
-               if (tb->items[slot].type == 0) {
-                  tb->items[slot] = br->items[right_end-1];
+               if (tb->items[slot_right].type == 0) {
+                  tb->items[slot_right] = br->items[right_end-1];
                   br->items[right_end-1].type = 0;
                }
             }
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot,itempos,1)) 
-               allow_new_frontmost_to_move[0] = 1;
 
-            itempos = basepos * ITEMS_PER_BELT_SIDE + ITEMS_PER_BELT_SIDE-1;
-            slot = 0 + itempos;
-            assert(slot < obarr_len(tb->items));
-
+            assert(slot_left < obarr_len(tb->items));
             if (br->items[left_end-1].type != 0) {
-               if (tb->items[slot].type == 0) {
-                  tb->items[slot] = br->items[left_end-1];
+               if (tb->items[slot_left].type == 0) {
+                  tb->items[slot_left] = br->items[left_end-1];
                   br->items[left_end-1].type = 0;
                }
             }
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot,itempos,1)) 
+            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_right,right_target_pos,1)) 
+               allow_new_frontmost_to_move[0] = 1;
+            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_left,left_target_pos,1)) 
                allow_new_frontmost_to_move[1] = 1;
             break;
          }
@@ -1809,7 +1815,6 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
          if (br->items[right_start+j].type == 0)
             break;
       br->mobile_slots[0] = j < 0 ? 0 : j;
-      if (force_mobile[0]) br->mobile_slots[0] = right_len;
    }
 
    if (allow_new_frontmost_to_move[1])
@@ -1819,7 +1824,6 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
          if (br->items[left_start+j].type == 0)
             break;
       br->mobile_slots[1] = j < 0 ? 0 : j;
-      if (force_mobile[1]) br->mobile_slots[1] = left_len;
    }
 
    if (br->mobile_slots[0] == 0 && br->items[right_start].type != 0)
