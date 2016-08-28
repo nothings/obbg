@@ -11,6 +11,8 @@ obbg:
 
 Done in today's stream (36)
    - deinterleave straight belts
+   - get rid of passed-around logi_chunks & local coords
+   - refactor belt tick to share all code
 
 Previous stream (35)
    -  fix idle threads

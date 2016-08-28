@@ -1264,7 +1264,7 @@ int SDL_main(int argc, char **argv)
    if (program_mode != MODE_single_player)
       networking = net_init(program_mode == MODE_server, server_port);
 
-   //SDL_GL_SetSwapInterval(0);
+   //SDL_GL_SetSwapInterval(0);   // disable vsync
    game_init();
    render_init();
 
