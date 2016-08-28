@@ -1203,187 +1203,6 @@ static belt_run *get_belt_run_in_direction(int x, int y, int z, int dir, int id,
 #define SHORT_SIDE  1
 #define LONG_SIDE   5
 
-void xlogistics_belt_turn_tick(int x, int y, int z, belt_run *br)
-{
-   int j;
-   int force_mobile[2] = { 0,0 };
-   logi_chunk *c = get_chunk(x,y,z);
-   int allow_new_frontmost_to_move[2] = { 0,0 };
-   int left_start, left_len, right_start, right_len, right_end, left_end;
-   int outdir = (br->dir + br->turn) & 3;
-
-   right_start = 0;
-   if (br->turn > 0) {
-      right_len = LONG_SIDE;
-      left_len = SHORT_SIDE;
-   } else {
-      right_len = SHORT_SIDE;
-      left_len = LONG_SIDE;
-   }
-   left_start = right_len;
-   right_end = right_start+right_len;
-   left_end = left_start + left_len;
-
-   if (br->target_id != TARGET_none) {
-      int relative_facing;
-      logi_chunk *tc;
-      vec3i target_belt_coords;
-      belt_run *tb;
-      vec3i target = get_target(x,y,z, br);
-      tc = get_chunk_v(&target);
-      assert(tc != NULL);
-      tb = &tc->belts[br->target_id];
-      target_belt_coords.x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
-      target_belt_coords.y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
-      target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
-      relative_facing = (tb->dir - outdir) & 3;
-      switch (relative_facing) {
-         case 0: {
-            int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
-            int target_right_start = 0;
-
-            if (tb->items[target_right_start].type == 0) {
-               tb->items[target_right_start] = br->items[right_end-1];
-               br->items[right_end-1].type = 0;
-            }
-            if (tb->items[target_left_start].type == 0) {
-               tb->items[target_left_start] = br->items[left_end-1];
-               br->items[left_end-1].type = 0;
-            }
-            force_mobile[0] = (tb->mobile_slots[0] > 0);
-            force_mobile[1] = (tb->mobile_slots[1] > 0);
-
-            allow_new_frontmost_to_move[0] = !tb->last_slot_filled_next_tick[0]; // (tb->mobile_slots[0] > 0);
-            allow_new_frontmost_to_move[1] = !tb->last_slot_filled_next_tick[1]; // (tb->mobile_slots[0] > 0);
-            break;
-         }
-         case 1: {
-            // e.g. from east to north
-            //
-            //                 ^  ^
-            //  [1] X X X X -> O  O 
-            //                 O  O
-            //  [0] X X X X -> O  O
-            //                 O  O
-
-            int ex = x + face_dir[outdir][0];
-            int ey = y + face_dir[outdir][1];
-            // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
-            int pos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
-            int itembase = pos * ITEMS_PER_BELT_SIDE;
-            int itempos;
-            itempos = (itembase + (ITEMS_PER_BELT_SIDE/4-1))*2+1;
-
-            if (br->items[right_end-1].type != 0) {
-               assert(itempos < obarr_len(tb->items));
-               if (tb->items[itempos].type == 0) {
-                  tb->items[itempos] = br->items[right_end-1];
-                  br->items[right_end-1].type = 0;
-               }
-            }
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,itempos,itempos/2,1)) 
-               allow_new_frontmost_to_move[0] = 1;
-
-            itempos = (itembase + (ITEMS_PER_BELT_SIDE-1))*2+1;
-            if (br->items[left_end-1].type != 0) {
-               if (tb->items[itempos].type == 0) {
-                  tb->items[itempos] = br->items[left_end-1];
-                  br->items[left_end-1].type = 0;
-               }
-            }
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,itempos,itempos/2,1)) 
-               allow_new_frontmost_to_move[1] = 1;
-            break;
-         }
-         case 2:
-            // conveyors point in opposite directions
-            break;
-         case 3: {
-            // e.g. from west to north
-            //
-            //   ^  ^
-            //   O  O <- X X X X [0]
-            //   O  O
-            //   O  O <- X X X X [1]
-            //   O  O
-            int ex = x + face_dir[outdir][0];
-            int ey = y + face_dir[outdir][1];
-            // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
-            int pos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
-            int itembase = pos * ITEMS_PER_BELT_SIDE;
-            int itempos = (itembase + (ITEMS_PER_BELT_SIDE-1))*2+0;
-
-            if (br->items[left_end-1].type != 0) {
-               assert(itempos < obarr_len(tb->items));
-               if (tb->items[itempos].type == 0) {
-                  tb->items[itempos] = br->items[left_end-1];
-                  br->items[left_end-1].type = 0;
-               }
-            }
-
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,itempos,itempos/2,0)) 
-               allow_new_frontmost_to_move[0] = 1;
-
-            itempos = (itembase + (ITEMS_PER_BELT_SIDE/4-1))*2+0;
-            if (br->items[right_end-1].type != 0) {
-               if (tb->items[itempos].type == 0) {
-                  tb->items[itempos] = br->items[right_end-1];
-                  br->items[right_end-1].type = 0;
-               }
-            }
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,itempos,itempos/2,0)) 
-               allow_new_frontmost_to_move[1] = 1;
-            break;
-         }
-      }
-   }
-
-   br->last_slot_filled_next_tick[0] = 0;
-   br->last_slot_filled_next_tick[1] = 0;
-
-   // at this moment, item[len-2] has just animated all the way to the farthest
-   // position that's still on the belt, i.e. it becomes item[len-1]
-
-   for (j=right_end-2; j >= right_start; --j)
-      if (br->items[j].type != 0 && br->items[j+1].type == 0) {
-         br->items[j+1] = br->items[j];
-         br->items[j].type = 0;
-      }
-   for (j=left_end-2; j >= left_start; --j)
-      if (br->items[j].type != 0 && br->items[j+1].type == 0) {
-         br->items[j+1] = br->items[j];
-         br->items[j].type = 0;
-      }
-
-   // now, we must check if item[len-1] is allowed to move OFF the belt
-   // over the next long tick
-
-   if (allow_new_frontmost_to_move[0])
-      br->mobile_slots[0] = right_len;
-   else {
-      for (j=right_len-1; j >= 0; --j)
-         if (br->items[right_start+j].type == 0)
-            break;
-      br->mobile_slots[0] = j < 0 ? 0 : j;
-      if (force_mobile[0]) br->mobile_slots[0] = right_len;
-   }
-
-   if (allow_new_frontmost_to_move[1])
-      br->mobile_slots[1] = left_len;
-   else {
-      for (j=left_len-1; j >= 0; --j)
-         if (br->items[left_start+j].type == 0)
-            break;
-      br->mobile_slots[1] = j < 0 ? 0 : j;
-      if (force_mobile[1]) br->mobile_slots[1] = left_len;
-   }
-
-   if (br->mobile_slots[0] == 0 && br->items[right_start].type != 0)
-      br->last_slot_filled_next_tick[0] = 1;
-   if (br->mobile_slots[1] == 0 && br->items[left_start].type != 0)
-      br->last_slot_filled_next_tick[1] = 1;
-}
-
 void logistics_belt_splitter_tick(int x, int y, int z, belt_run *br)
 {
    int j;
@@ -1619,6 +1438,24 @@ void check(belt_run *br)
       assert(br->items[i].type < 4);
 }
 
+// case 1:
+// e.g. from east to north
+//
+//                 ^  ^
+//  [1] X X X X -> O  O 
+//                 O  O
+//  [0] X X X X -> O  O
+//                 O  O
+
+// case 3:
+// e.g. from west to north
+//
+//   ^  ^
+//   O  O <- X X X X [0]
+//   O  O
+//   O  O <- X X X X [1]
+//   O  O
+
 void logistics_belt_tick(int x, int y, int z, belt_run *br)
 {
    //logi_slice *s, int cid, 
@@ -1677,114 +1514,59 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
       target_belt_coords.y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
       target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
       relative_facing = (tb->dir - outdir) & 3;
-      switch (relative_facing) {
-         case 0: {
-            int target_left_pos = 0;
-            int target_right_pos = 0;
-            int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
-            int target_right_start = 0;
-            int slot_right, slot_left;
-            slot_right = target_right_start;
-            slot_left = target_left_start;
-
-            if (br->items[right_end-1].type != 0) {
-               if (tb->items[slot_right].type == 0) {
-                  tb->items[slot_right] = br->items[right_end-1];
-                  br->items[right_end-1].type = 0;
-               }
+      if (relative_facing != 2) {
+         int ex = x + br->len*face_dir[br->dir][0];
+         int ey = y + br->len*face_dir[br->dir][1];
+         int basepos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
+         int left_target_pos, right_target_pos;
+         int slot_left, slot_right;
+         int left_target_side, right_target_side;
+         int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
+         int target_right_start = 0;
+         switch (relative_facing) {
+            case 0: {
+               right_target_side = 0;
+               left_target_side = 1;
+               right_target_pos = 0;
+               left_target_pos = 0;
+               break;
             }
-            if (br->items[left_end-1].type != 0) {
-               if (tb->items[slot_left].type == 0) {
-                  tb->items[slot_left] = br->items[left_end-1];
-                  br->items[left_end-1].type = 0;
-               }
+            case 1: {
+               // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
+               right_target_side = left_target_side = 1;
+               right_target_pos = basepos * ITEMS_PER_BELT_SIDE + 1;
+               left_target_pos = basepos * ITEMS_PER_BELT_SIDE + ITEMS_PER_BELT_SIDE-1;
+               break;
             }
-
-            allow_new_frontmost_to_move[0] = !tb->last_slot_filled_next_tick[0]; // (tb->mobile_slots[0] > 0);
-            allow_new_frontmost_to_move[1] = !tb->last_slot_filled_next_tick[1]; // (tb->mobile_slots[0] > 0);
-            break;
+            case 3: {
+               right_target_side = left_target_side = 0;
+               right_target_pos = basepos*ITEMS_PER_BELT_SIDE + ITEMS_PER_BELT_SIDE-1;
+               left_target_pos = basepos*ITEMS_PER_BELT_SIDE + 1;
+               break;
+            }
          }
-         case 1: {
-            // e.g. from east to north
-            //
-            //                 ^  ^
-            //  [1] X X X X -> O  O 
-            //                 O  O
-            //  [0] X X X X -> O  O
-            //                 O  O
+         slot_right = (right_target_side ? target_left_start : target_right_start) + right_target_pos;
+         slot_left  = ( left_target_side ? target_left_start : target_right_start) +  left_target_pos;
 
-            int ex = x + br->len*face_dir[br->dir][0];
-            int ey = y + br->len*face_dir[br->dir][1];
-            // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
-            int basepos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
-            int right_target_pos = basepos * ITEMS_PER_BELT_SIDE + 1;
-            int left_target_pos = basepos * ITEMS_PER_BELT_SIDE + ITEMS_PER_BELT_SIDE-1;
-            int slot_right, slot_left;
-            slot_right = left_offset(tb) + right_target_pos;
-            slot_left = 0 + left_target_pos;
-            
-            assert(slot_right < obarr_len(tb->items));
-            if (br->items[right_end-1].type != 0) {
-               if (tb->items[slot_right].type == 0) {
-                  tb->items[slot_right] = br->items[right_end-1];
-                  br->items[right_end-1].type = 0;
-               }
+         assert(slot_right < obarr_len(tb->items));
+         if (br->items[right_end-1].type != 0) {
+            if (tb->items[slot_right].type == 0) {
+               tb->items[slot_right] = br->items[right_end-1];
+               br->items[right_end-1].type = 0;
             }
-
-            assert(slot_left < obarr_len(tb->items));
-            if (br->items[left_end-1].type != 0) {
-               if (tb->items[slot_left].type == 0) {
-                  tb->items[slot_left] = br->items[left_end-1];
-                  br->items[left_end-1].type = 0;
-               }
-            }
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_right,right_target_pos,1)) 
-               allow_new_frontmost_to_move[0] = 1;
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_left,left_target_pos,1)) 
-               allow_new_frontmost_to_move[1] = 1;
-            break;
          }
-         case 2:
-            // conveyors point in opposite directions
-            break;
-         case 3: {
-            // e.g. from west to north
-            //
-            //   ^  ^
-            //   O  O <- X X X X [0]
-            //   O  O
-            //   O  O <- X X X X [1]
-            //   O  O
-            int ex = x + br->len*face_dir[br->dir][0];
-            int ey = y + br->len*face_dir[br->dir][1];
-            // offset of ex/ey point on belt is just manhattan distance from ex/ey point from start
-            int basepos = abs(ex - target_belt_coords.x) + abs(ey - target_belt_coords.y);
-            int itempos = basepos*ITEMS_PER_BELT_SIDE + ITEMS_PER_BELT_SIDE-1;
-            int slot = 0 + itempos;
-            assert(slot < obarr_len(tb->items));
 
-            if (br->items[right_end-1].type != 0) {
-               if (tb->items[slot].type == 0) {
-                  tb->items[slot] = br->items[right_end-1];
-                  br->items[right_end-1].type = 0;
-               }
+         assert(slot_left < obarr_len(tb->items));
+         if (br->items[left_end-1].type != 0) {
+            if (tb->items[slot_left].type == 0) {
+               tb->items[slot_left] = br->items[left_end-1];
+               br->items[left_end-1].type = 0;
             }
-
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot,itempos,0)) 
-               allow_new_frontmost_to_move[0] = 1;
-
-            itempos = basepos*ITEMS_PER_BELT_SIDE + 1;
-            slot = 0 + itempos;
-            if (br->items[left_end-1].type != 0) {
-               if (tb->items[slot].type == 0) {
-                  tb->items[slot] = br->items[left_end-1];
-                  br->items[left_end-1].type = 0;
-               }
-            }
-            if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot,itempos,0)) 
-               allow_new_frontmost_to_move[1] = 1;
-            break;
          }
+         if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_right,right_target_pos,1)) 
+            allow_new_frontmost_to_move[0] = 1;
+         if (BELT_SLOT_IS_EMPTY_NEXT_TICK(tb,slot_left,left_target_pos,1)) 
+            allow_new_frontmost_to_move[1] = 1;
       }
    }
 
