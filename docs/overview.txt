@@ -9,7 +9,9 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (36)
+Done in today's stream (37)
+
+Previous stream (36)
    - deinterleave straight belts
    - get rid of passed-around logi_chunks & local coords
    - refactor belt tick to share all code
