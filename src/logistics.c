@@ -1409,8 +1409,6 @@ static belt_ref *sorted_ref;
 
 typedef struct
 {
-   int off_x, off_y, off_z;
-   logi_chunk *c;
    logi_slice *s;
    int cid;
 } vtarget_chunk;
@@ -1424,21 +1422,25 @@ static void vget_target_chunk(vtarget_chunk *tc, int x, int y, int z, belt_run *
    int ex = target.x;
    int ey = target.y;
    int ez = target.z;
-   logi_chunk *c = logistics_get_chunk(target.x,target.y,target.z, &tc->s);
+   logistics_get_chunk(target.x,target.y,target.z, &tc->s);
    tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
-   tc->c = c;
-   tc->off_x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) - bx;
-   tc->off_y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) - by;
-   tc->off_z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) - bz;
 }
 
-static void vget_input_chunk(vtarget_chunk *tc, int x, int y, int z, logi_chunk *c, belt_run *br)
+static void vget_input_chunk(vtarget_chunk *tc, int x, int y, int z, belt_run *br)
 {
    int ex = x - face_dir[br->dir][0];
    int ey = y - face_dir[br->dir][1];
    int ez = z - br->input_dz;
-   logi_chunk *nc = logistics_get_chunk(ex,ey,ez, &tc->s);
-   tc->c = nc;
+   logistics_get_chunk(ex,ey,ez, &tc->s);
+   tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
+}
+
+static void vget_dir_chunk(vtarget_chunk *tc, int x, int y, int z, int dir)
+{
+   int ex = x + face_dir[dir][0];
+   int ey = y + face_dir[dir][1];
+   int ez = z;
+   logistics_get_chunk(ex,ey,ez, &tc->s);
    tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
 }
 
@@ -1452,9 +1454,26 @@ static void visit(belt_ref *ref)
       if (br->target_id != TARGET_none) {
          vtarget_chunk tc;
          belt_ref target;
-         if (br->type != BR_splitter) {
-            vget_target_chunk(&tc, ref->slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, ref->slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off, ref->cid * LOGI_CHUNK_SIZE_Z+br->z_off, br);
+         vec3i beltloc;
+         beltloc.x = ref->slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off;
+         beltloc.y = ref->slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off;
+         beltloc.z = ref->cid * LOGI_CHUNK_SIZE_Z+br->z_off;
+         if (br->type == BR_normal) {
+            vget_target_chunk(&tc, beltloc.x, beltloc.y, beltloc.z, br);
             target.belt_id = br->target_id;
+            target.cid = tc.cid;
+            target.slice = tc.s;
+            assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
+            visit(&target);
+         } else {
+            vget_dir_chunk(&tc, beltloc.x, beltloc.y, beltloc.z, (br->dir+3)&3);
+            target.belt_id = br->target_id;
+            target.cid = tc.cid;
+            target.slice = tc.s;
+            assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
+            visit(&target);
+            vget_dir_chunk(&tc, beltloc.x, beltloc.y, beltloc.z, (br->dir+1)&3);
+            target.belt_id = br->target2_id;
             target.cid = tc.cid;
             target.slice = tc.s;
             assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
@@ -1464,23 +1483,27 @@ static void visit(belt_ref *ref)
       if (br->mark == M_temporary) {
          br->mark = M_permanent;
          obarr_push(sorted_ref, *ref, "/logi/tick/sorted_ref");
+         ods("Queued %p(%2d): %d,dir=%d\n", br, ref->belt_id, br->type, br->dir);
       }
 
-      {
+      if (0) {
+         // this code guarantees we process continuous belts in serial order, not just
+         // topologically sorted, but it breaks the topological sort where the 'input'
+         // doesn't account for things (e.g. splitters, which don't set their targets 'input')
          belt_ref target = *ref;
          while (br->input_id != TARGET_none) {
             vtarget_chunk tc;
-            vget_input_chunk(&tc,  target.slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, target.slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off, target.cid * LOGI_CHUNK_SIZE_Z+br->z_off, c, br);
+            vget_input_chunk(&tc,  target.slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, target.slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off, target.cid * LOGI_CHUNK_SIZE_Z+br->z_off, br);
             target.belt_id = br->input_id;
             target.cid = tc.cid;
             target.slice = tc.s;
             assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
-            c = tc.c;
             br = &c->belts[target.belt_id];
             if (br->mark == M_permanent)
                break;
             br->mark = M_permanent;
             obarr_push(sorted_ref, target, "/logi/tick/sorted_ref");
+            ods("Queued %p(%2d): %d,dir=%d\n", br, ref->belt_id, br->type, br->dir);
          }
       }
    }
@@ -1709,6 +1732,8 @@ void logistics_do_long_tick(void)
 {
    int i,j,k,m;
    belt_ref *belts = NULL;
+
+   ods("Start tick\n");
 
    for (j=0; j < LOGI_CACHE_SIZE; ++j) {
       for (i=0; i < LOGI_CACHE_SIZE; ++i) {
