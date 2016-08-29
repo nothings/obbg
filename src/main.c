@@ -153,6 +153,25 @@ int num_sprites;
 
 #pragma warning(disable:4244)
 
+#ifdef _MSC_VER
+#pragma warning(disable:4305)
+#endif
+float it_color[20][3] =
+{
+   { 0,0,0, },
+   { 0.1,0.1,0.1 }, // IT_coal
+   { 0.4,0.4,0.4 }, // IT_iron_ore
+   { 0.6,0.6,0.3 }, // IT_copper_ore
+   { 0,0,0 },
+   { 0,0,0 },
+   { 0,0,0 },
+   { 0,0,0 },
+   { 1.0,1.0,1.0 }, // IT_iron_bar
+   { 0.7,0.7,0.7 }, // IT_iron_gear
+   { 0,0,0 },       // IT_steel_plate
+   { 1.0,0.0,1.0 }, // IT_conveyor_belt
+};
+
 void add_sprite(float x, float y, float z, int id)
 {
    sprite *s = &sprites[num_sprites++];
@@ -160,11 +179,11 @@ void add_sprite(float x, float y, float z, int id)
    s->pos.y = y;
    s->pos.z = z;
    s->size = 0.25;
-   assert(id >= 1 && id <= 3);
+   assert(id >= 1 && id < sizeof(it_color)/12);
    s->id = 0;
-   s->color.x = (id == 1) ? 1 : 0;
-   s->color.y = (id == 2) ? 1 : 0;
-   s->color.z = (id == 3) ? 1 : 0;
+   s->color.x = it_color[id][0];
+   s->color.y = it_color[id][1];
+   s->color.z = it_color[id][2];
 }
 
 
@@ -1048,14 +1067,14 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_R)   rotate_block();
          if (s == SDL_SCANCODE_M)   save_edits();
          if (k == '1') block_base = BT_conveyor;
-         if (k == '2') block_base = BT_conveyor_ramp_up_low;
+         if (k == '2') block_base = BT_conveyor_belt_maker;
          if (k == '3') block_base = BT_conveyor_ramp_up_high;
          if (k == '4') block_base = BT_conveyor_ramp_down_low;
          if (k == '5') block_base = BT_conveyor_ramp_down_high;
          if (k == '6') block_base = BT_ore_drill;
-         if (k == '7') block_base = BT_splitter;
+         if (k == '7') block_base = BT_furnace;
          if (k == '8') block_base = BT_picker;
-         if (k == '9') block_base = BT_balancer;
+         if (k == '9') block_base = BT_iron_gear_maker;
          if (k == '0') block_base = BT_stone;
          //if (k == '6') block_base = BT_conveyor_up_east_low;
          if (s == SDL_SCANCODE_H) global_hack = !global_hack;

@@ -105,13 +105,19 @@ void init_mesh_building(void)
    for (i=0; i < 4; ++i)
       tex1_for_blocktype[BT_conveyor_ramp_up_low+i][FACE_up] = 22;
 
-   set_blocktype_texture(BT_ore_eater, 17); tex1_for_blocktype[BT_ore_eater][FACE_east] = 23;
-   set_blocktype_texture(BT_ore_drill, 17); tex1_for_blocktype[BT_ore_drill][FACE_east] = 24;
+   set_blocktype_texture(BT_ore_eater      , 23)  ; tex1_for_blocktype[BT_ore_eater][FACE_up] = 17;
+   set_blocktype_texture(BT_ore_drill      , 24)  ; tex1_for_blocktype[BT_ore_drill][FACE_up] = 17;
+   set_blocktype_texture(BT_furnace        , 11)  ; tex1_for_blocktype[BT_furnace  ][FACE_up] = 17;
+   set_blocktype_texture(BT_iron_gear_maker, 10)  ; tex1_for_blocktype[BT_iron_gear_maker][FACE_up] = 17;
+   set_blocktype_texture(BT_conveyor_belt_maker,9); tex1_for_blocktype[BT_conveyor_belt_maker][FACE_up] = 21;
 
    geom_for_blocktype[BT_ore_drill] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_ore_eater] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_picker   ] = 0;
    geom_for_blocktype[BT_splitter ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
+   geom_for_blocktype[BT_furnace  ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
+   geom_for_blocktype[BT_iron_gear_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
+   geom_for_blocktype[BT_conveyor_belt_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    set_blocktype_texture(BT_splitter, 21);
    tex1_for_blocktype[BT_splitter][FACE_up] = 22;
 

@@ -61,6 +61,7 @@ typedef union
    uint16 packed;
 } logi_chunk_coord;
 
+#define MAX_UNIQUE_INPUTS 4
 typedef struct
 {
    logi_chunk_coord pos; // 2 bytes
@@ -1664,6 +1665,106 @@ belt_run *find_belt_slot_for_picker(int belt_id, int ix, int iy, int iz, int rot
    return b;
 }
 
+enum
+{
+   IT_empty,
+   IT_coal,
+   IT_iron_ore,
+   IT_copper_ore,
+   IT_ore_4,
+   IT_ore_5,
+   IT_ore_6,
+   IT_ore_7,
+   IT_iron_bar,
+   IT_iron_gear,
+   IT_steel_plate,
+   IT_conveyor_belt,
+   IT_conveyor_belt_ramp
+};
+
+static int input_type_table[][4] =
+{
+   { 0,0,0,0 }, // BT_machines
+   { 0,0,0,0 }, // BT_ore_drill
+   { 1,2,3,4 }, // BT_ore_eater
+   { IT_coal, IT_iron_ore }, // BT_furanace
+   { IT_coal, IT_iron_bar }, // BT_iron_gear_maker
+   { IT_iron_bar, IT_iron_gear },
+};
+
+int output_types[][4] =
+{
+   { 0 },
+   { 0 },
+   { 0 },
+   { IT_iron_bar },
+   { IT_iron_gear },
+   { IT_conveyor_belt },
+};
+
+void compute_free_input(Bool slot_free[4], machine_info *mi)
+{
+   //   2 2 1 1
+   int slot_used[4];
+   slot_used[0] = ((mi->input_flags     ) & 3);
+   slot_used[1] = ((mi->input_flags >> 2) & 3);
+   slot_used[2] = ((mi->input_flags >> 4) & 1);
+   slot_used[3] = ((mi->input_flags >> 5) & 1);
+
+   slot_free[0] = (slot_used[0] < 1);
+   slot_free[1] = (slot_used[1] < 1);
+   slot_free[2] = (slot_used[2] < 1);
+   slot_free[3] = (slot_used[3] < 1);
+}
+
+void add_one_input(machine_info *mi, int i)
+{
+   if (i == 0) mi->input_flags += 1;
+   if (i == 1) mi->input_flags += 1 << 2;
+   if (i == 2) mi->input_flags += 1 << 4;
+   if (i == 3) mi->input_flags += 1 << 5;
+}
+
+Bool allow_picker_for_machine(picker_info *pi, machine_info *mi, int item)
+{
+   int i;
+   int *input_types = input_type_table[mi->type - BT_machines];
+   Bool input_slot_free[MAX_UNIQUE_INPUTS];
+
+   compute_free_input(input_slot_free, mi);
+
+   if (mi->type != BT_ore_eater)
+      i=0;
+
+   for (i=0; i < MAX_UNIQUE_INPUTS; ++i)
+      if (item == input_types[i] && input_slot_free[i])
+         return True;
+   return False;
+}
+
+void move_from_picker_to_machine(picker_info *pi, machine_info *mi)
+{
+   int i;
+   int *input_types = input_type_table[mi->type - BT_machines];
+   Bool input_slot_free[MAX_UNIQUE_INPUTS];
+
+   compute_free_input(input_slot_free, mi);
+
+   for (i=0; i < MAX_UNIQUE_INPUTS; ++i) {
+      if (pi->item == input_types[i] && input_slot_free[i]) {
+         assert(pi->item);
+         add_one_input(mi, i);
+         if (mi->type == BT_ore_eater)
+            mi->output = pi->item;
+         else
+            i=i;
+         pi->item = 0;
+         pi->state = 1;
+         break;
+      }
+   }
+}
+
 void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, int base_z)
 {
    int m;
@@ -1708,6 +1809,33 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
          went_to_zero = (x->timer == 0);
       }
       switch (x->type) {
+         case BT_furnace:
+            if (went_to_zero)
+               x->output = IT_iron_bar;
+            if (x->timer == 0 && (x->input_flags == (1|4))) {
+               x->input_flags = 0;
+               x->timer = 7;
+            }
+            break;
+
+         case BT_iron_gear_maker:
+            if (went_to_zero)
+               x->output = IT_iron_gear;
+            if (x->timer == 0 && (x->input_flags == (1|4))) {
+               x->input_flags = 0;
+               x->timer = 11;
+            }
+            break;
+
+         case BT_conveyor_belt_maker:
+            if (went_to_zero)
+               x->output = IT_conveyor_belt;
+            if (x->timer == 0 && (x->input_flags == (1|4))) {
+               x->input_flags = 0;
+               x->timer = 14;
+            }
+            break;
+
          case BT_ore_eater:
             if (went_to_zero)
                x->output = 0;
@@ -1735,7 +1863,7 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
          pi->state = 2;
 
       if (pi->state == 0) {
-         if (pi->item == 0 && pi->input_id != TARGET_none && pi->state == 0) {
+         if (pi->item == 0 && pi->input_id != TARGET_none && pi->output_id != TARGET_none && pi->state == 0) {
             int ix = base_x + pi->pos.unpacked.x + face_dir[pi->rot  ][0];
             int iy = base_y + pi->pos.unpacked.y + face_dir[pi->rot  ][1];
             int iz = base_z + pi->pos.unpacked.z;
@@ -1743,11 +1871,23 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
                int slot;
                belt_run *b = find_belt_slot_for_picker(pi->input_id, ix,iy,iz-1, pi->rot, &slot);
                if (b->items[slot].type != 0) {
-                  pi->item = b->items[slot].type;
-                  remove_item_from_belt(b, slot);
-                  pi->state = 3;
+                  if (!pi->output_is_belt) {
+                     int ox = base_x + pi->pos.unpacked.x + face_dir[pi->rot^2][0];
+                     int oy = base_y + pi->pos.unpacked.y + face_dir[pi->rot^2][1];
+                     int oz = base_z + pi->pos.unpacked.z;
+                     logi_chunk *d = logistics_get_chunk(ox, oy, oz, 0);
+                     machine_info *mi;
+                     assert(pi->output_id < obarr_len(d->machine));
+                     mi = &d->machine[pi->output_id];
+                     if (!allow_picker_for_machine(pi, mi, b->items[slot].type))
+                        goto skip_picker;
+                     pi->item = b->items[slot].type;
+                     remove_item_from_belt(b, slot);
+                     pi->state = 3;
+                  }
                }
             } else {
+               // @TODO forbid picking up a thing that our output doesn't allow
                logi_chunk *d = logistics_get_chunk(ix, iy, base_z + pi->pos.unpacked.z, 0);
                machine_info *mi;
                assert(pi->input_id < obarr_len(d->machine));
@@ -1759,6 +1899,8 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
                }
             }
          }
+        skip_picker:
+         ;
       } else if (pi->state == 2) {
          assert(pi->item != 0);
          if (pi->output_id != TARGET_none) {
@@ -1779,12 +1921,7 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
                machine_info *mi;
                assert(pi->output_id < obarr_len(d->machine));
                mi = &d->machine[pi->output_id];
-               if (mi->output == 0) {
-                  assert(pi->item);
-                  mi->output = pi->item;
-                  pi->item = 0;
-                  pi->state = 1;
-               }
+               move_from_picker_to_machine(pi,mi);
             }
          }
       }
@@ -1925,6 +2062,9 @@ void logistics_render(void)
                      switch (m->type) {
                         case BT_ore_drill:
                         case BT_ore_eater:
+                        case BT_furnace:
+                        case BT_iron_gear_maker:
+                        case BT_conveyor_belt_maker:
                            break;
                         default:
                            glPushMatrix();
@@ -2031,7 +2171,7 @@ void logistics_render(void)
                            {{-1,0,},{0,-1}},
                            {{ 0,1,},{-1,0}},
                         };
-                        float x = stb_lerp(pi->input_is_belt ? 1-pos : pos, 0.75, -0.75);
+                        float x = stb_lerp(pi->input_is_belt ? 1-pos : pos, 0.5, -0.5);
                         float y = 0;
                         float az = 0.25;
                         float ax,ay;

@@ -1,18 +1,3 @@
-Refactor belt logitistics:
-   -  straight belt is interleaved items, other belts are concatenated lists
-          R1, L1, R2, L2, R3, L3...
-          R1, R2, L1, L2, L3, L4, L5
-   -  passing around logistics_chunk
-      - premature optimization
-      - get rid of, except if passing belt_id or similar logi_chunk-relative id
-   -  always need global coordinates
-      - premature optimization
-   -  refactor belts to use shared logic as much as possible
-      - except animation, which can be unique for each type
-   -  change mobile_slots to be consistenly inclusive or exclusive (currently '0' has two meanings)
-
-
-
    -  add mesh cache with explicit storing of coordinates & call function to access it instead of accessing inline
    -  why is set_mesh_chunk_for_coord either
       - (a) not just getting x & y from the mesh_chunk
@@ -37,7 +22,29 @@ Factorio-esque features:
    -  control circuits - factorio & infinifactory
    -  enemies & tower defense-ish gameplay - factorio?
 
+Initial crafting tree:
 
+   -  Furnace:
+         fuel: coal
+         input: iron ore
+         output: iron bar
+
+   -  Iron Gear Maker
+         input: iron bar
+         output: iron gears
+
+   -  Iron Belt Maker
+         input: 2x iron gear, iron bar
+         output: conveyor belt
+
+   -  Iron Belt Ramp Maker
+         input: 3x iron gear, iron bar
+         output: conveyor belt ramp
+
+   -  Steel Plate Maker
+         fuel: coal
+         input: iron bar
+         output: steel plate
 
 Ideas:
    -  iron initially, but need steel for higher-speed things? (i.e. more exact gears)
@@ -98,8 +105,8 @@ Ideas:
       - can be sprites or polygonal
       * large quantities (10,000?) of sprites
       * medium quantities of polygonal objects
-   *  save changes to disk
-   -  conveyor belts (special physics)
+   +  save changes to disk
+   *  conveyor belts (special physics)
       * factorio-style two-rows-of-sprite-sized stuff per conveyor
       x or just one row of block-sized stuff
       x maybe require multi-block things to be supported by multiple conveyors

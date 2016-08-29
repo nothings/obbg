@@ -99,6 +99,9 @@ enum
    BT_machines = 50,
    BT_ore_drill,
    BT_ore_eater,
+   BT_furnace,
+   BT_iron_gear_maker,
+   BT_conveyor_belt_maker,
 
    BT_belt_machines=250,
    BT_balancer=252,

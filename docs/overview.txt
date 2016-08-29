@@ -9,7 +9,11 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (37)
+Done in today's stream (38)
+   - furnace, iron gear maker, conveyor belt maker
+   - clean up picker logic when inputing to machine
+
+Previous stream (37)
    - more belt tick refactoring
    - fix belt animation between ticks
 
