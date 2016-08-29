@@ -382,7 +382,7 @@ float render_time;
 
 int screen_x, screen_y;
 int is_synchronous_debug;
-int sort_order;
+int sort_order_for_selected_belt;
 
 size_t mesh_cache_requested_in_use;
 int chunk_locations, chunks_considered, chunks_in_frustum;
@@ -546,7 +546,7 @@ void draw_stats(void)
       print("Mesh worker threads active: %d", num_threads_active);
       print("View distance: %d blocks", view_dist_for_display);
       print("x=%5.2f, y=%5.2f, z=%5.2f", obj[player_id].position.x, obj[player_id].position.y, obj[player_id].position.z);
-      print("Belt sort order: %d", sort_order);
+      print("Belt sort order: %d", sort_order_for_selected_belt);
       print("%s", glGetString(GL_RENDERER));
       #if 0
       for (i=0; i < 4; ++i)

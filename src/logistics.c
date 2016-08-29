@@ -1259,7 +1259,7 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
 {
    int side;
    for (side = 0; side < 2; ++side) {
-      int start, len, end, allow_new_frontmost_to_move=0, j;
+      int start, len, end, j;
       int target_id;
 
       if (br->type == BR_splitter) {
@@ -1355,6 +1355,106 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
                   br->items[end-1].type = 0;
                }
             }
+         }
+      }
+
+      // at this moment, item[len-2] has just animated all the way to the farthest
+      // position that's still on the belt, i.e. it becomes item[len-1]
+      for (j=end-2; j >= start; --j)
+         if (br->items[j].type != 0 && br->items[j+1].type == 0) {
+            br->items[j+1] = br->items[j];
+            br->items[j].type = 0;
+         }
+
+      if (global_hack && (stb_rand() % 10 < 2))
+         if (br->items[start].type == 0 && stb_rand() % 9 < 2)
+            br->items[start].type = stb_rand() % 4;
+   }
+}
+
+void logistics_belt_compute_mobility(int x, int y, int z, belt_run *br)
+{
+   int side;
+   for (side = 0; side < 2; ++side) {
+      int start, len, end, allow_new_frontmost_to_move=0, j;
+      int target_id;
+
+      if (br->type == BR_splitter) {
+         start = side ? left_offset(br) : 0;
+         len = 3;
+         end = start+len;
+      } else if (br->turn) {
+         int right_len = br->turn > 0 ? LONG_SIDE : SHORT_SIDE;
+         if (br->turn > 0)
+            len = side ? SHORT_SIDE : LONG_SIDE;
+         else
+            len = side ? LONG_SIDE : SHORT_SIDE;
+         start = side ? right_len : 0;
+         end = start + len;
+      } else {
+         start = side ? left_offset(br) : 0;
+         len = br->len * ITEMS_PER_BELT_SIDE;
+         end = start + len;
+      }
+
+      target_id = br->target_id;
+      if (br->type == BR_splitter)
+         if (side == LEFT)
+            target_id = br->target2_id;
+
+      if (target_id != TARGET_none) {
+         int target_side, target_pos, target_start;
+         vec3i target = get_belt_target(x,y,z, br, side);
+         logi_chunk *tc = get_chunk_v(&target);
+         belt_run *tb = &tc->belts[target_id];
+         Bool forbid = False;
+         int blockdist;
+         int outdir = (br->dir + br->turn) & 3;
+         vec3i target_belt_coords;
+         int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
+         int target_right_start = 0;
+         int target_slot;
+         int relative_facing = (tb->dir - outdir) & 3;
+         static int normal_output[4][2][2] =
+         { 
+            { { RIGHT,  0,                    }, { LEFT ,  0                    } },
+            { { LEFT ,  1,                    }, { LEFT , ITEMS_PER_BELT_SIDE-1 } },
+            { {  -1  , -1,                    }, {   -1 , -1                    } },
+            { { RIGHT, ITEMS_PER_BELT_SIDE-1, }, { RIGHT,  1                    } },
+         };
+         static int splitter_output[4][2][2] =
+         {
+            { { LEFT , ITEMS_PER_BELT_SIDE-2 },   { RIGHT, ITEMS_PER_BELT_SIDE-2 } },
+            { {  -1  , -1                    },   { RIGHT,  0                    } },
+            { { RIGHT,  1                    },   { LEFT ,  1                    } },
+            { { LEFT ,  0                    },   {  -1  , -1                    } },
+         };
+
+         if (br->type == BR_normal) {
+            target_side =   normal_output[relative_facing][side][0];
+            target_pos  =   normal_output[relative_facing][side][1];
+         } else if (br->type == BR_splitter) {
+            target_side = splitter_output[relative_facing][side][0];
+            target_pos  = splitter_output[relative_facing][side][1];
+         } else {
+            assert(0);
+         }
+
+         if (target_side < 0)
+            forbid = True;
+         if (tb->type == BR_splitter && relative_facing != 0)
+            forbid = True;
+         if (tb->turn != 0 && relative_facing != 0)
+            forbid = True;
+
+         if (!forbid) {
+            target_belt_coords.x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
+            target_belt_coords.y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
+            target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
+            blockdist = abs(target.x - target_belt_coords.x) + abs(target.y - target_belt_coords.y);
+            target_pos += blockdist * ITEMS_PER_BELT_SIDE;
+            target_start = (target_side ? target_left_start : target_right_start);
+            target_slot = target_start + target_pos;
 
             if (target_pos == 0) {
                if (IS_ITEM_MOBILE(tb,target_pos,target_side) || tb->items[target_slot].type == 0)
@@ -1374,14 +1474,6 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
          }
       }
 
-      // at this moment, item[len-2] has just animated all the way to the farthest
-      // position that's still on the belt, i.e. it becomes item[len-1]
-      for (j=end-2; j >= start; --j)
-         if (br->items[j].type != 0 && br->items[j+1].type == 0) {
-            br->items[j+1] = br->items[j];
-            br->items[j].type = 0;
-         }
-
       // determine which slots are animating
       if (allow_new_frontmost_to_move)
          br->mobile_slots[side] = len+1;
@@ -1391,10 +1483,6 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
                break;
          br->mobile_slots[side] = j+1;
       }
-
-      if (global_hack && (stb_rand() % 10 < 2))
-         if (br->items[start].type == 0 && stb_rand() % 9 < 2)
-            br->items[start].type = stb_rand() % 4;
    }
 }
 
@@ -1404,8 +1492,6 @@ typedef struct
    uint16 belt_id;
    uint8 cid;
 } belt_ref;
-
-static belt_ref *sorted_ref;
 
 typedef struct
 {
@@ -1444,6 +1530,7 @@ static void vget_dir_chunk(vtarget_chunk *tc, int x, int y, int z, int dir)
    tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
 }
 
+static belt_ref *sorted_ref;
 static void visit(belt_ref *ref)
 {
    logi_chunk *c = ref->slice->chunk[ref->cid];
@@ -1483,7 +1570,6 @@ static void visit(belt_ref *ref)
       if (br->mark == M_temporary) {
          br->mark = M_permanent;
          obarr_push(sorted_ref, *ref, "/logi/tick/sorted_ref");
-         ods("Queued %p(%2d): %d,dir=%d\n", br, ref->belt_id, br->type, br->dir);
       }
 
       if (0) {
@@ -1503,14 +1589,13 @@ static void visit(belt_ref *ref)
                break;
             br->mark = M_permanent;
             obarr_push(sorted_ref, target, "/logi/tick/sorted_ref");
-            ods("Queued %p(%2d): %d,dir=%d\n", br, ref->belt_id, br->type, br->dir);
          }
       }
    }
 }
 
 extern int selected_block[3];
-extern int sort_order;
+extern int sort_order_for_selected_belt;
 
 int offset_for_slot(belt_run *b, int slot)
 {
@@ -1529,8 +1614,6 @@ void remove_item_from_belt(belt_run *b, int slot)
    offset = offset_for_slot(b, slot);
    side = (offset!=0);
    pos = slot - offset;
-   if (pos+1 > b->mobile_slots[side])
-      b->mobile_slots[side] = pos+1;
 }
 
 Bool try_remove_item_from_belt(belt_run *b, int slot, int type1, int type2)
@@ -1545,36 +1628,16 @@ Bool try_remove_item_from_belt(belt_run *b, int slot, int type1, int type2)
 
 void add_item_to_belt(belt_run *b, int slot, int type)
 {
-   int side,pos,offset;
    assert(slot < obarr_len(b->items));
    assert(b->items[slot].type == 0);
    b->items[slot].type = type;
-   offset = offset_for_slot(b, slot);
-   side = (offset != 0);
-   pos = slot - offset;
-   if (b->mobile_slots[side]-1 == pos) {
-      int j;
-      for (j=pos-1; j >= 0; --j)
-         if (b->items[offset+j].type == 0)
-            break;
-      b->mobile_slots[side] = j+1;
-   }
 }
 
 void add_item_to_belt_pos(belt_run *b, int slot, int side, int pos, int type)
 {
-   int offset;
    assert(slot < obarr_len(b->items));
    assert(b->items[slot].type == 0);
    b->items[slot].type = type;
-   offset = offset_for_side(b, side);
-   if (b->mobile_slots[side]-1 == pos) {
-      int j;
-      for (j=pos-1; j >= 0; --j)
-         if (b->items[offset+j].type == 0)
-            break;
-      b->mobile_slots[side] = j+1;
-   }
 }
 
 Bool try_add_item_to_belt(belt_run *b, int slot, int type)
@@ -1733,8 +1796,6 @@ void logistics_do_long_tick(void)
    int i,j,k,m;
    belt_ref *belts = NULL;
 
-   ods("Start tick\n");
-
    for (j=0; j < LOGI_CACHE_SIZE; ++j) {
       for (i=0; i < LOGI_CACHE_SIZE; ++i) {
          logi_slice *s = &logi_world[j][i];
@@ -1756,9 +1817,6 @@ void logistics_do_long_tick(void)
       }
    }
 
-   obarr_free(sorted_ref);
-   sorted_ref = NULL;
-
    for (i=0; i < obarr_len(belts); ++i) {
       belt_run *br = &belts[i].slice->chunk[belts[i].cid]->belts[belts[i].belt_id];
       assert(belts[i].belt_id < obarr_len(belts[i].slice->chunk[belts[i].cid]->belts));
@@ -1766,8 +1824,10 @@ void logistics_do_long_tick(void)
          visit(&belts[i]);
       }
    }
+   obarr_free(belts);
+   belts = NULL;
 
-   sort_order = -1; // selected belt
+   sort_order_for_selected_belt = -1; // selected belt
    for (i=0; i < obarr_len(sorted_ref); ++i) {
       belt_ref *r = &sorted_ref[i];
       logi_slice *s = r->slice;
@@ -1781,10 +1841,8 @@ void logistics_do_long_tick(void)
       logistics_belt_tick(base_x+br->x_off,base_y+br->y_off,base_z+br->z_off, br);
       br->mark = M_unmarked;
       if (does_belt_intersect(br, selected_block[0]-base_x, selected_block[1]-base_y, selected_block[2]-base_z))
-         sort_order = i;
+         sort_order_for_selected_belt = i;
    }
-
-   obarr_free(belts);
 
    for (j=0; j < LOGI_CACHE_SIZE; ++j) {
       for (i=0; i < LOGI_CACHE_SIZE; ++i) {
@@ -1802,6 +1860,22 @@ void logistics_do_long_tick(void)
          }
       }
    }
+
+   for (i=0; i < obarr_len(sorted_ref); ++i) {
+      belt_ref *r = &sorted_ref[i];
+      logi_slice *s = r->slice;
+      belt_run *br = &s->chunk[r->cid]->belts[r->belt_id];
+      int obarrlen = obarr_len(s->chunk[r->cid]->belts);
+      int belt_id = r->belt_id;
+      int base_x = s->slice_x * LOGI_CHUNK_SIZE_X;
+      int base_y = s->slice_y * LOGI_CHUNK_SIZE_Y;
+      int base_z = r->cid     * LOGI_CHUNK_SIZE_Z;
+      assert(belt_id < obarrlen);
+      logistics_belt_compute_mobility(base_x+br->x_off,base_y+br->y_off,base_z+br->z_off, br);
+   }
+
+   obarr_free(sorted_ref);
+   sorted_ref = NULL;
 }
 
 extern int tex_anim_offset;
