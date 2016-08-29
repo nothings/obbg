@@ -910,7 +910,7 @@ void logistics_update_chunk(int x, int y, int z)
          if (1) { //c->belts[i].target_id == TARGET_unknown) {
             logi_chunk *d = c;
             belt_run *b = &c->belts[i];
-            int turn = b->type == BR_splitter ? 1 : b->turn;
+            int turn = b->type == BR_splitter ? 3 : b->turn;
             int outdir = (b->dir + turn)&3;
             int ex = b->x_off + b->len * face_dir[outdir][0];
             int ey = b->y_off + b->len * face_dir[outdir][1];
@@ -945,7 +945,7 @@ void logistics_update_chunk(int x, int y, int z)
                b->target_id = TARGET_none;
 
             if (b->type == BR_splitter) {
-               outdir = (b->dir + 3)&3;
+               outdir = (b->dir + 1)&3;
                ex = b->x_off + b->len * face_dir[outdir][0];
                ey = b->y_off + b->len * face_dir[outdir][1];
                ez = b->z_off + b->end_dz, is_neighbor=0;
@@ -1239,13 +1239,34 @@ void check(belt_run *br)
 //   O  O
 void add_item_to_belt_pos(belt_run *b, int slot, int side, int pos, int type);
 
+vec3i get_belt_target(int x, int y, int z, belt_run *br, int side)
+{
+   if (br->type == BR_normal) {
+      return get_target(x,y,z,br);
+   } else if (br->type == BR_splitter) {
+      if (side == RIGHT)
+         return get_coord_in_dir(x,y,z, (br->dir+3)&3);
+      else
+         return get_coord_in_dir(x,y,z, (br->dir+1)&3);
+   } else {
+      vec3i v = { 0,0,0 };
+      assert(0);
+      return v;
+   }
+}
+
 void logistics_belt_tick(int x, int y, int z, belt_run *br)
 {
    int side;
    for (side = 0; side < 2; ++side) {
       int start, len, end, allow_new_frontmost_to_move=0, j;
+      int target_id;
 
-      if (br->turn) {
+      if (br->type == BR_splitter) {
+         start = side ? left_offset(br) : 0;
+         len = 3;
+         end = start+len;
+      } else if (br->turn) {
          int right_len = br->turn > 0 ? LONG_SIDE : SHORT_SIDE;
          if (br->turn > 0)
             len = side ? SHORT_SIDE : LONG_SIDE;
@@ -1267,52 +1288,57 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
       // at this moment, item[len-1] has just animated all the way off of the belt (if mobile)
       // so, we move item[len-1] out to some other spot
 
-      if (br->target_id != TARGET_none) {
+      target_id = br->target_id;
+      if (br->type == BR_splitter)
+         if (side == LEFT)
+            target_id = br->target2_id;
+
+      if (target_id != TARGET_none) {
          int target_side, target_pos, target_start;
-         vec3i target = get_target(x,y,z, br);
+         vec3i target = get_belt_target(x,y,z, br, side);
          logi_chunk *tc = get_chunk_v(&target);
-         belt_run *tb = &tc->belts[br->target_id];
+         belt_run *tb = &tc->belts[target_id];
+         Bool forbid = False;
          int blockdist;
          int outdir = (br->dir + br->turn) & 3;
          vec3i target_belt_coords;
          int target_left_start = tb->turn ? (tb->turn > 0 ? LONG_SIDE : SHORT_SIDE) : left_offset(tb);
          int target_right_start = 0;
          int target_slot;
-
          int relative_facing = (tb->dir - outdir) & 3;
-         if (relative_facing != 2) {
-            switch (relative_facing) {
-               case 0: {
-                  if (side == RIGHT) {
-                     target_side = RIGHT;
-                     target_pos = 0;
-                  } else {
-                     target_side = LEFT;
-                     target_pos = 0;
-                  }
-                  break;
-               }
-               case 1: {
-                  if (side == RIGHT) {
-                     target_side = LEFT;
-                     target_pos = 1;
-                  } else {
-                     target_side = LEFT;
-                     target_pos = ITEMS_PER_BELT_SIDE-1;
-                  }
-                  break;
-               }
-               case 3: {
-                  if (side == RIGHT) {
-                     target_side = RIGHT;
-                     target_pos = ITEMS_PER_BELT_SIDE-1;
-                  } else {
-                     target_side = RIGHT;
-                     target_pos = 1;
-                  }
-                  break;
-               }
-            }
+         static int normal_output[4][2][2] =
+         { 
+            { { RIGHT,  0,                    }, { LEFT ,  0                    } },
+            { { LEFT ,  1,                    }, { LEFT , ITEMS_PER_BELT_SIDE-1 } },
+            { {  -1  , -1,                    }, {   -1 , -1                    } },
+            { { RIGHT, ITEMS_PER_BELT_SIDE-1, }, { RIGHT,  1                    } },
+         };
+         static int splitter_output[4][2][2] =
+         {
+            { { LEFT , ITEMS_PER_BELT_SIDE-2 },   { RIGHT, ITEMS_PER_BELT_SIDE-2 } },
+            { {  -1  , -1                    },   { RIGHT,  0                    } },
+            { { RIGHT,  1                    },   { LEFT ,  1                    } },
+            { { LEFT ,  0                    },   {  -1  , -1                    } },
+         };
+
+         if (br->type == BR_normal) {
+            target_side =   normal_output[relative_facing][side][0];
+            target_pos  =   normal_output[relative_facing][side][1];
+         } else if (br->type == BR_splitter) {
+            target_side = splitter_output[relative_facing][side][0];
+            target_pos  = splitter_output[relative_facing][side][1];
+         } else {
+            assert(0);
+         }
+
+         if (target_side < 0)
+            forbid = True;
+         if (tb->type == BR_splitter && relative_facing != 0)
+            forbid = True;
+         if (tb->turn != 0 && relative_facing != 0)
+            forbid = True;
+
+         if (!forbid) {
             target_belt_coords.x = (target.x & ~(LOGI_CHUNK_SIZE_X-1)) + tb->x_off;
             target_belt_coords.y = (target.y & ~(LOGI_CHUNK_SIZE_Y-1)) + tb->y_off;
             target_belt_coords.z = (target.z & ~(LOGI_CHUNK_SIZE_Z-1)) + tb->z_off;
@@ -1331,7 +1357,7 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
             }
 
             if (target_pos == 0) {
-               if (IS_ITEM_MOBILE(tb,target_pos,side) || tb->items[target_slot].type == 0)
+               if (IS_ITEM_MOBILE(tb,target_pos,target_side) || tb->items[target_slot].type == 0)
                   allow_new_frontmost_to_move = True;
             } else {
                // frontmost object goes to 'target_pos', so check if 'target_pos' will be open next
