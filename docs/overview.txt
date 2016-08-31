@@ -11,7 +11,8 @@ obbg:
 
 
 Done in today's stream (40)
-
+   - separate iron ore and ocal
+   - tweaks & bugs
 
 Previous stream (38.2? 39?)
    - initial crafting tree

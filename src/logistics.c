@@ -1696,6 +1696,17 @@ static int input_type_table[][4] =
    { IT_iron_bar, IT_iron_gear },
 };
 
+static int input_count_table[][4] =
+{
+   { 0,0,0,0 }, // BT_machines
+   { 0,0,0,0 }, // BT_ore_drill
+   { 0,0,0,0 }, // BT_ore_eater
+   { 1,1,0,0 }, // BT_furanace
+   { 1,1,0,0 }, // BT_iron_gear_maker
+   { 1,2,0,0 }, // BT_belt_maker
+
+};
+
 int output_types[][4] =
 {
    { 0 },
@@ -1709,16 +1720,14 @@ int output_types[][4] =
 void compute_free_input(Bool slot_free[4], machine_info *mi)
 {
    //   2 2 1 1
-   int slot_used[4];
+   int slot_used[4], i;
    slot_used[0] = ((mi->input_flags     ) & 3);
    slot_used[1] = ((mi->input_flags >> 2) & 3);
    slot_used[2] = ((mi->input_flags >> 4) & 1);
    slot_used[3] = ((mi->input_flags >> 5) & 1);
 
-   slot_free[0] = (slot_used[0] < 1);
-   slot_free[1] = (slot_used[1] < 1);
-   slot_free[2] = (slot_used[2] < 1);
-   slot_free[3] = (slot_used[3] < 1);
+   for (i=0; i < 4; ++i)
+      slot_free[i] = (slot_used[i] < input_count_table[mi->type-BT_machines][i]);
 }
 
 void add_one_input(machine_info *mi, int i)
@@ -1837,7 +1846,7 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
          case BT_conveyor_belt_maker:
             if (went_to_zero)
                mi->output = IT_conveyor_belt;
-            if (mi->timer == 0 && (mi->input_flags == (1|4)) && mi->output==0) {
+            if (mi->timer == 0 && (mi->input_flags == (1|8)) && mi->output==0) {
                mi->input_flags = 0;
                mi->timer = 14;
             }
