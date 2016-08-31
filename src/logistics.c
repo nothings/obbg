@@ -106,7 +106,8 @@ typedef struct
 {
    logi_chunk_coord pos;
    uint16 count;
-} ore_info;
+   uint8 type;
+} ore_info; // 8 (5)
 
 enum
 {
@@ -774,12 +775,13 @@ void create_machine(int x, int y, int z, int type, int rot, int bx, int by, int 
    d = logistics_get_chunk_alloc(bx+ox,by+oy,bz+oz-1);
    ore_z = (oz-1) & (LOGI_CHUNK_SIZE_Z-1);
    // @TODO only do followign test for BT_ore_driller
-   if (d->type[ore_z][oy][ox] == BT_stone) {
+   if (d->type[ore_z][oy][ox] == BT_stone || d->type[ore_z][oy][ox] == BT_asphalt) {
       int id = find_ore(x,y,z-1);
       if (id < 0) {
          ore_info ore;
          ore.pos = coord(ox,oy,ore_z);
          ore.count = 5;
+         ore.type = d->type[ore_z][oy][ox];
          obarr_push(d->ore, ore, "/logi/orelist");
       }
    }
@@ -1019,10 +1021,12 @@ void logistics_update_chunk(int x, int y, int z)
          if (m->type == BT_ore_drill) {
             int ore_z = base_z + m->pos.unpacked.z - 1;
             logi_chunk *d = logistics_get_chunk_alloc(base_x + m->pos.unpacked.x, base_y + m->pos.unpacked.y, ore_z);
+            #if 0
             if (d->type[ore_z & (LOGI_CHUNK_SIZE_Z-1)][m->pos.unpacked.y][m->pos.unpacked.x] == BT_stone)
                m->input_flags = 1;
             else
                m->input_flags = 0;
+            #endif
          }
       }
 
@@ -1802,54 +1806,67 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
    }
 
    for (m=0; m < obarr_len(c->machine); ++m) {
-      machine_info *x = &c->machine[m];
+      machine_info *mi = &c->machine[m];
       Bool went_to_zero = False;
-      if (x->timer) {
-         --x->timer;
-         went_to_zero = (x->timer == 0);
+      if (mi->timer) {
+         --mi->timer;
+         went_to_zero = (mi->timer == 0);
       }
-      switch (x->type) {
+      switch (mi->type) {
          case BT_furnace:
             if (went_to_zero)
-               x->output = IT_iron_bar;
-            if (x->timer == 0 && (x->input_flags == (1|4))) {
-               x->input_flags = 0;
-               x->timer = 7;
+               mi->output = IT_iron_bar;
+            if (mi->timer == 0 && (mi->input_flags == (1|4)) && mi->output==0) {
+               mi->input_flags = 0;
+               mi->timer = 7;
             }
             break;
 
          case BT_iron_gear_maker:
             if (went_to_zero)
-               x->output = IT_iron_gear;
-            if (x->timer == 0 && (x->input_flags == (1|4))) {
-               x->input_flags = 0;
-               x->timer = 11;
+               mi->output = IT_iron_gear;
+            if (mi->timer == 0 && (mi->input_flags == (1|4)) && mi->output==0) {
+               mi->input_flags = 0;
+               mi->timer = 11;
             }
             break;
 
          case BT_conveyor_belt_maker:
             if (went_to_zero)
-               x->output = IT_conveyor_belt;
-            if (x->timer == 0 && (x->input_flags == (1|4))) {
-               x->input_flags = 0;
-               x->timer = 14;
+               mi->output = IT_conveyor_belt;
+            if (mi->timer == 0 && (mi->input_flags == (1|4)) && mi->output==0) {
+               mi->input_flags = 0;
+               mi->timer = 14;
             }
             break;
 
          case BT_ore_eater:
             if (went_to_zero)
-               x->output = 0;
-            if (x->output != 0 && x->timer == 0)
-               x->timer = 7;
+               mi->output = 0;
+            if (mi->output != 0 && mi->timer == 0)
+               mi->timer = 7;
             break;
 
          case BT_ore_drill:
-            if (went_to_zero && x->input_flags) {
-               assert(x->output == 0);
-               x->output = 1 + (stb_rand() % 2);
+            if (went_to_zero) {
+               int ore_id = find_ore(base_x+mi->pos.unpacked.x, base_y+mi->pos.unpacked.y, base_z+mi->pos.unpacked.z-1);
+               if (ore_id >= 0) {
+                  ore_info *oi = &c->ore[ore_id];
+                  assert(mi->output == 0);
+                  switch (oi->type) {
+                     case BT_stone  : mi->output = IT_iron_ore; break;
+                     case BT_asphalt: mi->output = IT_coal    ; break;
+                  }
+               }
             }
-            if (x->timer == 0 && x->output == 0 && x->input_flags)
-               x->timer = 7; // start drilling
+            if (mi->timer == 0 && mi->output == 0) {
+               int ore_id = find_ore(base_x+mi->pos.unpacked.x, base_y+mi->pos.unpacked.y, base_z+mi->pos.unpacked.z-1);
+               if (ore_id >= 0) {
+                  ore_info *oi = &c->ore[ore_id];
+                  if (oi->count)
+                     mi->timer = 7; // start drilling
+               }
+            }
             break;
       }
    }

@@ -989,7 +989,7 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
          height_field_int[j+4][i+4] = (int) height_field[j+4][i+4];
          ground_top = stb_max(ground_top, height_field_int[j+4][i+4]);
          solid_bottom = stb_min(solid_bottom, height_field_int[j+4][i+4]);
-         height_ore[j+4][i+4] = big_noise(x+i,y+j, 0, x*77+y*31);
+         height_ore[j+4][i+4] = big_noise(x+i,y+j, 2, x*77+y*31);
       }
    add_time(thread_id, start, 2);
    start = SDL_GetPerformanceCounter();
@@ -1023,12 +1023,6 @@ gen_chunk *generate_chunk(int x, int y, int thread_id)
                   bt = BT_sand;
                if (ht > AVG_GROUND+14)
                   bt = BT_gravel;
-
-               if (height_ore[j+4][i+4] < -0.5) {
-                  bt = BT_stone;
-                  z_limit = stb_clamp(ht+1-z0, 0, Z_SEGMENT_SIZE);
-                  gc->highest_z = stb_max(gc->highest_z, stb_min(ht+1,255));
-               }
 
                //bt = (int) stb_lerp(height_lerp[j][i], BT_sand, BT_marble+0.99f);
                assert(z_limit >= 0 && Z_SEGMENT_SIZE - z_limit >= 0);

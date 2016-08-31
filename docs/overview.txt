@@ -9,7 +9,14 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (38)
+
+Done in today's stream (40)
+
+
+Previous stream (38.2? 39?)
+   - initial crafting tree
+
+Previous stream (38)
    - furnace, iron gear maker, conveyor belt maker
    - clean up picker logic when inputing to machine
 

@@ -160,14 +160,14 @@ float it_color[20][3] =
 {
    { 0,0,0, },
    { 0.1,0.1,0.1 }, // IT_coal
-   { 0.4,0.4,0.4 }, // IT_iron_ore
+   { 0.6,0.5,0.5 }, // IT_iron_ore
    { 0.6,0.6,0.3 }, // IT_copper_ore
    { 0,0,0 },
    { 0,0,0 },
    { 0,0,0 },
    { 0,0,0 },
    { 1.0,1.0,1.0 }, // IT_iron_bar
-   { 0.7,0.7,0.7 }, // IT_iron_gear
+   { 0.7,0.7,0.8 }, // IT_iron_gear
    { 0,0,0 },       // IT_steel_plate
    { 1.0,0.0,1.0 }, // IT_conveyor_belt
 };
@@ -1067,7 +1067,7 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_R)   rotate_block();
          if (s == SDL_SCANCODE_M)   save_edits();
          if (k == '1') block_base = BT_conveyor;
-         if (k == '2') block_base = BT_conveyor_belt_maker;
+         if (k == '2') block_base = BT_asphalt;
          if (k == '3') block_base = BT_conveyor_ramp_up_high;
          if (k == '4') block_base = BT_conveyor_ramp_down_low;
          if (k == '5') block_base = BT_conveyor_ramp_down_high;
