@@ -1002,6 +1002,7 @@ int loopmode(float dt, int real, int in_client)
 }
 
 static int quit;
+int hack_ffwd;
 
 void active_control_set(int key)
 {
@@ -1066,6 +1067,7 @@ void process_event(SDL_Event *e)
          if (s == SDL_SCANCODE_F)   client_player_input.flying = !client_player_input.flying;
          if (s == SDL_SCANCODE_R)   rotate_block();
          if (s == SDL_SCANCODE_M)   save_edits();
+         if (s == SDL_SCANCODE_TAB) hack_ffwd = !hack_ffwd;
          if (k == '1') block_base = BT_conveyor;
          if (k == '2') block_base = BT_asphalt;
          if (k == '3') block_base = BT_conveyor_ramp_up_high;

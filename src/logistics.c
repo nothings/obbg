@@ -1735,10 +1735,10 @@ Bool allow_picker_for_machine(picker_info *pi, machine_info *mi, int item)
    int *input_types = input_type_table[mi->type - BT_machines];
    Bool input_slot_free[MAX_UNIQUE_INPUTS];
 
-   compute_free_input(input_slot_free, mi);
+   if (mi->type == BT_ore_eater)
+      return mi->output == 0;
 
-   if (mi->type != BT_ore_eater)
-      i=0;
+   compute_free_input(input_slot_free, mi);
 
    for (i=0; i < MAX_UNIQUE_INPUTS; ++i)
       if (item == input_types[i] && input_slot_free[i])
@@ -1752,16 +1752,19 @@ void move_from_picker_to_machine(picker_info *pi, machine_info *mi)
    int *input_types = input_type_table[mi->type - BT_machines];
    Bool input_slot_free[MAX_UNIQUE_INPUTS];
 
+   if (mi->type == BT_ore_eater) {
+      mi->output = pi->item;
+      pi->item = 0;
+      pi->state = 1;
+      return;
+   }
+
    compute_free_input(input_slot_free, mi);
 
    for (i=0; i < MAX_UNIQUE_INPUTS; ++i) {
       if (pi->item == input_types[i] && input_slot_free[i]) {
          assert(pi->item);
          add_one_input(mi, i);
-         if (mi->type == BT_ore_eater)
-            mi->output = pi->item;
-         else
-            i=i;
          pi->item = 0;
          pi->state = 1;
          break;
@@ -1844,7 +1847,7 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
             if (went_to_zero)
                mi->output = 0;
             if (mi->output != 0 && mi->timer == 0)
-               mi->timer = 7;
+               mi->timer = 13;
             break;
 
          case BT_ore_drill:
@@ -2033,6 +2036,7 @@ void logistics_do_long_tick(void)
 }
 
 extern int tex_anim_offset;
+extern int hack_ffwd;
 void logistics_tick(void)
 {
    while (ore_pending != ore_processed) {
@@ -2050,7 +2054,7 @@ void logistics_tick(void)
    ++logistics_ticks;
    tex_anim_offset = ((logistics_ticks >> 3) & 3) * 16;
 
-   if (++logistics_long_tick == LONG_TICK_LENGTH) {
+   if (++logistics_long_tick == LONG_TICK_LENGTH || hack_ffwd) {
       logistics_do_long_tick();
       logistics_long_tick = 0;
    }
