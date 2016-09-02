@@ -16,6 +16,7 @@ int selected_block_to_create[3];
 Bool selected_block_valid;
 int block_rotation;
 int block_base = BT_conveyor;
+static int mouse_x, mouse_y;
 
 void rotate_block(void)
 {
@@ -41,16 +42,6 @@ void active_control_clear(int key)
    client_player_input.buttons &= ~(1 << key);
 }
 
-void mouse_down(int button)
-{
-   if (selected_block_valid) {
-      if (button == 1)
-         change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty, block_rotation);
-      else if (button == -1)
-         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base, block_rotation);
-   }
-}
-
 typedef struct
 {
    int y_base, y_size;
@@ -60,7 +51,37 @@ typedef struct
 
 int sprite_for_blocktype[256];
 
-void draw_ui_row(ui_rect_row *row, int *blockcodes)
+void get_coordinates(ui_rect_row *row, int item, int *x, int *y)
+{
+   *x = row->x_base + (row->x_size + row->x_spacing)*item;
+   *y = row->y_base;
+}
+
+int hit_detect_row(ui_rect_row *row, recti *box)
+{
+   int i;
+   int x_advance = row->x_size + row->x_spacing;
+   float y0 = row->y_base;
+   float y1 = y0 + row->y_size;
+   float x0 = row->x_base;
+   float x1 = x0 + row->x_size;
+
+   static recti mbox = { 0,0,0,0 };
+   if (box == NULL)
+      box = &mbox;
+
+   for (i=0; i < row->count; ++i) {
+      if (mouse_x+box->x0 < x1 && mouse_x+box->x1 > x0 &&
+          mouse_y+box->y0 < y1 && mouse_y+box->y1 > y0)
+         return i;
+
+      x0 += x_advance;
+      x1 += x_advance;
+   }
+   return -1;
+}
+
+void draw_ui_row(ui_rect_row *row, int *blockcodes, int hit_item)
 {
    int i;
    int x_advance = row->x_size + row->x_spacing;
@@ -71,6 +92,10 @@ void draw_ui_row(ui_rect_row *row, int *blockcodes)
    for (i=0; i < row->count; ++i) {
       glDisable(GL_TEXTURE_2D);
       glDisable(GL_BLEND);
+      if (hit_item==i) {
+         glColor3f(1.0,1.0,1.0);
+         stbgl_drawRect(x0-2,y0-2,x1+2,y1+2);
+      }
       glColor3f(0.9,0.9,0.9);
       stbgl_drawRect(x0,y0,x1,y1);
 
@@ -155,14 +180,64 @@ void compute_ui_inventory(void)
    ui_inventory[2].y_base = ui_inventory[1].y_base + advance;
 }
 
+static Bool dragging = False;
+static int mouse_drag_offset_x, mouse_drag_offset_y;
+static int drag_item;
+
+void mouse_down(int button)
+{
+   dragging = False;
+   switch (ui_screen) {
+      case UI_SCREEN_select: {
+         int j;
+         for (j=0; j < 3; ++j) {
+            int hit = hit_detect_row(&ui_inventory[j], NULL);
+            if (hit >= 0) {
+               int x,y;
+               dragging = True;
+               get_coordinates(&ui_inventory[j], hit, &x,&y);
+               mouse_drag_offset_x = x - mouse_x;
+               mouse_drag_offset_y = y - mouse_y;
+               drag_item = inventory_blocktype[j][hit];
+            }
+         }
+         break;
+      }
+      
+      case UI_SCREEN_none:
+         if (selected_block_valid) {
+            if (button == 1)
+               change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty, block_rotation);
+            else if (button == -1)
+               change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base, block_rotation);
+         }
+         break;
+   }
+}
 
 void mouse_up(void)
 {
+   if (dragging) {
+      int hit;
+      recti shape;
+      shape.x0 = mouse_drag_offset_x;
+      shape.y0 = mouse_drag_offset_y;
+      shape.x1 = shape.x0 + 32;
+      shape.y1 = shape.y0 + 32;
+      shape.x0 += 8;
+      shape.y0 += 8;
+      shape.x1 -= 8;
+      shape.y1 -= 8;
+      hit = hit_detect_row(ui_actionbar, &shape);
+      if (hit >= 0) {
+         actionbar_blocktype[hit] = drag_item;
+      }
+      dragging = False;
+   }
 }
 
 extern void update_view(float dx, float dy);
 
-static int mouse_x, mouse_y;
 static Bool first_mouse=True;
 
 void  process_mouse_move(int dx, int dy)
@@ -300,30 +375,54 @@ void do_ui_rendering_2d(void)
 
    switch (ui_screen) {
       case UI_SCREEN_select: {
+         int hit;
          int j;
-         glColor3f(0.8,0.8,0.8);
+         glColor3f(0.7,0.7,0.7);
          stbgl_drawRect(screen_x*1.0/4.0, screen_y*1.0/4.0, screen_x*3.0/4.0, screen_y*3.0/4.0);
          for (j=0; j < 3; ++j) {
-            draw_ui_row(&ui_inventory[j], &inventory_blocktype[j][0]);
+            int ihit = dragging ? -1 : hit_detect_row(&ui_inventory[j], NULL);
+            draw_ui_row(&ui_inventory[j], &inventory_blocktype[j][0], ihit);
          }
-         draw_ui_row(ui_actionbar, actionbar_blocktype);
+         hit = -1;
+         if (dragging) {
+            recti shape;
+            shape.x0 = mouse_drag_offset_x;
+            shape.y0 = mouse_drag_offset_y;
+            shape.x1 = shape.x0 + 32;
+            shape.y1 = shape.y0 + 32;
+            shape.x0 += 8;
+            shape.y0 += 8;
+            shape.x1 -= 8;
+            shape.y1 -= 8;
+            hit = hit_detect_row(&ui_actionbar[0], &shape);
+         }
+         draw_ui_row(ui_actionbar, actionbar_blocktype, hit);
          break;
       }
-      case UI_SCREEN_none:
-         draw_ui_row(ui_actionbar, actionbar_blocktype);
+      case UI_SCREEN_none: {
+         draw_ui_row(ui_actionbar, actionbar_blocktype, -1);
          break;
+      }
    }
 
    if (ui_screen != UI_SCREEN_none) {
       float mx,my;
+
+      glEnable(GL_TEXTURE_2D);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+      if (dragging) {
+         glBindTexture(GL_TEXTURE_2D, sprite_for_blocktype[drag_item]);
+         mx = mouse_x + mouse_drag_offset_x;
+         my = mouse_y + mouse_drag_offset_y;
+         stbgl_drawRectTC(mx,my, mx+ui_inventory[0].x_size,my+ui_inventory[0].y_size, 0,0,1,1);
+      }
+
       mx = mouse_x - 5;
       my = mouse_y - 6;
 
-      glEnable(GL_TEXTURE_2D);
       glBindTexture(GL_TEXTURE_2D, icon_arrow);
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-      stbgl_drawRectTC(mx-16,my-16, mx+16,my+16, 0,0,1,1);
+      stbgl_drawRectTC(mx,my, mx+32,my+32, 0,0,1,1);
       glDisable(GL_BLEND);
       glDisable(GL_TEXTURE_2D);
    }

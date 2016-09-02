@@ -72,6 +72,11 @@ typedef struct
    float x,y,z;
 } vec;
 
+typedef struct
+{
+   int x0,y0,x1,y1;
+} recti;
+
 // block types
 enum
 {
