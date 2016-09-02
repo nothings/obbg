@@ -91,11 +91,15 @@ Ideas:
       -  expand tree
       -  better placeholder art
          - draw actual blocks/machines on belt, or just sprites???
+   -  machines are 2x2x2 blocks
    -  animated machines
    -  player inventory
+      *  action bar
+      *  MC-creative-mode select
+      -  more placeholder
+      -  real inventory
    -  belt placement UI (ghost shapes, place-and-drag, automatic rotation)
    -  machine placement UI (ghost shapes)
-   -  machines are 2x2x2 blocks
    -  clean-up hacky code
       - ore
       - block edits
