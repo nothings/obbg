@@ -265,6 +265,12 @@ extern int view_dist_for_display;
 extern int num_threads_active, num_meshes_started, num_meshes_uploaded;
 extern unsigned char tex1_for_blocktype[256][6];
 extern float logistics_texture_scroll;
+extern int selected_block[3];
+extern int selected_block_to_create[3];
+extern Bool selected_block_valid;
+extern int screen_x, screen_y;
+extern int debug_render;
+extern Bool show_memory;
 
 enum
 {

@@ -20,6 +20,13 @@ extern void obbg_malloc_dump(obbg_malloc_dump_func *f);
 extern void query_thread_info(int id, int *count, double *time);
 extern void init_object_render(void);
 extern void force_update_for_block_raw(int x, int y, int z);
+extern void process_mouse_move(int dx, int dy);
+extern void mouse_up(void);
+extern void mouse_down(int button);
+extern void process_key_up(int k, int s);
+extern uint32 load_sprite(char *filename);
+extern void init_ui_render(void);
+
 
 extern void process_tick_raw(float dt);
 extern int get_next_built_mesh(built_mesh *bm);
@@ -30,6 +37,8 @@ extern int get_block_rot(int x, int y, int z);
 extern void save_edits(void);
 extern void load_edits(void);
 extern void init_mesh_building(void);
+extern void do_ui_rendering_3d(void);
+extern void do_ui_rendering_2d(void);
 
 extern mesh_chunk *build_mesh_chunk_for_coord(mesh_chunk *mc, int x, int y);
 extern void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer);

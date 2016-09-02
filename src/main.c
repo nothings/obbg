@@ -36,7 +36,6 @@
 
 char *game_name = "obbg";
 
-
 #define REVERSE_DEPTH
 
 
@@ -53,10 +52,7 @@ extern int load_bitmap_to_texture_array(int slot, unsigned char *data, int w, in
 GLuint debug_tex, dumb_prog;
 GLuint voxel_tex[2];
 GLuint sprite_tex;
-int selected_block[3];
-int selected_block_to_create[3];
 int debug_render;
-Bool selected_block_valid;
 
 
 typedef struct
@@ -186,6 +182,42 @@ void add_sprite(float x, float y, float z, int id)
    s->color.z = it_color[id][2];
 }
 
+void premultiply_alpha(uint8 *pixels, int w, int h)
+{
+   int i;
+   for (i=0; i < w*h; ++i) {
+      pixels[i*4+0] = blinn_8x8(pixels[i*4+0], pixels[i*4+3]);
+      pixels[i*4+1] = blinn_8x8(pixels[i*4+1], pixels[i*4+3]);
+      pixels[i*4+2] = blinn_8x8(pixels[i*4+2], pixels[i*4+3]);
+   }
+}
+
+GLuint load_sprite(char *filename)
+{
+   int w,h;
+   GLuint tex;
+   uint8 *data;
+
+   data = stbi_load(filename, &w, &h, 0, 4);
+   assert(data != NULL);
+   premultiply_alpha(data, w, h);
+
+   glGenTextures(1, &tex);
+   glBindTexture(GL_TEXTURE_2D, tex);
+
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+   free(data);
+
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+   glGenerateMipmapEXT(GL_TEXTURE_2D);
+   return tex;
+}
+
+
 
 void render_init(void)
 {
@@ -289,18 +321,15 @@ void render_init(void)
       char *filename = stb_sprintf("data/sprites/ore.png", textures[i].filename);
       int w,h;
       uint8 *pixels = stbi_load(filename, &w, &h, 0, 4);
+      premultiply_alpha(pixels, w, h);
       if (pixels) {
-         int i;
-         for (i=0; i < w*h; ++i) {
-            pixels[i*4+0] = blinn_8x8(pixels[i*4+0], pixels[i*4+3]);
-            pixels[i*4+1] = blinn_8x8(pixels[i*4+1], pixels[i*4+3]);
-            pixels[i*4+2] = blinn_8x8(pixels[i*4+2], pixels[i*4+3]);
-         }
          load_bitmap_to_texture_array(0, pixels, w, h, 0, 1);
          free(pixels);
       } else
          assert(0);
    }
+
+   init_ui_render();
 
    #if 0
    for (i=0; i < 500; ++i) {
@@ -799,63 +828,25 @@ void draw_main(void)
    glDisable(GL_CULL_FACE);
    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-   if (1) {
-      int i;
-      vec pos[2];
-      RaycastResult result;
-      // show wireframe of currently 'selected' block
-      objspace_to_worldspace(&pos[1].x, player_id, 0,9,0);
-      pos[0] = obj[player_id].position;
-      pos[1].x += pos[0].x;
-      pos[1].y += pos[0].y;
-      pos[1].z += pos[0].z;
-      selected_block_valid = raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result);
-      if (selected_block_valid) {
-         for (i=0; i < 3; ++i) {
-            selected_block[i] = (&result.bx)[i];
-            selected_block_to_create[i] = (&result.bx)[i] + face_dir[result.face][i];
-         }
-         glColor3f(0.7f,1.0f,0.7f);
-         //stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
-         stbgl_drawBox(selected_block[0]+0.5f, selected_block[1]+0.5f, selected_block[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
-      }
-   }
+   do_ui_rendering_3d();
 
    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
    if (debug_render)
       logistics_debug_render();
 
-   if (0) {
-      glBegin(GL_LINES);
-         glColor3f(1,0,0); glVertex3f(0,0,0); glVertex3f(1,0,0);
-         glColor3f(0,1,0); glVertex3f(0,0,0); glVertex3f(0,1,0);
-         glColor3f(0,0,1); glVertex3f(0,0,0); glVertex3f(0,0,1);
-      glEnd();
-   }
-
    render_time = (end_time - start_time) / (float) SDL_GetPerformanceFrequency();
 
    glMatrixMode(GL_PROJECTION);
    glLoadIdentity();
-   gluOrtho2D(0,screen_x/2,screen_y/2,0);
+   gluOrtho2D(0,screen_x,screen_y,0);
+
+   do_ui_rendering_2d();
+
    glMatrixMode(GL_MODELVIEW);
    glLoadIdentity();
-   glDisable(GL_BLEND);
-   glDisable(GL_CULL_FACE);
-   glDisable(GL_DEPTH_TEST);
 
-   if (1) {
-      float cx = screen_x / 4.0f;
-      float cy = screen_y / 4.0f;
-      glColor3f(1,1,1);
-      glBegin(GL_LINES);
-      glVertex2f(cx-4,cy); glVertex2f(cx+4,cy);
-      glVertex2f(cx,cy-3); glVertex2f(cx,cy+3);
-      glEnd();
-   }
-
-   if (1 && debug_tex) {
+   if (debug_tex) {
       stbglUseProgram(dumb_prog);
       glDisable(GL_TEXTURE_2D);
       glEnable(GL_BLEND);
@@ -866,45 +857,15 @@ void draw_main(void)
       stbgl_drawRectTCArray(0,0,512,512,0,0,1,1, 0.0);
       stbglUseProgram(0);
    }
-
-   if (0 && debug_tex) {
-      glEnable(GL_TEXTURE_2D);
-      glBindTexture(GL_TEXTURE_2D, debug_tex);
-      glColor3f(1,1,1);
-      stbgl_drawRectTC(0,0,512,512,0,0,1,1);
-   }
    glDisable(GL_TEXTURE_2D);
+   glMatrixMode(GL_PROJECTION);
+   glLoadIdentity();
+   gluOrtho2D(0,screen_x/2,screen_y/2,0);
    draw_stats();
 
 }
 
-int block_rotation;
-int block_base = BT_conveyor;
 
-void mouse_down(int button)
-{
-   if (selected_block_valid) {
-      if (button == SDL_BUTTON_RIGHT)
-         change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty, block_rotation);
-      else if (button == SDL_BUTTON_LEFT)
-         change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block_base, block_rotation);
-   }
-}
-
-void rotate_block(void)
-{
-   int block = get_block(selected_block[0], selected_block[1], selected_block[2]);
-   if (block >= BT_placeable) {
-      int rot = get_block_rot(selected_block[0], selected_block[1], selected_block[2]);
-      rot = (rot+1) & 3;
-      block_rotation = rot;
-      change_block(selected_block[0], selected_block[1], selected_block[2], block, rot);
-   }
-}
-
-void mouse_up(void)
-{
-}
 
 #pragma warning(disable:4244; disable:4305; disable:4018)
 
@@ -967,6 +928,7 @@ int raw_level_time;
 
 float global_timer;
 int global_hack;
+int quit;
 
 int loopmode(float dt, int real, int in_client)
 {
@@ -1001,34 +963,15 @@ int loopmode(float dt, int real, int in_client)
    return 0;
 }
 
-static int quit;
-int hack_ffwd;
-
-void active_control_set(int key)
-{
-   client_player_input.buttons |= 1 << key;
-}
-
-void active_control_clear(int key)
-{
-   client_player_input.buttons &= ~(1 << key);
-}
-
-extern void update_view(float dx, float dy);
-
-void  process_sdl_mouse(SDL_Event *e)
-{
-   update_view((float) e->motion.xrel / screen_x, (float) e->motion.yrel / screen_y);
-}
-
+extern void process_key_down(int k, int s, SDL_Keymod mod);
 void process_event(SDL_Event *e)
 {
    switch (e->type) {
       case SDL_MOUSEMOTION:
-         process_sdl_mouse(e);
+         process_mouse_move(e->motion.xrel, e->motion.yrel);
          break;
       case SDL_MOUSEBUTTONDOWN:
-         mouse_down(e->button.button);
+         mouse_down(e->button.button == SDL_BUTTON_LEFT ? -1 : e->button.button == SDL_BUTTON_RIGHT ? 1 : 0);
          break;
       case SDL_MOUSEBUTTONUP:
          mouse_up();
@@ -1051,87 +994,13 @@ void process_event(SDL_Event *e)
       case SDL_KEYDOWN: {
          int k = e->key.keysym.sym;
          int s = e->key.keysym.scancode;
-         SDL_Keymod mod;
-         mod = SDL_GetModState();
-         if (k == SDLK_ESCAPE)
-            quit = 1;
-
-         if (s == SDL_SCANCODE_D)   active_control_set(0);
-         if (s == SDL_SCANCODE_A)   active_control_set(1);
-         if (s == SDL_SCANCODE_W)   active_control_set(2);
-         if (s == SDL_SCANCODE_S)   active_control_set(3);
-         if (k == SDLK_SPACE)       active_control_set(4); 
-         if (s == SDL_SCANCODE_LCTRL)   active_control_set(5);
-         if (s == SDL_SCANCODE_S)   active_control_set(6);
-         if (s == SDL_SCANCODE_D)   active_control_set(7);
-         if (s == SDL_SCANCODE_F)   client_player_input.flying = !client_player_input.flying;
-         if (s == SDL_SCANCODE_R)   rotate_block();
-         if (s == SDL_SCANCODE_M)   save_edits();
-         if (s == SDL_SCANCODE_TAB) hack_ffwd = !hack_ffwd;
-         if (k == '1') block_base = BT_conveyor;
-         if (k == '2') block_base = BT_asphalt;
-         if (k == '3') block_base = BT_conveyor_ramp_up_high;
-         if (k == '4') block_base = BT_conveyor_ramp_down_low;
-         if (k == '5') block_base = BT_conveyor_ramp_down_high;
-         if (k == '6') block_base = BT_ore_drill;
-         if (k == '7') block_base = BT_furnace;
-         if (k == '8') block_base = BT_picker;
-         if (k == '9') block_base = BT_iron_gear_maker;
-         if (k == '0') block_base = BT_stone;
-         //if (k == '6') block_base = BT_conveyor_up_east_low;
-         if (s == SDL_SCANCODE_H) global_hack = !global_hack;
-         //if (k == '2') global_hack = -1;
-         //if (k == '3') obj[player_id].position.x += 65536;
-         if (s == SDL_SCANCODE_P) debug_render = !debug_render;
-         if (s == SDL_SCANCODE_C) show_memory = !show_memory;//examine_outstanding_genchunks();
-         #if 0
-         if (s == SDL_SCANCODE_R) {
-            objspace_to_worldspace(light_vel, player_id, 0,32,0);
-            memcpy(light_pos, &obj[player_id].position, sizeof(light_pos));
-         }
-         #endif
-
-         #if 0
-         if (game_mode == GAME_editor) {
-            switch (k) {
-               case SDLK_RIGHT: editor_key(STBTE_scroll_right); break;
-               case SDLK_LEFT : editor_key(STBTE_scroll_left ); break;
-               case SDLK_UP   : editor_key(STBTE_scroll_up   ); break;
-               case SDLK_DOWN : editor_key(STBTE_scroll_down ); break;
-            }
-            switch (s) {
-               case SDL_SCANCODE_S: editor_key(STBTE_tool_select); break;
-               case SDL_SCANCODE_B: editor_key(STBTE_tool_brush ); break;
-               case SDL_SCANCODE_E: editor_key(STBTE_tool_erase ); break;
-               case SDL_SCANCODE_R: editor_key(STBTE_tool_rectangle ); break;
-               case SDL_SCANCODE_I: editor_key(STBTE_tool_eyedropper); break;
-               case SDL_SCANCODE_L: editor_key(STBTE_tool_link); break;
-               case SDL_SCANCODE_G: editor_key(STBTE_act_toggle_grid); break;
-            }
-            if ((e->key.keysym.mod & KMOD_CTRL) && !(e->key.keysym.mod & ~KMOD_CTRL)) {
-               switch (s) {
-                  case SDL_SCANCODE_X: editor_key(STBTE_act_cut  ); break;
-                  case SDL_SCANCODE_C: editor_key(STBTE_act_copy ); break;
-                  case SDL_SCANCODE_V: editor_key(STBTE_act_paste); break;
-                  case SDL_SCANCODE_Z: editor_key(STBTE_act_undo ); break;
-                  case SDL_SCANCODE_Y: editor_key(STBTE_act_redo ); break;
-               }
-            }
-         }
-         #endif
+         process_key_down(k, s, SDL_GetModState());
          break;
       }
       case SDL_KEYUP: {
          int k = e->key.keysym.sym;
          int s = e->key.keysym.scancode;
-         if (s == SDL_SCANCODE_D)   active_control_clear(0);
-         if (s == SDL_SCANCODE_A)   active_control_clear(1);
-         if (s == SDL_SCANCODE_W)   active_control_clear(2);
-         if (s == SDL_SCANCODE_S)   active_control_clear(3);
-         if (k == SDLK_SPACE)       active_control_clear(4); 
-         if (s == SDL_SCANCODE_LCTRL)   active_control_clear(5);
-         if (s == SDL_SCANCODE_S)   active_control_clear(6);
-         if (s == SDL_SCANCODE_D)   active_control_clear(7);
+         process_key_up(k,s);
          break;
       }
    }

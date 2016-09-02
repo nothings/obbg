@@ -222,6 +222,10 @@ SOURCE=..\src\u_noise.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\src\ui.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\util.c
 # End Source File
 # Begin Source File

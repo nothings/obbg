@@ -10,8 +10,11 @@ obbg:
   : networking
 
 
-Done in today's stream (40)
-   - separate iron ore and ocal
+Done in today's stream:
+
+
+Previous stream (40)
+   - separate iron ore and coal
    - tweaks & bugs
 
 Previous stream (38.2? 39?)
