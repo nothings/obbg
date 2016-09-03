@@ -97,9 +97,12 @@ Ideas:
       *  action bar
       *  MC-creative-mode select
       -  more placeholder
-      -  real inventory
-   -  belt placement UI (ghost shapes, place-and-drag, automatic rotation)
-   -  machine placement UI (ghost shapes)
+      +  real inventory
+   +  belt placement UI
+      -  ghost shapes
+      -  place-and-drag
+      -  automatic rotation
+   *  machine placement UI (ghost shapes)
    -  clean-up hacky code
       - ore
       - block edits
