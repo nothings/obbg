@@ -230,6 +230,8 @@ extern "C" {
 //     modes 0,1,20,21, Z in the mesh can extend to 511 instead
 //     of 255. However, half-height blocks cannot be used.
 //
+//  #define STBVOX_DEFAULT_COLOR       <integer>   // default color value to use if no override
+//
 // All of the following just #ifdef tested so need no values, and are optional.
 //
 //    STBVOX_CONFIG_BLOCKTYPE_SHORT
@@ -1187,6 +1189,10 @@ struct stbvox_mesh_maker
 #error "Can't store both rotation and vheight in lighting"
 #endif
 
+#ifndef STBVOX_DEFAULT_COLOR
+#define STBVOX_DEFAULT_COLOR 0
+#endif
+
 
 // The following are candidate voxel modes. Only modes 0, 1, and 20, and 21 are
 // currently implemented. Reducing the storage-per-quad further
@@ -2002,7 +2008,7 @@ static unsigned char stbvox_rotate_face[6][4] =
 
 stbvox_mesh_face stbvox_compute_mesh_face_value(stbvox_mesh_maker *mm, stbvox_rotate rot, int face, int v_off, int normal)
 {
-   stbvox_mesh_face face_data = { 0 };
+   stbvox_mesh_face face_data = { 0,0,STBVOX_DEFAULT_COLOR,0 };
    stbvox_block_type bt = mm->input.blocktype[v_off];
    unsigned char bt_face = STBVOX_ROTATE(face, rot.block);
    int facerot = rot.facerot;

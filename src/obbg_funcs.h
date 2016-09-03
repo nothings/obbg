@@ -26,6 +26,9 @@ extern void mouse_down(int button);
 extern void process_key_up(int k, int s);
 extern uint32 load_sprite(char *filename);
 extern void init_ui_render(void);
+extern void voxel_draw_block(int x, int y, int z, int blocktype);
+extern int block_has_voxel_geometry(int blocktype);
+extern int build_small_mesh(int x, int y, int z, uint8 mesh_geom[4][4][4], int num_quads, uint8* vbuf, uint8 *fbuf, float transform[3][3]);
 
 
 extern void process_tick_raw(float dt);

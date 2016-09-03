@@ -165,6 +165,7 @@ void draw_ui_row(ui_rect_row *row, int *blockcodes, int hit_item, int choice)
    x1 = x0 + row->x_size;
    glEnable(GL_TEXTURE_2D);
    glEnable(GL_BLEND);
+   glColor3f(1,1,1);
    //glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);  // it's really premultiplied alpha so should be this one
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  // but hackily this produces outlines that makes it more readable
    for (i=0; i < row->count; ++i) {
@@ -430,6 +431,16 @@ void process_key_up(int k, int s)
    if (s == SDL_SCANCODE_D)   active_control_clear(7);
 }
 
+void draw_block(int x, int y, int z, int blocktype)
+{
+   if (block_has_voxel_geometry(blocktype)) {
+      voxel_draw_block(x,y,z, blocktype);
+   } else {
+      // draw picker, animated machine, etc.
+   }
+}
+
+
 
 GLuint icon_arrow;
 void do_ui_rendering_2d(void)
@@ -441,6 +452,7 @@ void do_ui_rendering_2d(void)
    glDisable(GL_BLEND);
    glDisable(GL_CULL_FACE);
    glDisable(GL_DEPTH_TEST);
+   glDisable(GL_TEXTURE_2D);
 
    {
       float cx = screen_x / 2.0f;
@@ -503,6 +515,7 @@ void do_ui_rendering_2d(void)
       mx = mouse_x - 5;
       my = mouse_y - 6;
 
+      glColor3f(1,1,1);
       glEnable(GL_TEXTURE_2D);
       glBindTexture(GL_TEXTURE_2D, icon_arrow);
       stbgl_drawRectTC(mx,my, mx+32,my+32, 0,0,1,1);
@@ -524,13 +537,23 @@ void do_ui_rendering_3d(void)
    pos[1].z += pos[0].z;
    selected_block_valid = raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result);
    if (selected_block_valid) {
+      int block = actionbar_blocktype[block_choice];
       for (i=0; i < 3; ++i) {
          selected_block[i] = (&result.bx)[i];
          selected_block_to_create[i] = (&result.bx)[i] + face_dir[result.face][i];
       }
-      glColor3f(0.7f,1.0f,0.7f);
-      //stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
-      stbgl_drawBox(selected_block[0]+0.5f, selected_block[1]+0.5f, selected_block[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
+
+      if (block != BT_empty) {
+         //glColor3f(
+         draw_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block);
+         //stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
+      } else {
+         glColor3f(0.7f,1.0f,0.7f);
+         glDisable(GL_CULL_FACE);
+         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+         stbgl_drawBox(selected_block[0]+0.5f, selected_block[1]+0.5f, selected_block[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
+         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+      }
    }
 }
 

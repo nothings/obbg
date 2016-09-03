@@ -31,6 +31,7 @@
 //#define STBVOX_CONFIG_PREMULTIPLIED_ALPHA  // this doesn't work properly alpha test without next #define
 //#define STBVOX_CONFIG_UNPREMULTIPLY  // slower, fixes alpha test makes windows & fancy leaves look better
 #define STBVOX_CONFIG_TEXTURE_TRANSLATION
+#define STBVOX_DEFAULT_COLOR  64
 
 #define STBVOX_CONFIG_ROTATION_IN_LIGHTING
 #define STB_VOXEL_RENDER_IMPLEMENTATION
@@ -127,7 +128,10 @@ void init_mesh_building(void)
    texture_scales[0] = texture_scales[16] = texture_scales[32] = texture_scales[48] = 1.0f;
 }
 
-
+int block_has_voxel_geometry(int blocktype)
+{
+   return geom_for_blocktype[blocktype] != 0;
+}
 
 // proc gen mesh
 #define GEN_CHUNK_CACHE_X_LOG2    4
@@ -1464,6 +1468,38 @@ void update_phys_chunk(mesh_chunk *mc, int ex, int ey, int ez, int type)
    }
    arena_free_all(mc->allocs);
    mc->allocs = new_chunks;
+}
+
+#define MX   STBVOX_MAKE_LIGHTING_EXT(255,0)
+static stbvox_mesh_maker small_mm;
+
+int build_small_mesh(int x, int y, int z, uint8 mesh_geom[4][4][4], int num_quads, uint8* vbuf, uint8 *fbuf, float transform[3][3])
+{
+   static uint8 dyn_lighting[4][4][4] = { { { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX } },
+                                          { { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX } },
+                                          { { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX } },
+                                          { { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX } } };
+   stbvox_input_description *map;
+   stbvox_init_mesh_maker(&small_mm);
+   map = stbvox_get_input_description(&small_mm);
+   map->block_tex1_face = tex1_for_blocktype;
+   map->block_geometry = geom_for_blocktype;
+   map->block_vheight = vheight_for_blocktype;
+   stbvox_set_buffer(&small_mm, 0, 0, vbuf, num_quads*4*4);
+   stbvox_set_buffer(&small_mm, 0, 1, fbuf, num_quads*4);
+
+   map->blocktype = &mesh_geom[1][1][1];
+   map->lighting  = &dyn_lighting[1][1][1];
+
+   stbvox_set_input_stride(&small_mm, 4, 4*4);
+   stbvox_set_input_range(&small_mm, 0,0,0, 1,1,1);
+   stbvox_set_default_mesh(&small_mm, 0);
+   stbvox_make_mesh(&small_mm);
+
+   stbvox_set_mesh_coordinates(&small_mm, x, y, z);
+   stbvox_get_transform(&small_mm, transform);
+
+   return stbvox_get_quad_count(&small_mm, 0);
 }
 
 void generate_mesh_for_chunk_set(stbvox_mesh_maker *mm, mesh_chunk *mc, vec3i world_coord, chunk_set *chunks, size_t build_size, build_data *bd)

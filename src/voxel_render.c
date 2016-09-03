@@ -14,6 +14,29 @@
 
 #include "stb_voxel_render.h"
 
+static GLuint dyn_vbuf, dyn_fbuf, dyn_fbuf_tex;
+
+static void init_dyn_mesh(void)
+{
+   glGenBuffersARB(1, &dyn_vbuf);
+   glGenBuffersARB(1, &dyn_fbuf);
+   glGenTextures(1, &dyn_fbuf_tex);
+}
+
+static void upload_dyn_mesh(void *vertex_build_buffer, void *face_buffer, int num_quads)
+{
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, dyn_vbuf);
+   glBufferDataARB(GL_ARRAY_BUFFER_ARB, 4*4*num_quads, vertex_build_buffer, GL_DYNAMIC_DRAW_ARB);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+
+   glBindBufferARB(GL_TEXTURE_BUFFER_ARB, dyn_fbuf);
+   glBufferDataARB(GL_TEXTURE_BUFFER_ARB, 4*num_quads, face_buffer , GL_DYNAMIC_DRAW_ARB);
+   glBindBufferARB(GL_TEXTURE_BUFFER_ARB, 0);
+
+   glBindTexture(GL_TEXTURE_BUFFER_ARB, dyn_fbuf_tex);
+   glTexBufferARB(GL_TEXTURE_BUFFER_ARB, GL_RGBA8UI, dyn_fbuf);
+   glBindTexture(GL_TEXTURE_BUFFER_ARB, 0);
+}
 
 #ifdef MINIMIZE_MEMORY
 size_t mesh_cache_max_storage = 1 << 25; // 32 MB
@@ -163,6 +186,8 @@ void init_voxel_render(int voxel_tex[2])
 
    vox_tex[0] = voxel_tex[0];
    vox_tex[1] = voxel_tex[1];
+
+   init_dyn_mesh();
 }
 
 
@@ -181,7 +206,12 @@ int tex_anim_offset;
 float texture_offsets[128][2];
 float logistics_texture_scroll;
 
-void setup_uniforms(float pos[3])
+float colortable[64][4] =
+{
+   { 1,1,1,1 },
+};
+
+void setup_uniforms(float pos[3], float alpha)
 {
    int i,j;
    texture_offsets[22][0] = -logistics_texture_scroll;
@@ -232,12 +262,10 @@ void setup_uniforms(float pos[3])
                data = table4;
                break;
 
-            #if 0
             case STBVOX_UNIFORM_color_table:
-               compute_colortable();
                data = colortable;
+               colortable[0][3] = alpha;
                break;
-            #endif
 
             case STBVOX_UNIFORM_camera_pos:
                data = table3[0];
@@ -489,6 +517,7 @@ void request_mesh_generation(int cam_x, int cam_y)
    swap_requested_meshes();
 }
 
+float temp_campos[3];
 
 void render_voxel_world(float campos[3])
 {
@@ -510,12 +539,13 @@ void render_voxel_world(float campos[3])
    cam_y = (int) floor(y);
 
    request_mesh_generation(cam_x, cam_y);
+   memcpy(temp_campos, campos, sizeof(temp_campos));
 
    glEnable(GL_ALPHA_TEST);
    glAlphaFunc(GL_GREATER, 0.5);
 
    stbglUseProgram(main_prog);
-   setup_uniforms(campos); // set uniforms to default values inefficiently
+   setup_uniforms(campos, 1.0f); // set uniforms to default values inefficiently
    glActiveTextureARB(GL_TEXTURE2_ARB);
    stbglEnableVertexAttribArray(0);
 
@@ -679,3 +709,37 @@ void render_voxel_world(float campos[3])
 
    stbglUseProgram(0);
 }
+
+void voxel_draw_block(int x, int y, int z, int blocktype)
+{
+   uint32 vertex_build_buffer[96*4];
+   uint32 face_buffer[96];
+   float transform[3][3];
+
+   int num_quads;
+   uint8 mesh_geom[4][4][4] = { 0 };
+
+   mesh_geom[1][1][1] = blocktype;
+
+   num_quads = build_small_mesh(x, y, z, mesh_geom, 96, (uint8*) vertex_build_buffer, (uint8*) face_buffer, transform);
+   upload_dyn_mesh(vertex_build_buffer, face_buffer, num_quads);
+
+   glEnable(GL_BLEND);
+   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+   stbglUseProgram(main_prog);
+   setup_uniforms(temp_campos,0.4f); // set uniforms to default values inefficiently
+   glActiveTextureARB(GL_TEXTURE2_ARB);
+   stbglEnableVertexAttribArray(0);
+   stbglUniform3fv(stbgl_find_uniform(main_prog, "transform"), 3, transform[0]);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, dyn_vbuf);
+   glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, 4, (void*) 0);
+   glBindTexture(GL_TEXTURE_BUFFER_ARB, dyn_fbuf_tex);
+   glDrawArrays(GL_QUADS, 0, num_quads*4);
+   stbglUseProgram(0);
+   glActiveTextureARB(GL_TEXTURE0_ARB);
+   glBindTexture(GL_TEXTURE_BUFFER_ARB, 0);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+   stbglDisableVertexAttribArray(0);
+   glDisable(GL_BLEND);
+}
+

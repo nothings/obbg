@@ -825,12 +825,8 @@ void draw_main(void)
    end_time = SDL_GetPerformanceCounter();
 
    glDisable(GL_LIGHTING);
-   glDisable(GL_CULL_FACE);
-   glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
    do_ui_rendering_3d();
-
-   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
    if (debug_render)
       logistics_debug_render();
