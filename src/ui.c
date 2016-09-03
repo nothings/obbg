@@ -36,11 +36,11 @@ static int mouse_x, mouse_y;
 
 int actionbar_blocktype[9] =
 {
+   BT_stone, BT_asphalt,
+   BT_picker, BT_ore_drill,
    BT_conveyor,
-   // BT_conveyor_90_left, BT_conveyor_90_right,
-   //BT_conveyor_ramp_up_low, BT_conveyor_ramp_down_high, BT_splitter,
-   //BT_stone, BT_asphalt,
-   //BT_picker, BT_ore_drill,
+   BT_conveyor_90_left, BT_conveyor_90_right,
+   BT_conveyor_ramp_up_low, BT_conveyor_ramp_down_high
 };
 
 
@@ -192,7 +192,7 @@ int inventory_blocktype[3][9] =
    { BT_stone, BT_asphalt, } ,
    { BT_picker, BT_ore_drill, BT_furnace, BT_iron_gear_maker, BT_conveyor_belt_maker },
    { BT_conveyor, BT_conveyor_90_left, BT_conveyor_90_right,
-     BT_conveyor_ramp_up_low, BT_conveyor_ramp_down_high, BT_splitter, },
+     BT_conveyor_ramp_up_low, BT_conveyor_ramp_down_high, BT_splitter, BT_balancer },
 };
 
 void draw_action_bar(int hit_item)
@@ -555,6 +555,12 @@ void do_ui_rendering_3d(void)
          glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
       }
    }
+
+   {
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      draw_picker(0.4f);
+   }
 }
 
 struct
@@ -576,6 +582,7 @@ struct
    { BT_conveyor_belt_maker    , "conveyor_belt_maker" },
    { BT_picker                 , "picker"           },
    { BT_ore_drill              , "drill"            },
+   { BT_balancer               , "arrow"            },
 };
 
 void init_ui_render(void)

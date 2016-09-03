@@ -118,13 +118,15 @@ void init_mesh_building(void)
 
    geom_for_blocktype[BT_ore_drill] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_ore_eater] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
-   geom_for_blocktype[BT_picker   ] = 0;
    geom_for_blocktype[BT_splitter ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_furnace  ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_iron_gear_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    geom_for_blocktype[BT_conveyor_belt_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    set_blocktype_texture(BT_splitter, 21);
    tex1_for_blocktype[BT_splitter][FACE_up] = 22;
+
+   geom_for_blocktype[BT_picker   ] = 0;
+   geom_for_blocktype[BT_balancer ] = 0;
 
    for (i=0; i < 256; ++i)
       texture_scales[i] = 1.0f/4;// textures[i].scale;

@@ -31,6 +31,8 @@ extern int block_has_voxel_geometry(int blocktype);
 extern int build_small_mesh(int x, int y, int z, uint8 mesh_geom[4][4][4], uint8 mesh_lighting[4][4][4], int num_quads, uint8* vbuf, uint8 *fbuf, float transform[3][3]);
 extern Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot);
 extern uint8 lighting_with_rotation(int light, int rot);
+extern void draw_picker(float alpha);
+
 
 extern void process_tick_raw(float dt);
 extern int get_next_built_mesh(built_mesh *bm);

@@ -4,6 +4,7 @@
 
 in  vec3  vnormal;
 in  vec3  rpos;
+uniform vec4 recolor;
 out vec4  outcolor;
 uniform vec4  fogdata;
 
@@ -20,6 +21,7 @@ void main()
 {
    vec4 color = vec4(1.0,1.0,1.0,1.0);
    color.rgb *= (dot(vnormal, vec3(0.6,0,0.8))+1.0)/2.0f;
+   color.rgba *= recolor.rgba;
    #if 1
    outcolor.xyz = compute_fog(color.xyz, rpos);
    outcolor.a = color.a;

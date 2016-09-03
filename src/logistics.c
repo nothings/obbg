@@ -2069,6 +2069,41 @@ void logistics_tick(void)
    }
 }
 
+void draw_one_picker(int x, int y, int z, int rot, float alpha)
+{
+   float pos = 0.75;
+   vec base = { 0.35f,0.35f,0.35f };
+   float bone_state[4];
+   float len;
+
+   bone_state[1] = stb_lerp(pos, 0.5, -0.75) - base.x;
+   bone_state[2] = 0 - base.y;
+   bone_state[3] = stb_lerp(pos, 0.30, 0.50) - base.z;
+
+   len = sqrt(bone_state[1]*bone_state[1] + bone_state[2]*bone_state[2])/2;
+   len = sqrt(1*1 - len);
+   bone_state[0] = len - base.z;
+   add_draw_picker(x+0.5, y+0.5, z, rot, bone_state);
+}
+
+void draw_balancer(int x, int y, int z, int rot, float alpha)
+{
+   glColor4f(1,1,1,alpha);
+   if (alpha <= 1) {
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+   } else {
+      glDisable(GL_BLEND);
+   }
+   glPushMatrix();
+   glTranslatef(x+0.5, y+0.5, z);
+   glRotatef(90*rot, 0,0,1);
+   stbgl_drawBox(0,0,0.75, 1,1,0.5, 1);
+   glPopMatrix();
+   glDisable(GL_BLEND);
+}
+
+
 void logistics_render(void)
 {
    float offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
@@ -2431,7 +2466,12 @@ void logistics_debug_render(void)
 Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot)
 {
    switch (blocktype) {
-      ;
+      case BT_picker:
+         draw_one_picker(x,y,z,rot, 0.4f);
+         break;
+      case BT_balancer:
+         draw_balancer(x,y,z,rot, 0.4f);
+         break;
    }
    return True;
 }

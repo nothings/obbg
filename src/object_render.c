@@ -166,13 +166,15 @@ void add_draw_picker(float x, float y, float z, int rot, float states[4])
    }
 }
 
-void draw_picker(void)
+void draw_picker(float alpha)
 {
    int xform_loc  = stbgl_find_uniform(picker_prog, "xform_data");   
    int fogdata    = stbgl_find_uniform(picker_prog, "fogdata");
    int camera_pos = stbgl_find_uniform(picker_prog, "camera_pos");
+   int recolor    = stbgl_find_uniform(picker_prog, "recolor");
 
    float fog_table[4];
+   float recolor_value[4] = { 1.0,1.0,1.0,alpha };
 
    fog_table[0] = 0.6f, fog_table[1] = 0.7f, fog_table[2] = 0.9f;
    fog_table[3] = 1.0f / (view_distance - MESH_CHUNK_SIZE_X);
@@ -191,6 +193,7 @@ void draw_picker(void)
 
    stbglUniform4fv(fogdata   , 1, fog_table);
    stbglUniform3fv(camera_pos, 1, camloc);
+   stbglUniform4fv(recolor   , 1, recolor_value);
 
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, picker_vbuf);
    stbglVertexAttribPointer(0, 3, GL_FLOAT, 0, sizeof(picker_vertex), (void*) 0);

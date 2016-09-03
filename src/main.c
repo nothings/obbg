@@ -714,8 +714,6 @@ void render_sprites(void)
    stbglUseProgram(0);
 }
 
-extern void draw_picker(void);
-
 void render_objects(void)
 {
    int i;
@@ -742,7 +740,7 @@ void render_objects(void)
 
    logistics_render();
 
-   draw_picker();
+   draw_picker(1.0f);
 
    render_sprites();
 }
