@@ -431,12 +431,12 @@ void process_key_up(int k, int s)
    if (s == SDL_SCANCODE_D)   active_control_clear(7);
 }
 
-void draw_block(int x, int y, int z, int blocktype)
+void draw_block(int x, int y, int z, int blocktype, int rot)
 {
    if (block_has_voxel_geometry(blocktype)) {
-      voxel_draw_block(x,y,z, blocktype);
-   } else {
-      // draw picker, animated machine, etc.
+      voxel_draw_block(x,y,z, blocktype, rot);
+   } else if (!logistics_draw_block(x,y,z, blocktype, rot)) {
+      assert(0);
    }
 }
 
@@ -545,7 +545,7 @@ void do_ui_rendering_3d(void)
 
       if (block != BT_empty) {
          //glColor3f(
-         draw_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block);
+         draw_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block, block_rotation);
          //stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
       } else {
          glColor3f(0.7f,1.0f,0.7f);

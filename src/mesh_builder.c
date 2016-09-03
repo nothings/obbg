@@ -63,6 +63,10 @@ float texture_scales[256];
 //   -2,0   <---  thread 1
 //    6,0   <---  thread 2
 //   -2,0   <---  thread 3
+uint8 lighting_with_rotation(int light, int rot)
+{
+   return STBVOX_MAKE_LIGHTING_EXT(255,(4-rot)&3);
+}
 
 
 void init_mesh_building(void)
@@ -1470,15 +1474,10 @@ void update_phys_chunk(mesh_chunk *mc, int ex, int ey, int ez, int type)
    mc->allocs = new_chunks;
 }
 
-#define MX   STBVOX_MAKE_LIGHTING_EXT(255,0)
 static stbvox_mesh_maker small_mm;
 
-int build_small_mesh(int x, int y, int z, uint8 mesh_geom[4][4][4], int num_quads, uint8* vbuf, uint8 *fbuf, float transform[3][3])
+int build_small_mesh(int x, int y, int z, uint8 mesh_geom[4][4][4], uint8 mesh_lighting[4][4][4], int num_quads, uint8* vbuf, uint8 *fbuf, float transform[3][3])
 {
-   static uint8 dyn_lighting[4][4][4] = { { { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX } },
-                                          { { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX } },
-                                          { { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX } },
-                                          { { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX }, { MX,MX,MX,MX } } };
    stbvox_input_description *map;
    stbvox_init_mesh_maker(&small_mm);
    map = stbvox_get_input_description(&small_mm);
@@ -1489,7 +1488,7 @@ int build_small_mesh(int x, int y, int z, uint8 mesh_geom[4][4][4], int num_quad
    stbvox_set_buffer(&small_mm, 0, 1, fbuf, num_quads*4);
 
    map->blocktype = &mesh_geom[1][1][1];
-   map->lighting  = &dyn_lighting[1][1][1];
+   map->lighting  = &mesh_lighting[1][1][1];
 
    stbvox_set_input_stride(&small_mm, 4, 4*4);
    stbvox_set_input_range(&small_mm, 0,0,0, 1,1,1);

@@ -2427,3 +2427,11 @@ void logistics_debug_render(void)
       glDisable(GL_BLEND);
    }
 }
+
+Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot)
+{
+   switch (blocktype) {
+      ;
+   }
+   return True;
+}

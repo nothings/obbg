@@ -710,7 +710,7 @@ void render_voxel_world(float campos[3])
    stbglUseProgram(0);
 }
 
-void voxel_draw_block(int x, int y, int z, int blocktype)
+void voxel_draw_block(int x, int y, int z, int blocktype, int rot)
 {
    uint32 vertex_build_buffer[96*4];
    uint32 face_buffer[96];
@@ -718,10 +718,15 @@ void voxel_draw_block(int x, int y, int z, int blocktype)
 
    int num_quads;
    uint8 mesh_geom[4][4][4] = { 0 };
+   uint8 mesh_lighting[4][4][4];
+
+   uint8 light = lighting_with_rotation(255,0);
+   memset(mesh_lighting, light, sizeof(mesh_lighting));
 
    mesh_geom[1][1][1] = blocktype;
+   mesh_lighting[1][1][1] = lighting_with_rotation(255,rot);
 
-   num_quads = build_small_mesh(x, y, z, mesh_geom, 96, (uint8*) vertex_build_buffer, (uint8*) face_buffer, transform);
+   num_quads = build_small_mesh(x, y, z, mesh_geom, mesh_lighting, 96, (uint8*) vertex_build_buffer, (uint8*) face_buffer, transform);
    upload_dyn_mesh(vertex_build_buffer, face_buffer, num_quads);
 
    glEnable(GL_BLEND);
