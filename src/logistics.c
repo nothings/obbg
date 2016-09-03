@@ -2069,20 +2069,20 @@ void logistics_tick(void)
    }
 }
 
-void draw_one_picker(int x, int y, int z, int rot, float alpha)
+void draw_one_picker(int x, int y, int z, int rot, float pos, float drop_on_pickup)
 {
-   float pos = 0.75;
-   vec base = { 0.35f,0.35f,0.35f };
    float bone_state[4];
+   vec base = { 0.35f,0.35f,0.35f };
    float len;
 
    bone_state[1] = stb_lerp(pos, 0.5, -0.75) - base.x;
    bone_state[2] = 0 - base.y;
-   bone_state[3] = stb_lerp(pos, 0.30, 0.50) - base.z;
+   bone_state[3] = stb_lerp(pos, 0.30, 0.50) - base.z + drop_on_pickup;
 
    len = sqrt(bone_state[1]*bone_state[1] + bone_state[2]*bone_state[2])/2;
    len = sqrt(1*1 - len);
    bone_state[0] = len - base.z;
+
    add_draw_picker(x+0.5, y+0.5, z, rot, bone_state);
 }
 
@@ -2146,6 +2146,9 @@ void logistics_render(void)
                      switch (m->type) {
                         case BT_down_marker:
                            break;
+                        case BT_balancer:
+                           draw_balancer(base_x+m->pos.unpacked.x,base_y+m->pos.unpacked.y,base_z+m->pos.unpacked.z, m->rot, 1.0);
+                           break;
                         default:
                            glPushMatrix();
                            glTranslatef(base_x+m->pos.unpacked.x+0.5, base_y+m->pos.unpacked.y+0.5, base_z+m->pos.unpacked.z);
@@ -2199,6 +2202,11 @@ void logistics_render(void)
                         len = sqrt(1*1 - len);
                         bone_state[0] = len - base.z;
                      }
+                     //add_draw_picker(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z,
+//                                     rot, pos, drop_on_pickup);
+
+                     draw_one_picker(base_x+pi->pos.unpacked.x, base_y+pi->pos.unpacked.y, base_z+pi->pos.unpacked.z,
+                                     rot, pos, drop_on_pickup);
 
                      //0,0.25,0.20
 
@@ -2210,8 +2218,6 @@ void logistics_render(void)
                      #endif
 
 
-                     add_draw_picker(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z,
-                                     rot, bone_state);
                      #if 0
                      for (b=1; b < 500; ++b) {
                         bone_state[0] = fmod(b*0.237,0.5);
@@ -2467,7 +2473,7 @@ Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot)
 {
    switch (blocktype) {
       case BT_picker:
-         draw_one_picker(x,y,z,rot, 0.4f);
+         draw_one_picker(x,y,z,rot, 0.75, 0.0);
          break;
       case BT_balancer:
          draw_balancer(x,y,z,rot, 0.4f);

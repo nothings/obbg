@@ -740,7 +740,7 @@ void render_objects(void)
 
    logistics_render();
 
-   draw_picker(1.0f);
+   draw_pickers_flush(1.0f);
 
    render_sprites();
 }

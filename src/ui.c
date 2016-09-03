@@ -559,7 +559,7 @@ void do_ui_rendering_3d(void)
    {
       glEnable(GL_BLEND);
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-      draw_picker(0.4f);
+      draw_pickers_flush(0.4f);
    }
 }
 

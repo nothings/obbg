@@ -10,8 +10,10 @@ obbg:
   : networking
 
 
-Done in today's stream:
-
+Done in today's stream: (41)
+   - inventory select screen
+   - bind keyboard to actionbar
+   - placement ghost blocks
 
 Previous stream (40)
    - separate iron ore and coal

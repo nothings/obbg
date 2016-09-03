@@ -166,7 +166,7 @@ void add_draw_picker(float x, float y, float z, int rot, float states[4])
    }
 }
 
-void draw_picker(float alpha)
+void draw_pickers_flush(float alpha)
 {
    int xform_loc  = stbgl_find_uniform(picker_prog, "xform_data");   
    int fogdata    = stbgl_find_uniform(picker_prog, "fogdata");
