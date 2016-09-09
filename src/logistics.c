@@ -1555,46 +1555,26 @@ static void visit(belt_ref *ref)
             target.belt_id = br->target_id;
             target.cid = tc.cid;
             target.slice = tc.s;
-            assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
+            if (target.belt_id != TARGET_none) assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
             visit(&target);
          } else {
             vget_dir_chunk(&tc, beltloc.x, beltloc.y, beltloc.z, (br->dir+3)&3);
             target.belt_id = br->target_id;
             target.cid = tc.cid;
             target.slice = tc.s;
-            assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
+            if (target.belt_id != TARGET_none) assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
             visit(&target);
             vget_dir_chunk(&tc, beltloc.x, beltloc.y, beltloc.z, (br->dir+1)&3);
             target.belt_id = br->target2_id;
             target.cid = tc.cid;
             target.slice = tc.s;
-            assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
+            if (target.belt_id != TARGET_none) assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
             visit(&target);
          }
       }
       if (br->mark == M_temporary) {
          br->mark = M_permanent;
          obarr_push(sorted_ref, *ref, "/logi/tick/sorted_ref");
-      }
-
-      if (0) {
-         // this code guarantees we process continuous belts in serial order, not just
-         // topologically sorted, but it breaks the topological sort where the 'input'
-         // doesn't account for things (e.g. splitters, which don't set their targets 'input')
-         belt_ref target = *ref;
-         while (br->input_id != TARGET_none) {
-            vtarget_chunk tc;
-            vget_input_chunk(&tc,  target.slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off, target.slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off, target.cid * LOGI_CHUNK_SIZE_Z+br->z_off, br);
-            target.belt_id = br->input_id;
-            target.cid = tc.cid;
-            target.slice = tc.s;
-            assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
-            br = &c->belts[target.belt_id];
-            if (br->mark == M_permanent)
-               break;
-            br->mark = M_permanent;
-            obarr_push(sorted_ref, target, "/logi/tick/sorted_ref");
-         }
       }
    }
 }

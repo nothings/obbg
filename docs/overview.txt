@@ -10,7 +10,10 @@ obbg:
   : networking
 
 
-Done in today's stream: (41)
+Done in today's stream (42):
+   - 
+
+Previouss tream (41)
    - inventory select screen
    - bind keyboard to actionbar
    - placement ghost blocks
