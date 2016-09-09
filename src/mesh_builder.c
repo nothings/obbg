@@ -1698,15 +1698,22 @@ void shutdown_WakeableWaiter(WakeableWaiter *ww)
 }
 WakeableWaiter manager_monitor;
 
-typedef struct
+#if 0
+int get_from_queue(threadsafe_queue *tq, void *item)
 {
-   SDL_mutex *mutex;
-   unsigned char padding[64];
-   int  head,tail;
-   int count;
-   size_t itemsize;
-   uint8 *data;
-} threadsafe_queue;
+   int retval=False;
+   SDL_LockMutex(tq->mutex);
+   if (tq->head != tq->tail) {
+      memcpy(item, tq->data + tq->itemsize * tq->tail, tq->itemsize);
+      ++tq->tail;
+      if (tq->tail >= tq->count)
+         tq->tail = 0;
+      retval = True;
+   }
+   SDL_UnlockMutex(tq->mutex);
+   return retval;
+}
+#endif
 
 void init_threadsafe_queue(threadsafe_queue *tq, int count, size_t size)
 {
@@ -1730,23 +1737,6 @@ int add_to_queue(threadsafe_queue *tq, void *item)
 
    return retval;
 }
-
-#if 0
-int get_from_queue(threadsafe_queue *tq, void *item)
-{
-   int retval=False;
-   SDL_LockMutex(tq->mutex);
-   if (tq->head != tq->tail) {
-      memcpy(item, tq->data + tq->itemsize * tq->tail, tq->itemsize);
-      ++tq->tail;
-      if (tq->tail >= tq->count)
-         tq->tail = 0;
-      retval = True;
-   }
-   SDL_UnlockMutex(tq->mutex);
-   return retval;
-}
-#endif
 
 int get_from_queue_nonblocking(threadsafe_queue *tq, void *item)
 {

@@ -1053,7 +1053,28 @@ static void logistics_update_block_core(int x, int y, int z, int type, int rot, 
       logistics_update_block_core(x,y,z-1,BT_empty,0,True);
 }
 
-static uint32 logistics_ticks;
+typedef struct
+{
+   int x, y, z, type, rot;
+   Bool alloc;
+} logistics_block_update;
+static threadsafe_queue block_update_queue;
+
+static void logistics_update_block_queue_process(void)
+{
+   logistics_block_update bu;
+   while (get_from_queue_nonblocking(&block_update_queue, &bu))
+      logistics_update_block_core(bu.x, bu.y, bu.z, bu.type, bu.rot, bu.alloc);
+}
+
+static void logistics_update_block_core_queue(int x, int y, int z, int type, int rot, Bool alloc)
+{
+   logistics_block_update bu = { x,y,z,type,rot,alloc };
+   if (!add_to_queue(&block_update_queue, &bu)) {
+      error("Overflowed block update queue");
+   }
+}
+
 static uint32 logistics_long_tick;
 
 static int get_interaction_pos(belt_run *b, int x, int y, int z)
@@ -1994,7 +2015,7 @@ static void free_render_logi_chunk(render_logi_chunk *rc)
    free(rc);
 }
 
-render_logi_chunk **render_copy;
+volatile render_logi_chunk **render_copy;
 void copy_logistics_database(void)
 {
    int i,j,k;
@@ -2016,14 +2037,17 @@ void copy_logistics_database(void)
 }
 
 
+static uint32 logistics_ticks;
 extern int tex_anim_offset;
 extern int hack_ffwd;
+static SDL_sem *logistics_copy_start, *logistics_copy_done;
+
 void logistics_tick(void)
 {
    while (ore_pending != ore_processed) {
       int i;
       for (i=ore_hack[ore_processed].z1; i < ore_hack[ore_processed].z2; ++i)
-         logistics_update_block_core(ore_hack[ore_processed].x, ore_hack[ore_processed].y, i, ore_hack[ore_processed].type, 0, False);
+         logistics_update_block_core_queue(ore_hack[ore_processed].x, ore_hack[ore_processed].y, i, ore_hack[ore_processed].type, 0, False);
 
       ++ore_processed;
    }
@@ -2035,17 +2059,21 @@ void logistics_tick(void)
    ++logistics_ticks;
    tex_anim_offset = ((logistics_ticks >> 3) & 3) * 16;
 
-   if (++logistics_long_tick == LONG_TICK_LENGTH || hack_ffwd) {
-      logistics_do_long_tick();
-      logistics_long_tick = 0;
-   }
+   ++logistics_long_tick;
+   if (logistics_long_tick > LONG_TICK_LENGTH)
+      logistics_long_tick = LONG_TICK_LENGTH;
 }
 
 void logistics_render(void)
 {
-   float offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
-   copy_logistics_database();
-   logistics_render_from_copy(render_copy, offset);
+   float offset;
+   if (logistics_long_tick == LONG_TICK_LENGTH || hack_ffwd) {
+      logistics_long_tick = 0;
+      SDL_SemPost(logistics_copy_start);
+      SDL_SemWait(logistics_copy_done);
+   }
+   offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
+   logistics_render_from_copy((render_logi_chunk **) render_copy, offset);
 }
 
 // Order of operations:
@@ -2055,16 +2083,22 @@ void logistics_render(void)
 //    4. Block updates
 static int logistics_thread_main(void *data)
 {
-   data=data;
-   #if 0
+   data=0;
    for(;;) {
+      SDL_SemWait(logistics_copy_start);
+      copy_logistics_database();
+      SDL_SemPost(logistics_copy_done);
 
+      // tick!
+      logistics_do_long_tick();
+
+      // do player & non-logistics interactions with logistics contents
+
+      // process block update queue
+      logistics_update_block_queue_process();
    }
-   #endif
    return 0;
 };
-
-
 
 void logistics_init(void)
 {
@@ -2072,6 +2106,9 @@ void logistics_init(void)
    for (j=0; j < LOGI_CACHE_SIZE; ++j)
       for (i=0; i < LOGI_CACHE_SIZE; ++i)
          logi_world[j][i].slice_x = i+1;
+   logistics_copy_start = SDL_CreateSemaphore(0);
+   logistics_copy_done  = SDL_CreateSemaphore(0);
+   init_threadsafe_queue(&block_update_queue, 16384, sizeof(logistics_block_update));
    SDL_CreateThread(logistics_thread_main, "logistics thread", (void *) 0);
 }
 
@@ -2102,8 +2139,8 @@ void logistics_record_ore(int x, int y, int z1, int z2, int type)
 void logistics_update_block(int x, int y, int z, int type, int rot)
 {
    if (type == BT_conveyor_ramp_up_low) {
-      logistics_update_block_core(x,y,z, BT_down_marker, 0, True);
-      logistics_update_block_core(x,y,z-1,type,rot, True);
+      logistics_update_block_core_queue(x,y,z, BT_down_marker, 0, True);
+      logistics_update_block_core_queue(x,y,z-1,type,rot, True);
    } else
-      logistics_update_block_core(x,y,z,type,rot, True);
+      logistics_update_block_core_queue(x,y,z,type,rot, True);
 }

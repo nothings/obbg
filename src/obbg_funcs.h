@@ -2,7 +2,9 @@
 #define INCLUDE_OBBG_FUNCS_H
 
 #include "obbg_data.h"
+#include "sdl.h"
 
+extern void error(char *s);
 extern void ods(char *fmt, ...);
 extern void examine_outstanding_genchunks(void);
 extern void init_voxel_render(int voxtex[2]);
@@ -84,6 +86,22 @@ typedef struct
    int face;
 } RaycastResult;
 extern Bool raycast(float x1, float y1, float z1, float x2, float y2, float z2, RaycastResult *res);
+
+
+typedef struct
+{
+   SDL_mutex *mutex;
+   unsigned char padding[64];
+   int  head,tail;
+   int count;
+   size_t itemsize;
+   uint8 *data;
+} threadsafe_queue;
+
+extern void init_threadsafe_queue(threadsafe_queue *tq, int count, size_t size);
+extern int add_to_queue(threadsafe_queue *tq, void *item);
+extern int get_from_queue_nonblocking(threadsafe_queue *tq, void *item);
+
 
 extern objid allocate_object(void);
 extern objid allocate_player(void);
