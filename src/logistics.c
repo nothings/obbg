@@ -2041,6 +2041,7 @@ static uint32 logistics_ticks;
 extern int tex_anim_offset;
 extern int hack_ffwd;
 static SDL_sem *logistics_copy_start, *logistics_copy_done;
+static Bool logistics_on_background_thread=True;
 
 void logistics_tick(void)
 {
@@ -2069,8 +2070,14 @@ void logistics_render(void)
    float offset;
    if (logistics_long_tick == LONG_TICK_LENGTH || hack_ffwd) {
       logistics_long_tick = 0;
-      SDL_SemPost(logistics_copy_start);
-      SDL_SemWait(logistics_copy_done);
+      if (logistics_on_background_thread) {
+         SDL_SemPost(logistics_copy_start);
+         SDL_SemWait(logistics_copy_done);
+      } else {
+         logistics_do_long_tick();
+         logistics_update_block_queue_process();
+         copy_logistics_database();
+      }
    }
    offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
    logistics_render_from_copy((render_logi_chunk **) render_copy, offset);
@@ -2106,10 +2113,12 @@ void logistics_init(void)
    for (j=0; j < LOGI_CACHE_SIZE; ++j)
       for (i=0; i < LOGI_CACHE_SIZE; ++i)
          logi_world[j][i].slice_x = i+1;
-   logistics_copy_start = SDL_CreateSemaphore(0);
-   logistics_copy_done  = SDL_CreateSemaphore(0);
    init_threadsafe_queue(&block_update_queue, 16384, sizeof(logistics_block_update));
-   SDL_CreateThread(logistics_thread_main, "logistics thread", (void *) 0);
+   if (logistics_on_background_thread) {
+      logistics_copy_start = SDL_CreateSemaphore(0);
+      logistics_copy_done  = SDL_CreateSemaphore(0);
+      SDL_CreateThread(logistics_thread_main, "logistics thread", (void *) 0);
+   }
 }
 
 void logistics_record_ore(int x, int y, int z1, int z2, int type)
