@@ -1,24 +1,11 @@
 #include "obbg_funcs.h"
 #include "SDL_thread.h"
-#include "stb_gl.h"
-#include <math.h>
-#include "stb.h"
 
-#pragma warning(disable:4244)
-
-#define ITEMS_PER_BELT_SIDE   4
-#define BELT_SIDES   2
-
-enum
-{
-   RIGHT=0,
-   LEFT=1
-};
-
-#define ITEMS_PER_BELT (ITEMS_PER_BELT_SIDE * BELT_SIDES)
 
 #define TARGET_none    0x7fff
 #define TARGET_unknown 0x7ffe
+
+typedef chunk_coord logi_chunk_coord;
 
 typedef struct
 {
@@ -37,22 +24,9 @@ typedef struct
    int8  end_dz:2;            // 0 bytes             // 2
    uint8 mobile_slots[2];     // 2 bytes             // 7,7    // number of slots that can move including frontmost empty slot
    uint16 target_id;          // 2 bytes             // 16
-   uint16 target2_id;
+   uint16 target2_id;         // 2 bytes             // 16
    beltside_item *items;      // 4 bytes  (8 bytes in 64-bit)
 } belt_run; // 16 bytes
-
-typedef struct
-{
-   uint8 x_off, y_off, z_off; // 3 bytes             // 5,5,3
-   uint8 dir  ;               // 1 bytes             // 2
-   uint8 len:6;               // 1 bytes             // 5
-   int8  turn:2;              // 0 bytes             // 2
-   uint8 type:1;              // 0 bytes             // 1
-   
-} render_belt_run;
-
-#define IS_ITEM_MOBILE(br,pos,side)  \
-      ((pos) < (br)->mobile_slots[side]-1)
 
 // @TODO add type field to belt run that's large enough to have BR_turn and BR_ramp
 enum
@@ -61,16 +35,6 @@ enum
    BR_splitter,
 };
 
-
-typedef union
-{
-   struct {
-      uint16 x:6;
-      uint16 y:6;
-      uint16 z:4;
-   } unpacked;
-   uint16 packed;
-} logi_chunk_coord;
 
 #define MAX_UNIQUE_INPUTS 4
 typedef struct
@@ -143,6 +107,7 @@ typedef struct
    int slice_x,slice_y;
    logi_chunk *chunk[MAX_Z_POW2CEIL / LOGI_CHUNK_SIZE_Z];
 } logi_slice;
+
 
 #define LOGI_CACHE_SIZE   128
 
@@ -286,10 +251,6 @@ static int offset_for_side(belt_run *a, int side)
    else
       return left_offset(a);
 }
-
-// lengths for turning conveyor
-#define SHORT_SIDE  1
-#define LONG_SIDE   5
 
 static void compute_mobile_slots(belt_run *br)
 {
@@ -1092,21 +1053,8 @@ static void logistics_update_block_core(int x, int y, int z, int type, int rot, 
       logistics_update_block_core(x,y,z-1,BT_empty,0,True);
 }
 
-static int face_orig[4][2] = {
-   { 0,0 },
-   { 1,0 },
-   { 1,1 },
-   { 0,1 },
-};
-
 static uint32 logistics_ticks;
 static uint32 logistics_long_tick;
-#define LONG_TICK_LENGTH   12
-
-float logistics_animation_offset(void)
-{
-   return (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
-}
 
 static int get_interaction_pos(belt_run *b, int x, int y, int z)
 {
@@ -1884,8 +1832,14 @@ static void logistics_do_long_tick(void)
    }
 
    for (i=0; i < obarr_len(belts); ++i) {
+      #if 0 // @TODO
+      belt_ref *b = &belts[i];
+      belt_run *br = &b->slice->chunk[b->cid]->belts[b->belt_id];
+      assert(b->belt_id < obarr_len(b->slice->chunk[b->cid]->belts));
+      #else
       belt_run *br = &belts[i].slice->chunk[belts[i].cid]->belts[belts[i].belt_id];
       assert(belts[i].belt_id < obarr_len(belts[i].slice->chunk[belts[i].cid]->belts));
+      #endif
       if (br->mark == M_unmarked) {
          visit(&belts[i]);
       }
@@ -1944,6 +1898,124 @@ static void logistics_do_long_tick(void)
    sorted_ref = NULL;
 }
 
+static void copy_belt(render_belt_run *rbr, belt_run *br)
+{
+   uint i;
+   size_t max_items = ITEMS_PER_BELT*br->len;
+   size_t size = sizeof(beltside_item) * max_items;
+   rbr->items = malloc(size);
+
+   rbr->pos.unpacked.x = br->x_off;
+   rbr->pos.unpacked.y = br->y_off;
+   rbr->pos.unpacked.z = br->z_off;
+   rbr->dir = br->dir;
+   rbr->len = br->len;
+   rbr->turn = br->turn;
+   rbr->type = br->type;
+   rbr->end_dz = br->end_dz;
+   for (i=0; i < 2; ++i)
+      rbr->mobile_slots[i] = br->mobile_slots[i];
+
+   for (i=0; i < max_items; ++i)
+      rbr->items[i] = br->items[i].type;
+}
+
+static void copy_belt_machine(render_belt_machine_info *rbm, belt_machine_info *bm)
+{
+   rbm->pos = bm->pos;
+   rbm->type = bm->type;
+   rbm->rot = bm->rot;
+   rbm->state = bm->state;
+   rbm->slots[0] = bm->slots[0];
+   rbm->slots[1] = bm->slots[1];
+}
+
+static void copy_machine(render_machine_info *rm, machine_info *mi)
+{
+   rm->pos = mi->pos;
+   rm->type = mi->type;
+   rm->timer = mi->timer;
+   rm->output = mi->output;
+   rm->config = mi->config;
+   rm->uses = mi->uses;
+   rm->input_flags = mi->input_flags;
+   rm->rot = mi->rot;
+}
+
+static void copy_picker(render_picker_info *rp, picker_info *pi)
+{
+   rp->pos = pi->pos;
+   rp->type = pi->type;
+   rp->state = pi->state;
+   rp->item = pi->item;
+   rp->rot = pi->rot;
+   rp->input_is_belt = 1;
+   rp->output_is_belt = 1;
+}
+
+static render_logi_chunk *copy_logi_chunk(logi_chunk *c, int slice_x, int slice_y, int chunk_z)
+{
+   int i;
+
+   render_logi_chunk *rc;
+
+   rc = malloc(sizeof(*rc));
+   rc->slice_x = slice_x;
+   rc->slice_y = slice_y;
+   rc->chunk_z = chunk_z;
+
+   rc->num_belts         = obarr_len(c->belts);
+   rc->num_machines      = obarr_len(c->machine);
+   rc->num_belt_machines = obarr_len(c->belt_machine);
+   rc->num_pickers       = obarr_len(c->pickers);
+
+   rc->belts        = malloc(sizeof(rc->belts       [0]) * rc->num_belts        );
+   rc->machine      = malloc(sizeof(rc->machine     [0]) * rc->num_machines     );
+   rc->belt_machine = malloc(sizeof(rc->belt_machine[0]) * rc->num_belt_machines);
+   rc->pickers      = malloc(sizeof(rc->pickers     [0]) * rc->num_pickers      );
+
+   for (i=0; i < rc->num_belts        ; ++i) copy_belt        (&rc->belts       [i], &c->belts       [i]);
+   for (i=0; i < rc->num_belt_machines; ++i) copy_belt_machine(&rc->belt_machine[i], &c->belt_machine[i]);
+   for (i=0; i < rc->num_pickers      ; ++i) copy_picker      (&rc->pickers     [i], &c->pickers     [i]);
+   for (i=0; i < rc->num_machines     ; ++i) copy_machine     (&rc->machine     [i], &c->machine     [i]);
+
+   return rc;
+}
+
+static void free_render_logi_chunk(render_logi_chunk *rc)
+{
+   int i;
+   for (i=0; i < rc->num_belts; ++i)
+      free(rc->belts[i].items);
+   free(rc->belts);
+   free(rc->machine);
+   free(rc->pickers);
+   free(rc->belt_machine);
+   free(rc);
+}
+
+render_logi_chunk **render_copy;
+void copy_logistics_database(void)
+{
+   int i,j,k;
+   obarr_free(render_copy);
+   for (j=0; j < LOGI_CACHE_SIZE; ++j) {
+      for (i=0; i < LOGI_CACHE_SIZE; ++i) {
+         logi_slice *s = &logi_world[j][i];
+         if (s->slice_x != i+1) {
+            for (k=0; k < stb_arrcount(s->chunk); ++k) {
+               logi_chunk *c = s->chunk[k];
+               if (c != NULL) {
+                  render_logi_chunk *rlc = copy_logi_chunk(c, s->slice_x, s->slice_y, k);
+                  obarr_push(render_copy, rlc, "foo");
+               }
+            }
+         }
+      }
+   }
+}
+
+
 extern int tex_anim_offset;
 extern int hack_ffwd;
 void logistics_tick(void)
@@ -1967,6 +2039,13 @@ void logistics_tick(void)
       logistics_do_long_tick();
       logistics_long_tick = 0;
    }
+}
+
+void logistics_render(void)
+{
+   float offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
+   copy_logistics_database();
+   logistics_render_from_copy(render_copy, offset);
 }
 
 // Order of operations:
@@ -2028,416 +2107,3 @@ void logistics_update_block(int x, int y, int z, int type, int rot)
    } else
       logistics_update_block_core(x,y,z,type,rot, True);
 }
-
-static void draw_one_picker(int x, int y, int z, int rot, float pos, float drop_on_pickup)
-{
-   float bone_state[4];
-   vec base = { 0.35f,0.35f,0.35f };
-   float len;
-
-   bone_state[1] = stb_lerp(pos, 0.5, -0.75) - base.x;
-   bone_state[2] = 0 - base.y;
-   bone_state[3] = stb_lerp(pos, 0.30, 0.50) - base.z + drop_on_pickup;
-
-   len = sqrt(bone_state[1]*bone_state[1] + bone_state[2]*bone_state[2])/2;
-   len = sqrt(1*1 - len);
-   bone_state[0] = len - base.z;
-
-   add_draw_picker(x+0.5, y+0.5, z, rot, bone_state);
-}
-
-static void draw_balancer(int x, int y, int z, int rot, float alpha)
-{
-   glColor4f(1,1,1,alpha);
-   if (alpha <= 1) {
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-   } else {
-      glDisable(GL_BLEND);
-   }
-   glPushMatrix();
-   glTranslatef(x+0.5, y+0.5, z);
-   glRotatef(90*rot, 0,0,1);
-   stbgl_drawBox(0,0,0.75, 1,1,0.5, 1);
-   glPopMatrix();
-   glDisable(GL_BLEND);
-}
-
-void logistics_render(float offset)
-{
-   //float offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
-   int i,j,k,a,e;
-   assert(offset >= 0 && offset <= 1);
-   for (j=0; j < LOGI_CACHE_SIZE; ++j) {
-      for (i=0; i < LOGI_CACHE_SIZE; ++i) {
-         logi_slice *s = &logi_world[j][i];
-         if (s->slice_x != i+1) {
-            for (k=0; k < stb_arrcount(s->chunk); ++k) {
-               logi_chunk *c = s->chunk[k];
-               if (c != NULL) {
-                  float base_x = (float) s->slice_x * LOGI_CHUNK_SIZE_X;
-                  float base_y = (float) s->slice_y * LOGI_CHUNK_SIZE_Y;
-                  float base_z = (float) k * LOGI_CHUNK_SIZE_Z;
-                  glMatrixMode(GL_MODELVIEW);
-                  glDisable(GL_TEXTURE_2D);
-                  glColor3f(1,1,1);
-                  for (a=0; a < obarr_len(c->machine); ++a) {
-                     machine_info *m = &c->machine[a];
-                     switch (m->type) {
-                        case BT_ore_drill:
-                        case BT_ore_eater:
-                        case BT_furnace:
-                        case BT_iron_gear_maker:
-                        case BT_conveyor_belt_maker:
-                           break;
-                        default:
-                           glPushMatrix();
-                           glTranslatef(base_x+m->pos.unpacked.x+0.5, base_y+m->pos.unpacked.y+0.5, base_z+m->pos.unpacked.z);
-                           glRotatef(90*m->rot, 0,0,1);
-                           stbgl_drawBox(0,0,0.25, 1,1,0.5, 1);
-                           glPopMatrix();
-                           break;
-                     }
-                  }
-                   
-                  for (a=0; a < obarr_len(c->belt_machine); ++a) {
-                     belt_machine_info *m = &c->belt_machine[a];
-                     switch (m->type) {
-                        case BT_down_marker:
-                           break;
-                        case BT_balancer:
-                           draw_balancer(base_x+m->pos.unpacked.x,base_y+m->pos.unpacked.y,base_z+m->pos.unpacked.z, m->rot, 1.0);
-                           break;
-                        default:
-                           glPushMatrix();
-                           glTranslatef(base_x+m->pos.unpacked.x+0.5, base_y+m->pos.unpacked.y+0.5, base_z+m->pos.unpacked.z);
-                           glRotatef(90*m->rot, 0,0,1);
-                           stbgl_drawBox(0,0,0.75, 1,1,0.5, 1);
-                           glPopMatrix();
-                           break;
-                     }
-                  }
-
-                  for (a=0; a < obarr_len(c->pickers); ++a) {
-                     int b = 0;
-                     picker_info *pi = &c->pickers[a];
-                     float pos=0;
-                     float bone_state[4]= {0,0,0,0};
-                     int state = pi->state;
-                     int rot = pi->rot;
-                     float drop_on_pickup;
-                     
-
-                     if (pi->input_is_belt) {
-                        state = state^2;
-                        rot = rot^2;
-                     }
-
-                     // state = 0 -> immobile at pickup
-                     // state = 1 -> animating towards pickup
-                     // state = 2 -> immobile at dropoff
-                     // state = 3 -> animating towards dropoff
-
-                     if (state == 0) pos = 0;
-                     if (state == 1) pos = 1-offset - 1.0/LONG_TICK_LENGTH;
-                     if (state == 2) pos = 1;
-                     if (state == 3) pos = offset;
-
-                     if ((state == 1 || state == 3) && offset < 0.125)
-                        drop_on_pickup = stb_linear_remap(offset, 0,0.125, -0.15, 0);
-                     else
-                        drop_on_pickup = 0.0f;
-
-                     #if 1
-                     {
-                        vec base = { 0.35f,0.35f,0.35f };
-                        float len;
-
-                        bone_state[1] = stb_lerp(pos, 0.5, -0.75) - base.x;
-                        bone_state[2] = 0 - base.y;
-                        bone_state[3] = stb_lerp(pos, 0.30, 0.50) - base.z + drop_on_pickup;
-
-                        len = sqrt(bone_state[1]*bone_state[1] + bone_state[2]*bone_state[2])/2;
-                        len = sqrt(1*1 - len);
-                        bone_state[0] = len - base.z;
-                     }
-                     //add_draw_picker(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z,
-//                                     rot, pos, drop_on_pickup);
-
-                     draw_one_picker(base_x+pi->pos.unpacked.x, base_y+pi->pos.unpacked.y, base_z+pi->pos.unpacked.z,
-                                     rot, pos, drop_on_pickup);
-
-                     //0,0.25,0.20
-
-                     #else
-                     bone_state[0] = (state >= 2 ? 0.06f : 0.08f);
-                     bone_state[1] = stb_lerp(pos, 0.75, -0.75);
-                     bone_state[3] = 0.05f + drop_on_pickup;
-                     //bone_state[3] = (pi->state >= 2 ? 0.05f : -0.05f);
-                     #endif
-
-
-                     #if 0
-                     for (b=1; b < 500; ++b) {
-                        bone_state[0] = fmod(b*0.237,0.5);
-                        add_draw_picker(base_x+pi->pos.unpacked.x+0.5, base_y+pi->pos.unpacked.y+0.5, base_z+pi->pos.unpacked.z+b,
-                                        pi->rot, bone_state);
-                     }
-                     #endif
-
-                     #if 0
-                     glPushMatrix();
-                     glTranslatef();
-                     glRotatef(90*pi->rot, 0,0,1);
-                     stbgl_drawBox(0,0,0.5, 1.5,0.125,0.125, 1);
-                     stbgl_drawBox(stb_lerp(pos, 0.75, -0.75),0,0.5-0.125, 0.25,0.25,0.125, 1);
-                     glPopMatrix();
-                     #endif
-
-                     {
-                        float mrot[4][2][2] = {
-                           {{ 1,0,},{0,1}},
-                           {{ 0,-1,},{1,0}},
-                           {{-1,0,},{0,-1}},
-                           {{ 0,1,},{-1,0}},
-                        };
-                        float x = stb_lerp(pi->input_is_belt ? 1-pos : pos, 0.5, -0.5);
-                        float y = 0;
-                        float az = 0.25;
-                        float ax,ay;
-                        ax = mrot[pi->rot][0][0]*x + mrot[pi->rot][0][1]*y;
-                        ay = mrot[pi->rot][1][0]*x + mrot[pi->rot][1][1]*y;
-                        ax += base_x+pi->pos.unpacked.x+0.5;
-                        ay += base_y+pi->pos.unpacked.y+0.5;
-                        az += base_z+pi->pos.unpacked.z+0.175;
-                        if (pi->item != 0)
-                           add_sprite(ax, ay, az, pi->item);
-                     }
-                  }
-                  for (a=0; a < obarr_len(c->belts); ++a) {
-                     belt_run *b = &c->belts[a];
-                     if (b->turn == 0) {
-                        float z = k * LOGI_CHUNK_SIZE_Z + 1.0f + b->z_off + 0.125f;
-                        float x1 = (float) s->slice_x * LOGI_CHUNK_SIZE_X + b->x_off;
-                        float y1 = (float) s->slice_y * LOGI_CHUNK_SIZE_Y + b->y_off;
-                        float x2,y2;
-                        int len = b->len * ITEMS_PER_BELT_SIDE;
-                        int d0 = b->dir;
-                        int d1 = (d0 + 1) & 3;
-
-                        x1 += face_orig[b->dir][0];
-                        y1 += face_orig[b->dir][1];
-
-                        x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
-                        y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
-
-                        x2 = x1 + face_dir[d1][0]*(0.9f - 0.5/ITEMS_PER_BELT_SIDE);
-                        x1 = x1 + face_dir[d1][0]*(0.1f + 0.5/ITEMS_PER_BELT_SIDE);
-
-                        y2 = y1 + face_dir[d1][1]*(0.9f - 0.5/ITEMS_PER_BELT_SIDE);
-                        y1 = y1 + face_dir[d1][1]*(0.1f + 0.5/ITEMS_PER_BELT_SIDE);
-
-                        for (e=0; e < len; ++e) {
-                           float ax,ay,az;
-                           if (b->items[e+0].type != 0) {
-                              ax = x1, ay = y1, az=z;
-                              if (IS_ITEM_MOBILE(b,e,RIGHT)) {
-                                 ax += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-                                 ay += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-                                 az += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE) * offset;
-                              }
-                              add_sprite(ax, ay, az, b->items[e+0].type);
-
-                           }
-                           if (b->items[e+len].type != 0) {
-                              ax = x2, ay = y2, az=z;
-                              if (IS_ITEM_MOBILE(b,e,LEFT)) {
-                                 ax += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-                                 ay += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
-                                 az += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE) * offset;
-                              }
-                              add_sprite(ax, ay, az, b->items[e+len].type);
-                           }
-                           x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE);
-                           y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE);
-                           x2 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE);
-                           y2 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE);
-                           z += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE);
-                        }
-                     } else {
-                        float z = k * LOGI_CHUNK_SIZE_Z + 1.0f + b->z_off + 0.125f;
-                        float x1 = (float) s->slice_x * LOGI_CHUNK_SIZE_X + b->x_off;
-                        float y1 = (float) s->slice_y * LOGI_CHUNK_SIZE_Y + b->y_off;
-                        float x2,y2;
-                        float ox,oy;
-                        int d0 = b->dir;
-                        int d1 = (d0 + 1) & 3;
-                        int left_len = b->turn > 0 ? SHORT_SIDE : LONG_SIDE;
-                        int right_len = SHORT_SIDE+LONG_SIDE - left_len;
-
-                        x1 += face_orig[b->dir][0];
-                        y1 += face_orig[b->dir][1];
-
-                        ox = x1;
-                        oy = y1;
-                        if (b->turn > 0) {
-                           ox += face_dir[(b->dir+1)&3][0];
-                           oy += face_dir[(b->dir+1)&3][1];
-                        }
-
-                        x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
-                        y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
-
-                        x2 = x1 + face_dir[d1][0]*(0.9f - 0.5/ITEMS_PER_BELT_SIDE);
-                        y2 = y1 + face_dir[d1][1]*(0.9f - 0.5/ITEMS_PER_BELT_SIDE);
-
-                        x1 = x1 + face_dir[d1][0]*(0.1f + 0.5/ITEMS_PER_BELT_SIDE);
-                        y1 = y1 + face_dir[d1][1]*(0.1f + 0.5/ITEMS_PER_BELT_SIDE);
-
-                        for (e=0; e < right_len; ++e) {
-                           if (b->items[0+e].type != 0) {
-                              float bx,by,ax,ay;
-                              float ang = e, s,c;
-                              if (IS_ITEM_MOBILE(b,e,RIGHT))
-                                 ang += offset;
-                              ang = (ang / right_len) * 3.141592/2;
-                              if (b->turn > 0) ang = -ang;
-                              ax = x1-ox;
-                              ay = y1-oy;
-                              s = sin(ang);
-                              c = cos(ang);
-                              bx = c*ax + s*ay;
-                              by = -s*ax + c*ay;
-                              add_sprite(ox+bx, oy+by, z, b->items[0+e].type);
-                           }
-                        }
-                        for (e=0; e < left_len; ++e) {
-                           if (b->items[right_len+e].type != 0) {
-                              float bx,by,ax,ay;
-                              float ang = e, s,c;
-                              if (IS_ITEM_MOBILE(b,e,LEFT))
-                                 ang += offset;
-                              ang = (ang / left_len) * 3.141592/2;
-                              if (b->turn > 0) ang = -ang;
-                              ax = x2-ox;
-                              ay = y2-oy;
-                              s = sin(ang);
-                              c = cos(ang);
-                              bx = c*ax + s*ay;
-                              by = -s*ax + c*ay;
-                              add_sprite(ox+bx, oy+by, z, b->items[right_len+e].type);
-                           }
-                        }
-                     }
-                  }
-               }
-            }
-         }
-      }
-   }
-}
-
-void logistics_debug_render(void)
-{
-   int i,j,k,a;
-   for (j=0; j < LOGI_CACHE_SIZE; ++j) {
-      for (i=0; i < LOGI_CACHE_SIZE; ++i) {
-         logi_slice *s = &logi_world[j][i];
-         if (s->slice_x != i+1) {
-            float x,y;
-            for (k=0; k < stb_arrcount(s->chunk); ++k) {
-               logi_chunk *c = s->chunk[k];
-               if (c != NULL) {
-                  int base_x = s->slice_x * LOGI_CHUNK_SIZE_X;
-                  int base_y = s->slice_y * LOGI_CHUNK_SIZE_Y;
-                  int base_z = k * LOGI_CHUNK_SIZE_Z;
-                  for (a=0; a < obarr_len(c->belts); ++a) {
-                     belt_run *b = &c->belts[a];
-                     int d0 = b->dir;
-                     int d1 = (d0 + 1) & 3;
-                     float z = k * LOGI_CHUNK_SIZE_Z + 1.1f + b->z_off;
-
-                     x = (float) base_x + b->x_off;
-                     y = (float) base_y + b->y_off;
-                     x += face_orig[b->dir][0];
-                     y += face_orig[b->dir][1];
-
-                     //  +------+
-                     //  |      |
-                     //  |      |
-                     //  +------+
-                     // (0,0)
-
-                     glBegin(GL_LINE_LOOP);
-                        glColor3f(0.75,0,0);
-                        glVertex3f(x                , y                , z);
-                        glVertex3f(x+face_dir[d1][0], y+face_dir[d1][1], z);
-                        glColor3f(0.75,0.75,0);
-                        glVertex3f(x+face_dir[d1][0]+face_dir[d0][0]*b->len, y+face_dir[d1][1]+face_dir[d0][1]*b->len, z);
-                        glVertex3f(x                +face_dir[d0][0]*b->len, y                +face_dir[d0][1]*b->len, z);
-                     glEnd();
-
-                     if (b->target_id != TARGET_none) {
-                        int ex = base_x + b->x_off + b->len * face_dir[b->dir][0];
-                        int ey = base_y + b->y_off + b->len * face_dir[b->dir][1];
-                        int ez = base_z + b->z_off, is_neighbor=0;
-                        logi_chunk *c = logistics_get_chunk(ex,ey,ez,0);
-                        assert(c != NULL);
-                        if (c) {
-                           float tx,ty,tz;
-                           belt_run *t = &c->belts[b->target_id];
-                           tx = (float) (ex & ~(LOGI_CHUNK_SIZE_X-1)) + t->x_off + 0.5;
-                           ty = (float) (ey & ~(LOGI_CHUNK_SIZE_Y-1)) + t->y_off + 0.5;
-                           tz = (float) (ez & ~(LOGI_CHUNK_SIZE_Z-1)) + t->z_off + 1.2f;
-                           //tx = ex+0.5, ty = ey+0.5, tz = ez+1.2f;
-                           glBegin(GL_LINES);
-                           glVertex3f(x-face_orig[b->dir][0]+0.5+face_dir[d0][0]*(b->len-1),
-                                      y-face_orig[b->dir][1]+0.5+face_dir[d0][1]*(b->len-1),
-                                      z+0.1f);
-                           glVertex3f(tx,ty,tz);
-                           glEnd();
-                        }
-                     }
-                  }
-               }
-            }
-         }
-      }
-   }
-
-
-   if (0) {
-      vec pos = obj[player_id].position;
-      int x,y,z;
-      x = (int) floor(pos.x);
-      y = (int) floor(pos.y);
-      z = (int) floor(pos.z);
-
-      x &= ~(LOGI_CHUNK_SIZE_X-1);
-      y &= ~(LOGI_CHUNK_SIZE_Y-1);
-      z &= ~(LOGI_CHUNK_SIZE_Z-1);
-
-      glDisable(GL_TEXTURE_2D);
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-      glColor4f(0.2f,0.2f,0.2f,0.2f);
-      glDisable(GL_CULL_FACE);
-      stbgl_drawBox(x+LOGI_CHUNK_SIZE_X/2, y+LOGI_CHUNK_SIZE_Y/2, z+LOGI_CHUNK_SIZE_Z/2, LOGI_CHUNK_SIZE_X-0.125f, LOGI_CHUNK_SIZE_Y-0.125f, LOGI_CHUNK_SIZE_Z-0.125f, 0);
-      glEnable(GL_TEXTURE_2D);
-      glDisable(GL_BLEND);
-   }
-}
-
-Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot)
-{
-   switch (blocktype) {
-      case BT_picker:
-         draw_one_picker(x,y,z,rot, 0.75, 0.0);
-         break;
-      case BT_balancer:
-         draw_balancer(x,y,z,rot, 0.4f);
-         break;
-   }
-   return True;
-}
-

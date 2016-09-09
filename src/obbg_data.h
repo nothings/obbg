@@ -62,6 +62,8 @@ typedef int Bool;
 #define LOGI_CHUNK_SIZE_Y           (1 << LOGI_CHUNK_SIZE_Y_LOG2)
 #define LOGI_CHUNK_SIZE_Z           (1 << LOGI_CHUNK_SIZE_Z_LOG2)
 
+#define LONG_TICK_LENGTH   12
+
 typedef struct
 {
    int x,y,z;
@@ -76,6 +78,94 @@ typedef struct
 {
    int x0,y0,x1,y1;
 } recti;
+
+typedef union
+{
+   struct {
+      uint16 x:6;
+      uint16 y:6;
+      uint16 z:4;
+   } unpacked;
+   uint16 packed;
+} chunk_coord;
+
+typedef struct
+{
+   chunk_coord pos;
+   uint8 type;
+   uint8 state;
+   uint8 item;
+
+   uint8 rot:2;
+   uint8 input_is_belt:1;
+   uint8 output_is_belt:1;
+} render_picker_info; // 6 bytes
+
+typedef struct
+{
+   chunk_coord pos; // 2 bytes
+   uint8 type;           // 1 byte
+   uint8 timer;          // 1 byte
+
+   uint8 output;         // 1 byte
+   uint8 config;         // 1 byte
+   uint8 uses;           // 1 byte
+   uint8 input_flags:6;  // 1 byte
+   uint8 rot:2;          // 0 bytes
+} render_machine_info;  // 8 bytes
+
+typedef struct
+{
+   chunk_coord pos;   // 2
+   uint8 type;             // 1
+   uint8 rot:2;            // 1
+   uint8 state:6;          // 0
+   uint8 slots[2];         // 2
+} render_belt_machine_info;  // 6 bytes
+
+typedef struct
+{
+   chunk_coord pos;           // 2 bytes
+   uint8 dir  ;               // 1 bytes             // 2
+   uint8 len:6;               // 1 bytes             // 5
+   int8  turn:2;              // 0 bytes             // 2
+   uint8 type:1;              // 1 bytes             // 1
+   int8  end_dz:2;            // 0 bytes             // 2
+   uint8 mobile_slots[2];     // 2 bytes             // 7,7    // number of slots that can move including frontmost empty slot
+   uint8 *items;
+} render_belt_run;
+
+#define IS_ITEM_MOBILE(br,pos,side)  \
+      ((pos) < (br)->mobile_slots[side]-1)
+
+// lengths for turning conveyor
+#define SHORT_SIDE  1
+#define LONG_SIDE   5
+
+enum
+{
+   RIGHT=0,
+   LEFT=1
+};
+
+typedef struct
+{
+   int slice_x,slice_y;
+   int chunk_z;
+   int num_belts;
+   int num_machines;
+   int num_belt_machines;
+   int num_pickers;
+   render_belt_run *belts; // obarr
+   render_machine_info *machine;
+   render_belt_machine_info *belt_machine;
+   render_picker_info *pickers;
+} render_logi_chunk;
+
+#define ITEMS_PER_BELT_SIDE   4
+#define BELT_SIDES   2
+#define ITEMS_PER_BELT (ITEMS_PER_BELT_SIDE * BELT_SIDES)
+
 
 // block types
 enum

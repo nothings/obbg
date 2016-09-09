@@ -35,13 +35,14 @@ extern void mouse_relative(Bool relative);
 
 
 extern void logistics_tick(void); // move into thread
-extern void logistics_render(float animation_offset); // render from copy
+extern void logistics_render(void); // create copy and render
 extern void logistics_debug_render(void); // render from copy
 extern Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot); // doesn't access db
 extern void logistics_init(void); // create thread
 extern void logistics_record_ore(int x, int y, int z1, int z2, int type); // uses locks
 extern void logistics_update_block(int x, int y, int z, int type, int rot); // <--- queue up block changes, process in thread
 extern float logistics_animation_offset(void);
+extern void logistics_render_from_copy(render_logi_chunk **render_copy, float offset); // render from copy
 
 extern void process_tick_raw(float dt);
 extern int get_next_built_mesh(built_mesh *bm);

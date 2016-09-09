@@ -736,7 +736,7 @@ void render_objects(void)
       }
    }
 
-   logistics_render(logistics_animation_offset());
+   logistics_render();
 
    draw_pickers_flush(1.0f);
 
@@ -825,8 +825,10 @@ void draw_main(void)
 
    do_ui_rendering_3d();
 
+   #if 0
    if (debug_render)
       logistics_debug_render();
+   #endif
 
    render_time = (end_time - start_time) / (float) SDL_GetPerformanceFrequency();
 

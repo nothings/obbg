@@ -13,7 +13,7 @@ obbg:
 Done in today's stream (42):
    - 
 
-Previouss tream (41)
+Previous stream (41)
    - inventory select screen
    - bind keyboard to actionbar
    - placement ghost blocks
