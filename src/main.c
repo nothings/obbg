@@ -426,7 +426,7 @@ void update_view(float dx, float dy)
    pending_view_x -= dy*700;
 }
 
-float render_time;
+float render_time, tick_time;
 
 int screen_x, screen_y;
 int is_synchronous_debug;
@@ -439,8 +439,6 @@ int chunk_storage_rendered, chunk_storage_considered, chunk_storage_total;
 int view_dist_for_display;
 int num_threads_active, num_meshes_started, num_meshes_uploaded;
 float chunk_server_activity;
-
-static Uint64 start_time, end_time; // render time
 
 float chunk_server_status[32];
 int chunk_server_pos;
@@ -565,7 +563,7 @@ void draw_stats(void)
    stb_easy_font_spacing(-0.75);
    pos_y = 10;
    text_color[0] = text_color[1] = text_color[2] = 1.0f;
-   print("Frame time: %6.2fms, CPU frame render time: %5.2fms", frame_time*1000, render_time*1000);
+   print("Frame time: %6.2fms, CPU frame render time: %5.2fms , CPU tick time: %5.2fms", frame_time*1000, render_time*1000, tick_time*1000);
    print("Tris: %4.1fM drawn of %4.1fM in range", 2*quads_rendered/1000000.0f, 2*quads_considered/1000000.0f);
    print("Mesh data: requested in-cache %dMB, total in cache %dMB", mesh_cache_requested_in_use >> 20, c_mesh_cache_in_use >> 20);
    if (debug_render) {
@@ -756,6 +754,7 @@ int face_dir[6][3] = {
 
 void draw_main(void)
 {
+   Uint64 start_time, end_time; // render time
    glEnable(GL_CULL_FACE);
    glDisable(GL_TEXTURE_2D);
    glDisable(GL_LIGHTING);
@@ -926,6 +925,7 @@ int quit;
 
 int loopmode(float dt, int real, int in_client)
 {
+   Uint64 start_time, end_time;
    if (!initialized) return 0;
 
    if (!real)
@@ -950,7 +950,10 @@ int loopmode(float dt, int real, int in_client)
       carried_dt -= 1.0/TICKRATE;
    }
 
+   start_time = SDL_GetPerformanceCounter();
    process_tick(dt);
+   end_time = SDL_GetPerformanceCounter();
+   tick_time = (end_time - start_time) / (float) SDL_GetPerformanceFrequency();
 
    draw();
 
@@ -1036,6 +1039,15 @@ void enable_synchronous(void)
 {
    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
    is_synchronous_debug = 1;
+}
+
+static cur_mouse_relative = True;
+void mouse_relative(Bool relative)
+{
+   if (relative != cur_mouse_relative) {
+      SDL_SetRelativeMouseMode(relative ? SDL_TRUE : SDL_FALSE);
+      cur_mouse_relative = relative;
+   }
 }
 
 //extern void prepare_threads(void);

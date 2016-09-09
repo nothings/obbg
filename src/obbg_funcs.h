@@ -32,6 +32,7 @@ extern int build_small_mesh(int x, int y, int z, uint8 mesh_geom[4][4][4], uint8
 extern Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot);
 extern uint8 lighting_with_rotation(int light, int rot);
 extern void draw_pickers_flush(float alpha);
+extern void mouse_relative(Bool relative);
 
 
 extern void process_tick_raw(float dt);

@@ -359,6 +359,8 @@ void process_key_down(int k, int s, SDL_Keymod mod)
          compute_ui_inventory();
          first_mouse = True;
       }
+
+      mouse_relative(ui_screen == UI_SCREEN_none);
    }
 
    if (ui_screen != UI_SCREEN_none && first_mouse) {

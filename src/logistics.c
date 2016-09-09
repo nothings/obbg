@@ -148,7 +148,7 @@ stb_define_hash_base(STB_noprefix, stb_uidict, STB_nofields, stb_uidict_,stb_uid
               return stb_rehash_improved(k);,
               void *,STB_nullvalue,NULL)
 
-stb_uidict *uidict;
+static stb_uidict *uidict;
 
 typedef struct
 {
@@ -156,35 +156,10 @@ typedef struct
    int x,y;
 } ore_hack_info;
 
-ore_hack_info ore_hack[500000];
-ore_hack_info *next_ohi = ore_hack;
+static ore_hack_info ore_hack[500000];
+static ore_hack_info *next_ohi = ore_hack;
 
-int ore_processed, ore_pending, ore_count;
-
-extern SDL_mutex *ore_update_mutex;
-void logistics_record_ore(int x, int y, int z1, int z2, int type)
-{
-   ore_hack_info *ohi;
-   SDL_LockMutex(ore_update_mutex);
-   if (uidict == NULL) uidict = stb_uidict_create();
-
-   if (ore_count++ <= 2000) {
-      ohi = stb_uidict_get(uidict, y*65536+x);
-      if (ohi == NULL) {
-         ++ore_pending;
-         ohi = next_ohi++;//malloc(sizeof(*ohi));
-         ohi->x = x;
-         ohi->y = y;
-         ohi->z1 = z1;
-         ohi->z2 = z2;
-         ohi->type = type;
-         ohi->padding = 0;
-         stb_uidict_add(uidict, y*65536+x, ohi);
-      }
-   }
-
-   SDL_UnlockMutex(ore_update_mutex);
-}
+static int ore_processed, ore_pending, ore_count;
 
 
 //   4K x 4K
@@ -195,7 +170,7 @@ void logistics_record_ore(int x, int y, int z1, int z2, int type)
 
 static logi_slice logi_world[LOGI_CACHE_SIZE][LOGI_CACHE_SIZE];
 
-logi_chunk *logistics_get_chunk(int x, int y, int z, logi_slice **r_s)
+static logi_chunk *logistics_get_chunk(int x, int y, int z, logi_slice **r_s)
 {
    int slice_x = x >> LOGI_CHUNK_SIZE_X_LOG2;
    int slice_y = y >> LOGI_CHUNK_SIZE_Y_LOG2;
@@ -243,6 +218,7 @@ static void logistics_create_slice(logi_slice *s, int x, int y)
    s->slice_y = y;
 }
 
+extern SDL_mutex *ore_update_mutex;
 static logi_chunk *logistics_get_chunk_alloc(int x, int y, int z)
 {
    int slice_x = x >> LOGI_CHUNK_SIZE_X_LOG2;
@@ -360,7 +336,7 @@ static void split_belt_raw(belt_run *a, belt_run *b, int num_a)
    obarr_setlen(a->items, a->len * ITEMS_PER_BELT, "/logi/beltrun/array");
 }
 
-int does_belt_intersect(belt_run *a, int x, int y, int z)
+static int does_belt_intersect(belt_run *a, int x, int y, int z)
 {
    if (a->z_off == z) {
       switch (a->dir) {
@@ -385,7 +361,7 @@ int does_belt_intersect(belt_run *a, int x, int y, int z)
    return 0;
 }
 
-void split_belt(int x, int y, int z, int dir)
+static void split_belt(int x, int y, int z, int dir)
 {
    logi_chunk *c = get_chunk(x,y,z);
    int i, pos;
@@ -489,39 +465,14 @@ void split_belt(int x, int y, int z, int dir)
    }
 }
 
-void destroy_belt_raw(logi_chunk *c, int belt_id)
+static void destroy_belt_raw(logi_chunk *c, int belt_id)
 {
    belt_run *b = &c->belts[belt_id];
    obarr_free(b->items);
    obarr_fastdelete(c->belts, belt_id);
 }
 
-#if 0
-#error "this all needs to be cleaned up to use simpler, more comprehensible logic"
-
-void cleanup_input_pointers_to_belt_run(logi_chunk *c, int x, int y, int z, int belt_id)
-{
-   belt_run *b = &c->belts[belt_id];
-   if (b->target_id != TARGET_none) {
-      target_chunk tc;
-      belt_run *tbr;
-      int dir = (b->dir + b->turn);
-      int ex = b->x_off + b->len * face_dir[dir][0];
-      int ey = b->y_off + b->len * face_dir[dir][1];
-      int ez = b->z_off + b->end_dz;
-      get_target_chunk(&tc, x,y,z, b);
-      assert(b->target_id < obarr_len(tc.c->belts);
-      tbr = &tc.c->belts[b->target_id];
-      if (tbr->dir == ((b->dir+b->turn)&3) && ex == (tc.off_x + tbr->x_off) && ey == (tc.off_y + tbr->y_off) && ez == (tc.off_z + tbr->z_off)) {
-         if (tbr->input_id == belt_id) {
-            tbr->input_id = TARGET_none;
-         }
-      }
-   }
-}
-#endif
-
-void destroy_belt(int x, int y, int z)
+static void destroy_belt(int x, int y, int z)
 {
    logi_chunk *c = get_chunk(x,y,z);
    int i;
@@ -538,7 +489,7 @@ void destroy_belt(int x, int y, int z)
    }
 }
 
-int merge_run(logi_chunk *c, int belt_i, int belt_j)
+static int merge_run(logi_chunk *c, int belt_i, int belt_j)
 {
    belt_run *a = &c->belts[belt_i];
    belt_run *b = &c->belts[belt_j];
@@ -575,7 +526,7 @@ int merge_run(logi_chunk *c, int belt_i, int belt_j)
       return belt_i;
 }
 
-void create_ramp(int x, int y, int z, int dir, int dz)
+static void create_ramp(int x, int y, int z, int dir, int dz)
 {
    logi_chunk *c = get_chunk(x,y,z);
    belt_run nb;
@@ -594,7 +545,7 @@ void create_ramp(int x, int y, int z, int dir, int dz)
    obarr_push(c->belts, nb, "/logi/beltlist");
 }
 
-void create_splitter(int x, int y, int z, int dir)
+static void create_splitter(int x, int y, int z, int dir)
 {
    logi_chunk *c = get_chunk(x,y,z);
    belt_run nb;
@@ -614,7 +565,7 @@ void create_splitter(int x, int y, int z, int dir)
    obarr_push(c->belts, nb, "/logi/beltlist");
 }
 
-void destroy_ramp_or_turn(int x, int y, int z)
+static void destroy_ramp_or_turn(int x, int y, int z)
 {
    logi_chunk *c = get_chunk(x,y,z);
    int i;
@@ -630,7 +581,7 @@ void destroy_ramp_or_turn(int x, int y, int z)
    }
 }
 
-void create_turn(int x, int y, int z, int dir, int turn)
+static void create_turn(int x, int y, int z, int dir, int turn)
 {
    logi_chunk *c = get_chunk(x,y,z);
    belt_run nb;
@@ -650,7 +601,7 @@ void create_turn(int x, int y, int z, int dir, int turn)
 }
 
 // if there is already a belt there, it is one-long
-void create_belt(logi_chunk *c, int x, int y, int z, int dir)
+static void create_belt(logi_chunk *c, int x, int y, int z, int dir)
 {
    int i, j;
    belt_run *a;
@@ -715,7 +666,7 @@ static logi_chunk_coord coord(int x, int y, int z)
    return lcc;
 }
 
-void create_picker(int x, int y, int z, int type, int rot)
+static void create_picker(int x, int y, int z, int type, int rot)
 {
    logi_chunk *c = get_chunk(x,y,z);
    int ox = LOGI_CHUNK_MASK_X(x);
@@ -728,7 +679,7 @@ void create_picker(int x, int y, int z, int type, int rot)
    obarr_push(c->pickers, pi, "/logi/pickerlist");
 }
 
-void destroy_picker(int x, int y, int z)
+static void destroy_picker(int x, int y, int z)
 {
    logi_chunk *c = get_chunk(x,y,z);
    int ox = LOGI_CHUNK_MASK_X(x);
@@ -744,7 +695,7 @@ void destroy_picker(int x, int y, int z)
    }
 }
 
-int find_ore(int x, int y, int z)
+static int find_ore(int x, int y, int z)
 {
    logi_chunk *c = get_chunk(x,y,z);
    int ox = LOGI_CHUNK_MASK_X(x);
@@ -758,7 +709,7 @@ int find_ore(int x, int y, int z)
    return -1;
 }
 
-void create_machine(int x, int y, int z, int type, int rot, int bx, int by, int bz)
+static void create_machine(int x, int y, int z, int type, int rot, int bx, int by, int bz)
 {
    logi_chunk *c = get_chunk(x,y,z);
    int ox = LOGI_CHUNK_MASK_X(x);
@@ -787,7 +738,7 @@ void create_machine(int x, int y, int z, int type, int rot, int bx, int by, int 
    }
 }
 
-void create_belt_machine(int x, int y, int z, int type, int rot, int bx, int by, int bz)
+static void create_belt_machine(int x, int y, int z, int type, int rot, int bx, int by, int bz)
 {
    logi_chunk *c = get_chunk(x,y,z);
    int ox = LOGI_CHUNK_MASK_X(x);
@@ -872,7 +823,7 @@ static int get_machine_id(int x, int y, int z)
 // @TODO what happens if we point a conveyor at the side of a turn
 // @TODO make all functions returning belt_id return TARGET_none
 
-int get_belt_id(int x, int y, int z, int dir)
+static int get_belt_id(int x, int y, int z, int dir)
 {
    int j;
    logi_chunk *d = get_chunk(x,y,z);
@@ -901,7 +852,7 @@ int get_belt_id(int x, int y, int z, int dir)
    return TARGET_none;
 }
 
-void logistics_update_chunk(int x, int y, int z)
+static void logistics_update_chunk(int x, int y, int z)
 {
    logi_chunk *c = get_chunk(x,y,z);
    if (c != NULL) {
@@ -1057,7 +1008,7 @@ void logistics_update_chunk(int x, int y, int z)
 //  
 //
 
-void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool alloc)
+static void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool alloc)
 {
    logi_chunk *c = alloc ? logistics_get_chunk_alloc(x,y,z) : logistics_get_chunk(x,y,z,0);
    int ox = LOGI_CHUNK_MASK_X(x);
@@ -1145,16 +1096,7 @@ void logistics_update_block_core(int x, int y, int z, int type, int rot, Bool al
       logistics_update_block_core(x,y,z-1,BT_empty,0,True);
 }
 
-void logistics_update_block(int x, int y, int z, int type, int rot)
-{
-   if (type == BT_conveyor_ramp_up_low) {
-      logistics_update_block_core(x,y,z, BT_down_marker, 0, True);
-      logistics_update_block_core(x,y,z-1,type,rot, True);
-   } else
-      logistics_update_block_core(x,y,z,type,rot, True);
-}
-
-int face_orig[4][2] = {
+static int face_orig[4][2] = {
    { 0,0 },
    { 1,0 },
    { 1,1 },
@@ -1166,18 +1108,6 @@ static uint32 logistics_long_tick;
 #define LONG_TICK_LENGTH   12
 
 #pragma warning(disable:4244)
-void logistics_init(void)
-{
-   int i,j;
-   for (j=0; j < LOGI_CACHE_SIZE; ++j)
-      for (i=0; i < LOGI_CACHE_SIZE; ++i)
-         logi_world[j][i].slice_x = i+1;
-}
-
-// 7 6 5 4 3 2 1 0
-// X X . . X X . .
-// X X . X X . . .
-// X X X X . . . .
 
 static int get_interaction_pos(belt_run *b, int x, int y, int z)
 {
@@ -1218,7 +1148,7 @@ static belt_run *get_belt_run_in_direction(int x, int y, int z, int dir, int id,
    return &c->belts[id];
 }
 
-void check(belt_run *br)
+static void check(belt_run *br)
 {
    int i;
    for (i=0; i < obarr_len(br->items); ++i)
@@ -1242,9 +1172,9 @@ void check(belt_run *br)
 //   O  O
 //   O  O <- X X X X [1]
 //   O  O
-void add_item_to_belt_pos(belt_run *b, int slot, int side, int pos, int type);
+static void add_item_to_belt_pos(belt_run *b, int slot, int side, int pos, int type);
 
-vec3i get_belt_target(int x, int y, int z, belt_run *br, int side)
+static vec3i get_belt_target(int x, int y, int z, belt_run *br, int side)
 {
    if (br->type == BR_normal) {
       return get_target(x,y,z,br);
@@ -1260,7 +1190,7 @@ vec3i get_belt_target(int x, int y, int z, belt_run *br, int side)
    }
 }
 
-void logistics_belt_tick(int x, int y, int z, belt_run *br)
+static void logistics_belt_tick(int x, int y, int z, belt_run *br)
 {
    int side;
    for (side = 0; side < 2; ++side) {
@@ -1377,7 +1307,7 @@ void logistics_belt_tick(int x, int y, int z, belt_run *br)
    }
 }
 
-void logistics_belt_compute_mobility(int x, int y, int z, belt_run *br)
+static void logistics_belt_compute_mobility(int x, int y, int z, belt_run *br)
 {
    int side;
    for (side = 0; side < 2; ++side) {
@@ -1579,10 +1509,7 @@ static void visit(belt_ref *ref)
    }
 }
 
-extern int selected_block[3];
-extern int sort_order_for_selected_belt;
-
-int offset_for_slot(belt_run *b, int slot)
+static int offset_for_slot(belt_run *b, int slot)
 {
    int left_off = left_offset(b);
    if (slot < left_off)
@@ -1591,7 +1518,7 @@ int offset_for_slot(belt_run *b, int slot)
       return left_off;
 }
 
-void remove_item_from_belt(belt_run *b, int slot)
+static void remove_item_from_belt(belt_run *b, int slot)
 {
    int side,pos, offset;
    assert(slot < obarr_len(b->items));
@@ -1601,7 +1528,7 @@ void remove_item_from_belt(belt_run *b, int slot)
    pos = slot - offset;
 }
 
-Bool try_remove_item_from_belt(belt_run *b, int slot, int type1, int type2)
+static Bool try_remove_item_from_belt(belt_run *b, int slot, int type1, int type2)
 {
    assert(slot < obarr_len(b->items));
    if (b->items[slot].type == type1 || b->items[slot].type == type2) {
@@ -1611,21 +1538,21 @@ Bool try_remove_item_from_belt(belt_run *b, int slot, int type1, int type2)
       return False;
 }
 
-void add_item_to_belt(belt_run *b, int slot, int type)
+static void add_item_to_belt(belt_run *b, int slot, int type)
 {
    assert(slot < obarr_len(b->items));
    assert(b->items[slot].type == 0);
    b->items[slot].type = type;
 }
 
-void add_item_to_belt_pos(belt_run *b, int slot, int side, int pos, int type)
+static void add_item_to_belt_pos(belt_run *b, int slot, int side, int pos, int type)
 {
    assert(slot < obarr_len(b->items));
    assert(b->items[slot].type == 0);
    b->items[slot].type = type;
 }
 
-Bool try_add_item_to_belt(belt_run *b, int slot, int type)
+static Bool try_add_item_to_belt(belt_run *b, int slot, int type)
 {
    assert(slot < obarr_len(b->items));
    if (b->items[slot].type == 0) {
@@ -1635,7 +1562,7 @@ Bool try_add_item_to_belt(belt_run *b, int slot, int type)
       return False;
 }
 
-belt_run *find_belt_slot_for_picker(int belt_id, int ix, int iy, int iz, int rot, int *slot)
+static belt_run *find_belt_slot_for_picker(int belt_id, int ix, int iy, int iz, int rot, int *slot)
 {
    logi_chunk *d = logistics_get_chunk(ix, iy, iz, 0);
    belt_run *b = &d->belts[belt_id];
@@ -1687,7 +1614,7 @@ static int input_count_table[][4] =
 
 };
 
-int output_types[][4] =
+static int output_types[][4] =
 {
    { 0 },
    { 0 },
@@ -1697,7 +1624,7 @@ int output_types[][4] =
    { IT_conveyor_belt },
 };
 
-void compute_free_input(Bool slot_free[4], machine_info *mi)
+static void compute_free_input(Bool slot_free[4], machine_info *mi)
 {
    //   2 2 1 1
    int slot_used[4], i;
@@ -1710,7 +1637,7 @@ void compute_free_input(Bool slot_free[4], machine_info *mi)
       slot_free[i] = (slot_used[i] < input_count_table[mi->type-BT_machines][i]);
 }
 
-void add_one_input(machine_info *mi, int i)
+static void add_one_input(machine_info *mi, int i)
 {
    if (i == 0) mi->input_flags += 1;
    if (i == 1) mi->input_flags += 1 << 2;
@@ -1718,7 +1645,7 @@ void add_one_input(machine_info *mi, int i)
    if (i == 3) mi->input_flags += 1 << 5;
 }
 
-Bool allow_picker_for_machine(picker_info *pi, machine_info *mi, int item)
+static Bool allow_picker_for_machine(picker_info *pi, machine_info *mi, int item)
 {
    int i;
    int *input_types = input_type_table[mi->type - BT_machines];
@@ -1735,7 +1662,7 @@ Bool allow_picker_for_machine(picker_info *pi, machine_info *mi, int item)
    return False;
 }
 
-void move_from_picker_to_machine(picker_info *pi, machine_info *mi)
+static void move_from_picker_to_machine(picker_info *pi, machine_info *mi)
 {
    int i;
    int *input_types = input_type_table[mi->type - BT_machines];
@@ -1761,7 +1688,7 @@ void move_from_picker_to_machine(picker_info *pi, machine_info *mi)
    }
 }
 
-void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, int base_z)
+static void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, int base_z)
 {
    int m;
    int i;
@@ -1937,7 +1864,10 @@ void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int base_y, in
    }
 }
 
-void logistics_do_long_tick(void)
+extern int selected_block[3];
+extern int sort_order_for_selected_belt;
+
+static void logistics_do_long_tick(void)
 {
    int i,j,k,m;
    belt_ref *belts = NULL;
@@ -2049,7 +1979,25 @@ void logistics_tick(void)
    }
 }
 
-void draw_one_picker(int x, int y, int z, int rot, float pos, float drop_on_pickup)
+// Order of operations:
+//    1. Copy
+//    2. Tick
+//    3. Belt & machine contents updates
+//    4. Block updates
+static int logistics_thread_main(void *data)
+{
+   data=data;
+   #if 0
+   for(;;) {
+
+   }
+   #endif
+   return 0;
+};
+
+
+
+static void draw_one_picker(int x, int y, int z, int rot, float pos, float drop_on_pickup)
 {
    float bone_state[4];
    vec base = { 0.35f,0.35f,0.35f };
@@ -2066,7 +2014,7 @@ void draw_one_picker(int x, int y, int z, int rot, float pos, float drop_on_pick
    add_draw_picker(x+0.5, y+0.5, z, rot, bone_state);
 }
 
-void draw_balancer(int x, int y, int z, int rot, float alpha)
+static void draw_balancer(int x, int y, int z, int rot, float alpha)
 {
    glColor4f(1,1,1,alpha);
    if (alpha <= 1) {
@@ -2461,3 +2409,46 @@ Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot)
    }
    return True;
 }
+
+void logistics_init(void)
+{
+   int i,j;
+   for (j=0; j < LOGI_CACHE_SIZE; ++j)
+      for (i=0; i < LOGI_CACHE_SIZE; ++i)
+         logi_world[j][i].slice_x = i+1;
+   SDL_CreateThread(logistics_thread_main, "logistics thread", (void *) 0);
+}
+
+void logistics_record_ore(int x, int y, int z1, int z2, int type)
+{
+   ore_hack_info *ohi;
+   SDL_LockMutex(ore_update_mutex);
+   if (uidict == NULL) uidict = stb_uidict_create();
+
+   if (ore_count++ <= 2000) {
+      ohi = stb_uidict_get(uidict, y*65536+x);
+      if (ohi == NULL) {
+         ++ore_pending;
+         ohi = next_ohi++;//malloc(sizeof(*ohi));
+         ohi->x = x;
+         ohi->y = y;
+         ohi->z1 = z1;
+         ohi->z2 = z2;
+         ohi->type = type;
+         ohi->padding = 0;
+         stb_uidict_add(uidict, y*65536+x, ohi);
+      }
+   }
+
+   SDL_UnlockMutex(ore_update_mutex);
+}
+
+void logistics_update_block(int x, int y, int z, int type, int rot)
+{
+   if (type == BT_conveyor_ramp_up_low) {
+      logistics_update_block_core(x,y,z, BT_down_marker, 0, True);
+      logistics_update_block_core(x,y,z-1,type,rot, True);
+   } else
+      logistics_update_block_core(x,y,z,type,rot, True);
+}
+
