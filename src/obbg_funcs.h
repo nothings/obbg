@@ -29,11 +29,19 @@ extern void init_ui_render(void);
 extern void voxel_draw_block(int x, int y, int z, int blocktype, int rot);
 extern int block_has_voxel_geometry(int blocktype);
 extern int build_small_mesh(int x, int y, int z, uint8 mesh_geom[4][4][4], uint8 mesh_lighting[4][4][4], int num_quads, uint8* vbuf, uint8 *fbuf, float transform[3][3]);
-extern Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot);
 extern uint8 lighting_with_rotation(int light, int rot);
 extern void draw_pickers_flush(float alpha);
 extern void mouse_relative(Bool relative);
 
+
+extern void logistics_tick(void); // move into thread
+extern void logistics_render(float animation_offset); // render from copy
+extern void logistics_debug_render(void); // render from copy
+extern Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot); // doesn't access db
+extern void logistics_init(void); // create thread
+extern void logistics_record_ore(int x, int y, int z1, int z2, int type); // uses locks
+extern void logistics_update_block(int x, int y, int z, int type, int rot); // <--- queue up block changes, process in thread
+extern float logistics_animation_offset(void);
 
 extern void process_tick_raw(float dt);
 extern int get_next_built_mesh(built_mesh *bm);
@@ -56,7 +64,6 @@ extern mesh_chunk *get_physics_chunk_for_coord(int x, int y);
 extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3]);
 extern void build_picker(void);
 extern void add_draw_picker(float x, float y, float z, int rot, float states[4]);
-extern void logistics_record_ore(int x, int y, int z1, int z2, int type);
 extern void finished_caching_mesh_chunk(int x, int y, Bool needs_triangles);
 
 extern void physics_process_mesh_chunk(mesh_chunk *mc);
@@ -67,11 +74,6 @@ extern void change_block(int x, int y, int z, int type, int rot);
 extern void update_phys_chunk(mesh_chunk *mc, int x, int y, int z, int type);
 extern void free_phys_chunk(mesh_chunk *mc);
 extern void update_physics_cache(int x, int y, int z, int type, int rot);
-extern void logistics_update_block(int x, int y, int z, int type, int rot);
-extern void logistics_init(void);
-extern void logistics_tick(void);
-extern void logistics_debug_render(void);
-extern void logistics_render(void);
 extern void add_sprite(float x, float y, float z, int id);
 extern void stop_manager(void);
 

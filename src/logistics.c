@@ -1,7 +1,10 @@
 #include "obbg_funcs.h"
+#include "SDL_thread.h"
 #include "stb_gl.h"
 #include <math.h>
-#include "SDL_thread.h"
+#include "stb.h"
+
+#pragma warning(disable:4244)
 
 #define ITEMS_PER_BELT_SIDE   4
 #define BELT_SIDES   2
@@ -32,13 +35,21 @@ typedef struct
    uint8 type:1;              // 0 bytes             // 1
    uint8 mark:2;              // 0 bytes             // 2
    int8  end_dz:2;            // 0 bytes             // 2
-   int8  input_dz:2;          // 0 bytes             // 2
    uint8 mobile_slots[2];     // 2 bytes             // 7,7    // number of slots that can move including frontmost empty slot
    uint16 target_id;          // 2 bytes             // 16
    uint16 target2_id;
-   uint16 input_id;           // 2 bytes
    beltside_item *items;      // 4 bytes  (8 bytes in 64-bit)
 } belt_run; // 16 bytes
+
+typedef struct
+{
+   uint8 x_off, y_off, z_off; // 3 bytes             // 5,5,3
+   uint8 dir  ;               // 1 bytes             // 2
+   uint8 len:6;               // 1 bytes             // 5
+   int8  turn:2;              // 0 bytes             // 2
+   uint8 type:1;              // 0 bytes             // 1
+   
+} render_belt_run;
 
 #define IS_ITEM_MOBILE(br,pos,side)  \
       ((pos) < (br)->mobile_slots[side]-1)
@@ -424,7 +435,6 @@ static void split_belt(int x, int y, int z, int dir)
       f.y_off = y;
       f.z_off = z;
       f.target_id = TARGET_unknown;
-      f.input_id = TARGET_none;
       f.end_dz = 0;
       f.turn = 0;
 
@@ -437,7 +447,6 @@ static void split_belt(int x, int y, int z, int dir)
       g.y_off = y + face_dir[dir][1];
       g.z_off = z;
       g.target_id = TARGET_unknown;
-      g.input_id = TARGET_none;
       g.end_dz = 0;
       g.turn = 0;
 
@@ -514,7 +523,6 @@ static int merge_run(logi_chunk *c, int belt_i, int belt_j)
 
    a->len += b->len;
    a->target_id = TARGET_unknown;
-   a->input_id = TARGET_none;
 
    // delete b
    destroy_belt_raw(c, belt_j);
@@ -538,7 +546,6 @@ static void create_ramp(int x, int y, int z, int dir, int dz)
    nb.turn = 0;
    nb.items = NULL;
    nb.end_dz = dz;
-   nb.input_id = TARGET_none;
    nb.target_id = TARGET_unknown;
    obarr_setlen(nb.items, ITEMS_PER_BELT*nb.len, "/logi/beltrun/array");
    memset(nb.items, 0, sizeof(nb.items[0]) * obarr_len(nb.items));
@@ -557,7 +564,6 @@ static void create_splitter(int x, int y, int z, int dir)
    nb.dir = dir;
    nb.turn = 0;
    nb.items = NULL;
-   nb.input_id = TARGET_none;
    nb.target_id = TARGET_unknown;
    nb.target2_id = TARGET_unknown;
    obarr_setlen(nb.items, ITEMS_PER_BELT*nb.len, "/logi/beltrun/array");
@@ -593,7 +599,6 @@ static void create_turn(int x, int y, int z, int dir, int turn)
    nb.turn = turn;
    nb.items = NULL;
    nb.end_dz = 0;
-   nb.input_id = TARGET_none;
    nb.target_id = TARGET_unknown;
    obarr_setlen(nb.items, ITEMS_PER_BELT*nb.len, "/logi/beltrun/array");
    memset(nb.items, 0, sizeof(nb.items[0]) * obarr_len(nb.items));
@@ -653,7 +658,6 @@ static void create_belt(logi_chunk *c, int x, int y, int z, int dir)
    }
 
    c->belts[i].target_id = TARGET_unknown;
-   c->belts[i].input_id = TARGET_none;
    compute_mobile_slots(&c->belts[i]);
 }
 
@@ -884,10 +888,6 @@ static void logistics_update_chunk(int x, int y, int z)
                   if (d->belts[j].dir == outdir || (d->belts[j].turn==0 && d->belts[j].end_dz==0)) {
                      if (does_belt_intersect(&d->belts[j], ex,ey,ez)) {
                         b->target_id = j;
-                        if (d->belts[j].dir == outdir) {
-                           d->belts[j].input_id = i;
-                           d->belts[j].input_dz = b->end_dz;
-                        }
                         break;
                      }
                   }
@@ -916,10 +916,6 @@ static void logistics_update_chunk(int x, int y, int z)
                      if (d->belts[j].dir == outdir || (d->belts[j].turn==0 && d->belts[j].end_dz==0)) {
                         if (does_belt_intersect(&d->belts[j], ex,ey,ez)) {
                            b->target2_id = j;
-                           if (d->belts[j].dir == outdir) {
-                              d->belts[j].input_id = i;
-                              d->belts[j].input_dz = b->end_dz;
-                           }
                            break;
                         }
                      }
@@ -1107,7 +1103,10 @@ static uint32 logistics_ticks;
 static uint32 logistics_long_tick;
 #define LONG_TICK_LENGTH   12
 
-#pragma warning(disable:4244)
+float logistics_animation_offset(void)
+{
+   return (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
+}
 
 static int get_interaction_pos(belt_run *b, int x, int y, int z)
 {
@@ -1303,7 +1302,7 @@ static void logistics_belt_tick(int x, int y, int z, belt_run *br)
 
       if (global_hack && (stb_rand() % 10 < 2))
          if (br->items[start].type == 0 && stb_rand() % 9 < 2)
-            br->items[start].type = stb_rand() % 4;
+            br->items[start].type = (uint8) (stb_rand() % 4);
    }
 }
 
@@ -1444,15 +1443,6 @@ static void vget_target_chunk(vtarget_chunk *tc, int x, int y, int z, belt_run *
    int ey = target.y;
    int ez = target.z;
    logistics_get_chunk(target.x,target.y,target.z, &tc->s);
-   tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
-}
-
-static void vget_input_chunk(vtarget_chunk *tc, int x, int y, int z, belt_run *br)
-{
-   int ex = x - face_dir[br->dir][0];
-   int ey = y - face_dir[br->dir][1];
-   int ez = z - br->input_dz;
-   logistics_get_chunk(ex,ey,ez, &tc->s);
    tc->cid = ez >> LOGI_CHUNK_SIZE_Z_LOG2;
 }
 
@@ -1997,6 +1987,48 @@ static int logistics_thread_main(void *data)
 
 
 
+void logistics_init(void)
+{
+   int i,j;
+   for (j=0; j < LOGI_CACHE_SIZE; ++j)
+      for (i=0; i < LOGI_CACHE_SIZE; ++i)
+         logi_world[j][i].slice_x = i+1;
+   SDL_CreateThread(logistics_thread_main, "logistics thread", (void *) 0);
+}
+
+void logistics_record_ore(int x, int y, int z1, int z2, int type)
+{
+   ore_hack_info *ohi;
+   SDL_LockMutex(ore_update_mutex);
+   if (uidict == NULL) uidict = stb_uidict_create();
+
+   if (ore_count++ <= 2000) {
+      ohi = stb_uidict_get(uidict, y*65536+x);
+      if (ohi == NULL) {
+         ++ore_pending;
+         ohi = next_ohi++;//malloc(sizeof(*ohi));
+         ohi->x = x;
+         ohi->y = y;
+         ohi->z1 = z1;
+         ohi->z2 = z2;
+         ohi->type = type;
+         ohi->padding = 0;
+         stb_uidict_add(uidict, y*65536+x, ohi);
+      }
+   }
+
+   SDL_UnlockMutex(ore_update_mutex);
+}
+
+void logistics_update_block(int x, int y, int z, int type, int rot)
+{
+   if (type == BT_conveyor_ramp_up_low) {
+      logistics_update_block_core(x,y,z, BT_down_marker, 0, True);
+      logistics_update_block_core(x,y,z-1,type,rot, True);
+   } else
+      logistics_update_block_core(x,y,z,type,rot, True);
+}
+
 static void draw_one_picker(int x, int y, int z, int rot, float pos, float drop_on_pickup)
 {
    float bone_state[4];
@@ -2031,10 +2063,9 @@ static void draw_balancer(int x, int y, int z, int rot, float alpha)
    glDisable(GL_BLEND);
 }
 
-
-void logistics_render(void)
+void logistics_render(float offset)
 {
-   float offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
+   //float offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
    int i,j,k,a,e;
    assert(offset >= 0 && offset <= 1);
    for (j=0; j < LOGI_CACHE_SIZE; ++j) {
@@ -2408,47 +2439,5 @@ Bool logistics_draw_block(int x, int y, int z, int blocktype, int rot)
          break;
    }
    return True;
-}
-
-void logistics_init(void)
-{
-   int i,j;
-   for (j=0; j < LOGI_CACHE_SIZE; ++j)
-      for (i=0; i < LOGI_CACHE_SIZE; ++i)
-         logi_world[j][i].slice_x = i+1;
-   SDL_CreateThread(logistics_thread_main, "logistics thread", (void *) 0);
-}
-
-void logistics_record_ore(int x, int y, int z1, int z2, int type)
-{
-   ore_hack_info *ohi;
-   SDL_LockMutex(ore_update_mutex);
-   if (uidict == NULL) uidict = stb_uidict_create();
-
-   if (ore_count++ <= 2000) {
-      ohi = stb_uidict_get(uidict, y*65536+x);
-      if (ohi == NULL) {
-         ++ore_pending;
-         ohi = next_ohi++;//malloc(sizeof(*ohi));
-         ohi->x = x;
-         ohi->y = y;
-         ohi->z1 = z1;
-         ohi->z2 = z2;
-         ohi->type = type;
-         ohi->padding = 0;
-         stb_uidict_add(uidict, y*65536+x, ohi);
-      }
-   }
-
-   SDL_UnlockMutex(ore_update_mutex);
-}
-
-void logistics_update_block(int x, int y, int z, int type, int rot)
-{
-   if (type == BT_conveyor_ramp_up_low) {
-      logistics_update_block_core(x,y,z, BT_down_marker, 0, True);
-      logistics_update_block_core(x,y,z-1,type,rot, True);
-   } else
-      logistics_update_block_core(x,y,z,type,rot, True);
 }
 

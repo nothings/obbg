@@ -736,7 +736,7 @@ void render_objects(void)
       }
    }
 
-   logistics_render();
+   logistics_render(logistics_animation_offset());
 
    draw_pickers_flush(1.0f);
 
