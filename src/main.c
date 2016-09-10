@@ -1046,10 +1046,12 @@ void enable_synchronous(void)
 static cur_mouse_relative = True;
 void mouse_relative(Bool relative)
 {
+   #if 0
    if (relative != cur_mouse_relative) {
       SDL_SetRelativeMouseMode(relative ? SDL_TRUE : SDL_FALSE);
       cur_mouse_relative = relative;
    }
+   #endif
 }
 
 //extern void prepare_threads(void);

@@ -178,6 +178,10 @@ SOURCE=..\src\logistics.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\src\logistics_render.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\src\main.c
 # End Source File
 # Begin Source File

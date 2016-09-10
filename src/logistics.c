@@ -1535,23 +1535,6 @@ static belt_run *find_belt_slot_for_picker(int belt_id, int ix, int iy, int iz, 
    return b;
 }
 
-enum
-{
-   IT_empty,
-   IT_coal,
-   IT_iron_ore,
-   IT_copper_ore,
-   IT_ore_4,
-   IT_ore_5,
-   IT_ore_6,
-   IT_ore_7,
-   IT_iron_bar,
-   IT_iron_gear,
-   IT_steel_plate,
-   IT_conveyor_belt,
-   IT_conveyor_belt_ramp
-};
-
 static int input_type_table[][4] =
 {
    { 0,0,0,0 }, // BT_machines

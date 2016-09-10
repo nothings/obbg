@@ -204,6 +204,37 @@ enum
    BT_no_change=255,
 };
 
+enum
+{
+   IT_empty,
+   IT_asphalt,
+   IT_stone,
+   IT_coal,
+   IT_iron_ore,
+   IT_copper_ore,
+   IT_ore_4,
+   IT_ore_5,
+   IT_ore_6,
+   IT_ore_7,
+   IT_iron_bar,
+   IT_iron_gear,
+   IT_steel_plate,
+   IT_conveyor_belt,
+   IT_conveyor_ramp_up_low,
+   IT_conveyor_ramp_up_high,
+   IT_conveyor_ramp_down_low,
+   IT_conveyor_ramp_down_high,
+   IT_picker,
+   IT_conveyor_90_left,
+   IT_conveyor_90_right,
+   IT_ore_drill,
+   IT_furnace,
+   IT_iron_gear_maker,
+   IT_conveyor_belt_maker,
+   IT_splitter,
+   IT_balancer,
+};
+
 
 enum {
    FACE_east,

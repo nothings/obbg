@@ -3,11 +3,14 @@
 #define STB_GLEXT_DECLARE "glext_list.h"
 #include "stb_gl.h"
 
+Bool creative = False;
+
 #pragma warning(disable:4305; disable:4244)
 enum
 {
    UI_SCREEN_none,
-   UI_SCREEN_select
+   UI_SCREEN_select,
+   UI_SCREEN_inventory,
 };
 int ui_screen=UI_SCREEN_none;
 
@@ -76,6 +79,7 @@ typedef struct
 } ui_rect_row;
 
 int sprite_for_blocktype[256];
+int sprite_for_itemtype[256];
 
 void get_coordinates(ui_rect_row *row, int item, int *x, int *y)
 {
@@ -128,7 +132,7 @@ int hit_detect_row(ui_rect_row *row, recti *box)
    return best_i;
 }
 
-void draw_ui_row(ui_rect_row *row, int *blockcodes, int hit_item, int choice)
+void draw_ui_row(ui_rect_row *row, int *blockcodes, int *itemcodes, int hit_item, int choice, int hide)
 {
    int i;
    int x_advance = row->x_size + row->x_spacing;
@@ -168,9 +172,17 @@ void draw_ui_row(ui_rect_row *row, int *blockcodes, int hit_item, int choice)
    glColor3f(1,1,1);
    //glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);  // it's really premultiplied alpha so should be this one
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  // but hackily this produces outlines that makes it more readable
+
    for (i=0; i < row->count; ++i) {
-      if (blockcodes != NULL) {
-         int sprite = sprite_for_blocktype[blockcodes[i]];
+      if (hide != i) {
+         int sprite=0;
+         if (blockcodes != NULL)
+            sprite = sprite_for_blocktype[blockcodes[i]];
+         else if (itemcodes != NULL)
+            sprite = sprite_for_itemtype[itemcodes[i]];
+         else
+            assert(0);
+
          if (sprite != 0) {
             glBindTexture(GL_TEXTURE_2D, sprite);
             glBegin(GL_QUADS);
@@ -185,9 +197,10 @@ void draw_ui_row(ui_rect_row *row, int *blockcodes, int hit_item, int choice)
 }
 
 ui_rect_row ui_actionbar[1];
-ui_rect_row ui_inventory[3];
+ui_rect_row ui_select[3];
+ui_rect_row ui_inventory[4];
 
-int inventory_blocktype[3][9] =
+int select_blocktype[3][9] =
 {
    { BT_stone, BT_asphalt, } ,
    { BT_picker, BT_ore_drill, BT_furnace, BT_iron_gear_maker, BT_conveyor_belt_maker },
@@ -195,9 +208,18 @@ int inventory_blocktype[3][9] =
      BT_conveyor_ramp_up_low, BT_conveyor_ramp_down_high, BT_splitter, BT_balancer },
 };
 
+static int inventory_item[4][9] =
+{
+   { IT_stone, IT_asphalt, } ,
+   { IT_picker, IT_ore_drill, IT_furnace, IT_iron_gear_maker, IT_conveyor_belt_maker },
+   { IT_conveyor_belt, IT_conveyor_90_left, IT_conveyor_90_right,
+     IT_conveyor_ramp_up_low, IT_conveyor_ramp_down_high, IT_splitter, IT_balancer },
+   { 0 },
+};
+
 void draw_action_bar(int hit_item)
 {
-   draw_ui_row(ui_actionbar, actionbar_blocktype, hit_item, block_choice);
+   draw_ui_row(ui_actionbar, actionbar_blocktype, NULL, hit_item, block_choice, -1);
 }
 
 float left_x_to_center_contents_of_width(float size)
@@ -221,6 +243,31 @@ void compute_ui_actionbar(void)
    rr->x_base = left_x_to_center_contents_of_width(rr->x_size * rr->count + rr->x_spacing*(rr->count-1));
 }
 
+void compute_ui_select(void)
+{
+   int i;
+   ui_rect_row *rr;
+   int y_spacing = 8;
+   int y_size = 90;
+   int advance = y_size + y_spacing;
+
+   for (i=0; i < 3; ++i) {
+      ui_select[i].x_size = 90;
+      ui_select[i].y_size = y_size;
+      ui_select[i].x_spacing = 8;
+      ui_select[i].count = 9;
+   }
+
+   rr = &ui_select[0];
+   ui_select[1].x_base =
+   ui_select[2].x_base =
+   rr->x_base = left_x_to_center_contents_of_width(rr->x_size * rr->count + rr->x_spacing*(rr->count-1));
+
+   rr->y_base = top_y_to_center_contents_of_height(rr->y_size * 3 + y_spacing*2);
+   ui_select[1].y_base = ui_select[0].y_base + advance;
+   ui_select[2].y_base = ui_select[1].y_base + advance;
+}
+
 void compute_ui_inventory(void)
 {
    int i;
@@ -241,42 +288,140 @@ void compute_ui_inventory(void)
    ui_inventory[2].x_base = 
    rr->x_base = left_x_to_center_contents_of_width(rr->x_size * rr->count + rr->x_spacing*(rr->count-1));
 
-   rr->y_base = top_y_to_center_contents_of_height(rr->y_size * 3 + y_spacing*2);
+   rr->y_base = top_y_to_center_contents_of_height(rr->y_size * 5 + y_spacing*2);
    ui_inventory[1].y_base = ui_inventory[0].y_base + advance;
    ui_inventory[2].y_base = ui_inventory[1].y_base + advance;
+
+   rr = &ui_inventory[3];
+   rr->x_size = 70;
+   rr->y_size = 70;
+   rr->x_spacing = 12;
+   rr->count = 9;
+   rr->y_base = screen_y - rr->y_size;
+   rr->x_base = left_x_to_center_contents_of_width(rr->x_size * rr->count + rr->x_spacing*(rr->count-1));
 }
 
 static Bool dragging = False;
 static int mouse_drag_offset_x, mouse_drag_offset_y;
-static int drag_item;
+static int drag_item, drag_from_row, drag_from_column, drag_from_screen, drag_sprite;
+static ui_rect_row *drag_type;
+static int drag_distance_x, drag_distance_y;
 
-int blocktype_mouse_is_over(void)
+
+static int blocktype_mouse_is_over(void)
 {
    int j;
    for (j=0; j < 3; ++j) {
-      int hit = hit_detect_row(&ui_inventory[j], NULL);
+      int hit = hit_detect_row(&ui_select[j], NULL);
       if (hit >= 0) {
-         return inventory_blocktype[j][hit];
+         return select_blocktype[j][hit];
       }
    }
    return -1;
 }
 
+static Bool hit_detect_grid(ui_rect_row *rows, int num_rows, int *x, int *y, recti *box)
+{
+   int i,j;
+   for (j=0; j < num_rows; ++j) {
+      i = hit_detect_row(&rows[j], box);
+      if (i >= 0) {
+         *x = i;
+         *y = j;
+         return True;
+      }
+   }
+   return False;
+}
+
+static void compute_drag_shape(recti *shape, ui_rect_row *rr)
+{
+   shape->x0 = mouse_drag_offset_x;
+   shape->y0 = mouse_drag_offset_y;
+   shape->x1 = shape->x0 + rr->x_size;
+   shape->y1 = shape->y0 + rr->y_size;
+}
+
+static void inventory_mode_drop_item(void)
+{
+   int i,j;
+   Bool hit;
+   recti shape;
+   compute_drag_shape(&shape, &ui_inventory[drag_from_row]);
+   if (ui_screen == UI_SCREEN_inventory) {
+      hit = hit_detect_grid(ui_inventory, 4, &i, &j, &shape);
+   } else {
+      hit = hit_detect_grid(&ui_inventory[3], 1, &i, &j, &shape);
+      j = 3;
+   }
+   if (!hit)
+      dragging = False;
+   else if (i == drag_from_column && j == drag_from_row)
+      dragging = False;
+   else {
+      int temp;
+      if (inventory_item[j][i] == IT_empty)
+         dragging = False;
+      temp = inventory_item[j][i];
+      inventory_item[j][i] = inventory_item[drag_from_row][drag_from_column];
+      inventory_item[drag_from_row][drag_from_column] = temp;
+      drag_sprite = sprite_for_itemtype[inventory_item[drag_from_row][drag_from_column]];
+      drag_distance_x = 0;
+      drag_distance_y = 0;
+   }
+}
+int blocktype_for_itemtype[256];
+
 void mouse_down(int button)
 {
-   dragging = False;
+   #if 0
+   if (dragging) {
+      switch (drag_from_screen) {
+         case UI_SCREEN_select:
+            dragging = False;
+            break;
+         case UI_SCREEN_inventory: {
+            inventory_mode_drop_item();
+            break;
+         }
+      }
+   }
+   #endif
    switch (ui_screen) {
       case UI_SCREEN_select: {
-         int j;
-         for (j=0; j < 3; ++j) {
-            int hit = hit_detect_row(&ui_inventory[j], NULL);
-            if (hit >= 0) {
+         int i,j;
+         if (!dragging && hit_detect_grid(&ui_select[0], 3, &i, &j, NULL)) {
+            if (select_blocktype[j][i] != BT_empty) {
                int x,y;
                dragging = True;
-               get_coordinates(&ui_inventory[j], hit, &x,&y);
+               drag_type = ui_select;
+               get_coordinates(&ui_select[j], i, &x,&y);
                mouse_drag_offset_x = x - mouse_x;
                mouse_drag_offset_y = y - mouse_y;
-               drag_item = inventory_blocktype[j][hit];
+               drag_item = select_blocktype[j][i];
+               drag_sprite = sprite_for_blocktype[drag_item];
+               drag_from_screen = ui_screen;
+            }
+         }
+         break;
+      }
+
+      case UI_SCREEN_inventory: {
+         int i,j;
+         if (!dragging && hit_detect_grid(&ui_inventory[0], 4, &i, &j, NULL)) {
+            if (inventory_item[j][i] != IT_empty) {
+               int x,y;
+               dragging = True;
+               drag_type = &ui_inventory[j];
+               get_coordinates(&ui_inventory[j], i, &x,&y);
+               mouse_drag_offset_x = x - mouse_x;
+               mouse_drag_offset_y = y - mouse_y;
+               drag_from_row = j;
+               drag_from_column = i;
+               drag_from_screen = ui_screen;
+               drag_sprite = sprite_for_itemtype[inventory_item[j][i]];
+               drag_distance_x = 0;
+               drag_distance_y = 0;
             }
          }
          break;
@@ -287,7 +432,12 @@ void mouse_down(int button)
             if (button == 1)
                change_block(selected_block[0], selected_block[1], selected_block[2], BT_empty, block_rotation);
             else if (button == -1) {
-               int block = actionbar_blocktype[block_choice];
+               int block;
+               if (creative)
+                  block = actionbar_blocktype[block_choice];
+               else
+                  block = blocktype_for_itemtype[inventory_item[3][block_choice]];
+
                if (block != BT_empty)
                   change_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block, block_rotation);
             }
@@ -296,21 +446,27 @@ void mouse_down(int button)
    }
 }
 
+Bool did_drag(void)
+{
+   return drag_distance_x + drag_distance_y >= 10;
+}
 
 void mouse_up(void)
 {
    if (dragging) {
-      int hit;
-      recti shape;
-      shape.x0 = mouse_drag_offset_x;
-      shape.y0 = mouse_drag_offset_y;
-      shape.x1 = shape.x0 + ui_inventory[0].x_size;
-      shape.y1 = shape.y0 + ui_inventory[0].y_size;
-      hit = hit_detect_row(ui_actionbar, &shape);
-      if (hit >= 0) {
-         actionbar_blocktype[hit] = drag_item;
+      if (drag_from_screen == UI_SCREEN_select) {
+         int hit;
+         recti shape;
+         compute_drag_shape(&shape, ui_select);
+         hit = hit_detect_row(ui_actionbar, &shape);
+         if (hit >= 0) {
+            actionbar_blocktype[hit] = drag_item;
+         }
+         dragging = False;
+      } else if (drag_from_screen == UI_SCREEN_inventory) {
+         if (did_drag())
+            inventory_mode_drop_item();
       }
-      dragging = False;
    }
 }
 
@@ -321,6 +477,11 @@ static Bool first_mouse=True;
 void  process_mouse_move(int dx, int dy)
 {
    if (ui_screen != UI_SCREEN_none) {
+      if (dragging) {
+         drag_distance_x += abs(dx);
+         drag_distance_y += abs(dy);
+      }
+
       mouse_x += dx*2;
       mouse_y += dy*2;
       mouse_x = stb_clamp(mouse_x, 0, screen_x);
@@ -355,8 +516,12 @@ void process_key_down(int k, int s, SDL_Keymod mod)
       if (ui_screen != UI_SCREEN_none) {
          ui_screen = UI_SCREEN_none;
       } else {
-         ui_screen = UI_SCREEN_select;
-         compute_ui_inventory();
+         if (creative) {
+            ui_screen = UI_SCREEN_select;
+            compute_ui_select();
+         } else {
+            ui_screen = UI_SCREEN_inventory;
+         }
          first_mouse = True;
       }
 
@@ -442,8 +607,6 @@ void draw_block(int x, int y, int z, int blocktype, int rot)
    }
 }
 
-
-
 GLuint icon_arrow;
 void do_ui_rendering_2d(void)
 {
@@ -473,23 +636,43 @@ void do_ui_rendering_2d(void)
          glColor3f(0.7,0.7,0.7);
          //stbgl_drawRect(screen_x*1.0/4.0, screen_y*1.0/4.0, screen_x*3.0/4.0, screen_y*3.0/4.0);
          for (j=0; j < 3; ++j) {
-            int ihit = dragging ? -1 : hit_detect_row(&ui_inventory[j], NULL);
-            draw_ui_row(&ui_inventory[j], &inventory_blocktype[j][0], ihit, -1);
+            int ihit = dragging ? -1 : hit_detect_row(&ui_select[j], NULL);
+            draw_ui_row(&ui_select[j], &select_blocktype[j][0], NULL, ihit, -1, -1);
          }
          hit = -1;
          if (dragging) {
             recti shape;
-            shape.x0 = mouse_drag_offset_x;
-            shape.y0 = mouse_drag_offset_y;
-            shape.x1 = shape.x0 + ui_inventory[0].x_size;
-            shape.y1 = shape.y0 + ui_inventory[0].y_size;
+            compute_drag_shape(&shape, drag_type);
             hit = hit_detect_row(&ui_actionbar[0], &shape);
          }
          draw_action_bar(hit);
          break;
       }
       case UI_SCREEN_none: {
-         draw_action_bar(-1);
+         if (creative)
+            draw_action_bar(-1);
+         else {
+            draw_ui_row(&ui_inventory[3], NULL, inventory_item[3], -1, -1, -1); // @TODO compute second to last value
+         }
+         break;
+      }
+      case UI_SCREEN_inventory: {
+         int j, hit_i, hit_j;
+         Bool drag_hit=False;
+         if (dragging) {
+            recti shape;
+            compute_drag_shape(&shape, drag_type);
+            drag_hit = hit_detect_grid(ui_inventory, 4, &hit_i, &hit_j, &shape);
+         } else
+            drag_hit = hit_detect_grid(ui_inventory, 4, &hit_i, &hit_j, NULL);
+
+         for (j=0; j < 4; ++j) {
+            draw_ui_row(&ui_inventory[j], NULL, inventory_item[j],
+                drag_hit && j==hit_j ? hit_i : -1, // hit item
+                j==3 ? block_choice : -1,// choice
+                dragging && j==drag_from_row ? drag_from_column : -1// hide
+            );
+         }
          break;
       }
    }
@@ -505,13 +688,13 @@ void do_ui_rendering_2d(void)
 
          glDisable(GL_TEXTURE_2D);
          glColor4f(0.3,0.3,0.3,0.3);
-         stbgl_drawRect(mx,my, mx+ui_inventory[0].x_size,my+ui_inventory[0].y_size);
+         stbgl_drawRect(mx,my, mx+drag_type->x_size,my+drag_type->y_size);
 
          glEnable(GL_TEXTURE_2D);
-         glBindTexture(GL_TEXTURE_2D, sprite_for_blocktype[drag_item]);
+         glBindTexture(GL_TEXTURE_2D, drag_sprite);
          glColor3f(1,1,1);
          glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // hack to get outline
-         stbgl_drawRectTC(mx,my, mx+ui_inventory[0].x_size,my+ui_inventory[0].y_size, 0,0,1,1);
+         stbgl_drawRectTC(mx,my, mx+drag_type->x_size,my+drag_type->y_size, 0,0,1,1);
       }
 
       mx = mouse_x - 5;
@@ -539,7 +722,11 @@ void do_ui_rendering_3d(void)
    pos[1].z += pos[0].z;
    selected_block_valid = raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result);
    if (selected_block_valid) {
-      int block = actionbar_blocktype[block_choice];
+      int block;
+      if (creative)
+         block = actionbar_blocktype[block_choice];
+      else
+         block = blocktype_for_itemtype[inventory_item[3][block_choice]];
       for (i=0; i < 3; ++i) {
          selected_block[i] = (&result.bx)[i];
          selected_block_to_create[i] = (&result.bx)[i] + face_dir[result.face][i];
@@ -591,8 +778,39 @@ void init_ui_render(void)
 {
    int i;
    icon_arrow = load_sprite("data/sprites/icon_arrow.png");
+   compute_ui_inventory();
 
    for (i=0; i < sizeof(sprite_filenames)/sizeof(sprite_filenames[0]); ++i)
       sprite_for_blocktype[sprite_filenames[i].blocktype] = load_sprite(stb_sprintf("data/sprites/icon_%s.png", sprite_filenames[i].sprite_name));
 
+   blocktype_for_itemtype[IT_asphalt]                 = BT_asphalt;
+   blocktype_for_itemtype[IT_stone]                   = BT_stone;
+   //blocktype_for_itemtype[IT_coal]                    = ;
+   //blocktype_for_itemtype[IT_iron_ore]                = ;
+   //blocktype_for_itemtype[IT_copper_ore]              = ;
+   //blocktype_for_itemtype[IT_ore_4]                   = ;
+   //blocktype_for_itemtype[IT_ore_5]                   = ;
+   //blocktype_for_itemtype[IT_ore_6]                   = ;
+   //blocktype_for_itemtype[IT_ore_7]                   = ;
+   //blocktype_for_itemtype[IT_iron_bar]                = ;
+   //blocktype_for_itemtype[IT_iron_gear]               = ;
+   //blocktype_for_itemtype[IT_steel_plate]             = ;
+   blocktype_for_itemtype[IT_conveyor_belt]           = BT_conveyor;
+   blocktype_for_itemtype[IT_conveyor_ramp_up_low]    = BT_conveyor_ramp_up_low;
+   //blocktype_for_itemtype[IT_conveyor_ramp_up_high]   = ;
+   //blocktype_for_itemtype[IT_conveyor_ramp_down_low]  = ;
+   blocktype_for_itemtype[IT_conveyor_ramp_down_high] = BT_conveyor_ramp_down_high;
+   blocktype_for_itemtype[IT_picker]                  = BT_picker;
+   blocktype_for_itemtype[IT_conveyor_90_left]        = BT_conveyor_90_left;
+   blocktype_for_itemtype[IT_conveyor_90_right]       = BT_conveyor_90_right;
+   blocktype_for_itemtype[IT_ore_drill]               = BT_ore_drill;
+   blocktype_for_itemtype[IT_furnace]                 = BT_furnace;
+   blocktype_for_itemtype[IT_iron_gear_maker]         = BT_iron_gear_maker;
+   blocktype_for_itemtype[IT_conveyor_belt_maker]     = BT_conveyor_belt_maker;
+   blocktype_for_itemtype[IT_splitter]                = BT_splitter;
+   blocktype_for_itemtype[IT_balancer]                = BT_balancer;
+
+   for (i=0; i < 256; ++i)
+      if (blocktype_for_itemtype[i] != 0)
+         sprite_for_itemtype[i] = sprite_for_blocktype[blocktype_for_itemtype[i]];
 }
