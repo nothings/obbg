@@ -69,6 +69,8 @@ extern void build_picker(void);
 extern void add_draw_picker(float x, float y, float z, int rot, float states[4]);
 extern void finished_caching_mesh_chunk(int x, int y, Bool needs_triangles);
 extern void player_vacuum(Bool enable, vec *loc);
+extern Bool available_inventory_slot(int type);
+extern void add_to_inventory(int type);
 
 extern void physics_process_mesh_chunk(mesh_chunk *mc);
 extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py);

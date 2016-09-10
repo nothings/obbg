@@ -207,8 +207,6 @@ enum
 enum
 {
    IT_empty,
-   IT_asphalt,
-   IT_stone,
    IT_coal,
    IT_iron_ore,
    IT_copper_ore,
@@ -220,6 +218,8 @@ enum
    IT_iron_gear,
    IT_steel_plate,
    IT_conveyor_belt,
+   IT_asphalt,
+   IT_stone,
    IT_conveyor_ramp_up_low,
    IT_conveyor_ramp_up_high,
    IT_conveyor_ramp_down_low,

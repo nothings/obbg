@@ -210,12 +210,42 @@ int select_blocktype[3][9] =
 
 static int inventory_item[4][9] =
 {
+#if 0
    { IT_stone, IT_asphalt, } ,
    { IT_picker, IT_ore_drill, IT_furnace, IT_iron_gear_maker, IT_conveyor_belt_maker },
    { IT_conveyor_belt, IT_conveyor_90_left, IT_conveyor_90_right,
      IT_conveyor_ramp_up_low, IT_conveyor_ramp_down_high, IT_splitter, IT_balancer },
    { 0 },
+#else
+   { 0 },
+#endif
 };
+
+Bool available_inventory_slot(int type)
+{
+   int j,i;
+   for (j=3; j >= 0; --j) {
+      ui_rect_row *rr = &ui_inventory[j];
+      for (i=0; i < rr->count; ++i)
+         if (inventory_item[j][i] == IT_empty)
+            return True;
+   }
+   return False;
+}
+
+void add_to_inventory(int type)
+{
+   int j,i;
+   for (j=3; j >= 0; --j) {
+      ui_rect_row *rr = &ui_inventory[j];
+      for (i=0; i < rr->count; ++i) {
+         if (inventory_item[j][i] == IT_empty) {
+            inventory_item[j][i] = type;
+            return;
+         }
+      }
+   }
+}
 
 void draw_action_bar(int hit_item)
 {

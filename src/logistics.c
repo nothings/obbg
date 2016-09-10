@@ -2100,7 +2100,11 @@ static Bool should_vacuum(float x, float y, float z, vec *pmin, vec *pmax)
 
 static void vacuum_item(belt_run *br, int slot)
 {
-   br->items[slot].type = 0;
+   assert(br->items[slot].type != 0);
+   if (available_inventory_slot(br->items[slot].type)) {
+      add_to_inventory(br->items[slot].type);
+      br->items[slot].type = 0;
+   }
 }
 
 // @TODO we don't really want this
