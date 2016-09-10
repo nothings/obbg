@@ -1,5 +1,6 @@
 #include "obbg_funcs.h"
 #include "SDL_thread.h"
+#include <math.h>
 
 
 #define TARGET_none    0x7fff
@@ -2048,6 +2049,234 @@ void logistics_tick(void)
       logistics_long_tick = LONG_TICK_LENGTH;
 }
 
+static vec player_vacuum_loc;
+static Bool do_player_vacuum;
+
+void player_vacuum(Bool enable, vec *loc)
+{
+   do_player_vacuum = enable;
+   if (enable)
+      player_vacuum_loc = *loc;
+}
+
+static int floori(float x)
+{
+   return (int) floor(x);
+}
+
+extern float camera_bounds[2][3]; // @TODO this is a hack
+
+static int face_orig[4][2] = {
+   { 0,0 },
+   { 1,0 },
+   { 1,1 },
+   { 0,1 },
+};
+
+Bool axis_overlap(float a_min, float a_max, float b_center, float b_radius)
+{
+   return a_min <= b_center+b_radius && a_max >= b_center-b_radius;
+}
+
+static Bool should_vacuum(float x, float y, float z, vec *pmin, vec *pmax)
+{
+   float item_radius = 1.0f / ITEMS_PER_BELT_SIDE;
+   float player_radius_y = (pmax->y - pmin->y)/2.0f;
+   float player_radius_x = (pmax->x - pmin->x)/2.0f;
+   float player_radius = (player_radius_x + player_radius_y)/2.0f;
+   float threshold_dist = item_radius + player_radius;
+
+   float dx,dy;
+   dx = (float) fabs(x - (pmin->x + pmax->x)/2);
+   dy = (float) fabs(y - (pmin->y + pmax->y)/2);
+   if (!axis_overlap(pmin->z, pmax->z, z, item_radius))
+      return False;
+
+   if (dx*dx + dy*dy > threshold_dist * threshold_dist)
+      return False;
+
+   return True;
+}
+
+static void vacuum_item(belt_run *br, int slot)
+{
+   br->items[slot].type = 0;
+}
+
+// @TODO we don't really want this
+#pragma warning(disable:4244)
+
+// @TODO: this is only safe if the main thread is stopped
+static void non_logistics_interactions(void)
+{
+   // do player & non-logistics interactions with logistics contents
+   if (do_player_vacuum) {
+      float offset=0.5;
+      int i,j,k;
+      vec pmin, pmax;
+      vec3i wmin, wmax;
+      vec3i cmin,cmax;
+      pmin.x = player_vacuum_loc.x + camera_bounds[0][0] - 0.25f;
+      pmin.y = player_vacuum_loc.y + camera_bounds[0][1] - 0.25f;
+      pmin.z = player_vacuum_loc.z + camera_bounds[0][2];
+
+      pmax.x = player_vacuum_loc.x + camera_bounds[1][0] + 0.25f;
+      pmax.y = player_vacuum_loc.y + camera_bounds[1][1] + 0.25f;
+      pmax.z = player_vacuum_loc.z + camera_bounds[1][2] + 0.25f;
+
+      wmin.x = floori(pmin.x);
+      wmin.y = floori(pmin.y);
+      wmin.z = floori(pmin.z);
+
+      wmax.x = floori(pmax.x);
+      wmax.y = floori(pmax.y);
+      wmax.z = floori(pmax.z);
+
+      cmin.x = wmin.x >> LOGI_CHUNK_SIZE_X_LOG2;
+      cmin.y = wmin.y >> LOGI_CHUNK_SIZE_Y_LOG2;
+      cmin.z = wmin.z >> LOGI_CHUNK_SIZE_Z_LOG2;
+      cmax.x = wmax.x >> LOGI_CHUNK_SIZE_X_LOG2;
+      cmax.y = wmax.y >> LOGI_CHUNK_SIZE_Y_LOG2;
+      cmax.z = wmax.z >> LOGI_CHUNK_SIZE_Z_LOG2;
+
+      for (j=cmin.y; j <= cmax.y; ++j) {
+         for (i=cmin.x; i <= cmax.x; ++i) {
+            for (k=cmin.z; k <= cmax.z; ++k) {
+               logi_chunk *c = logistics_get_chunk(i*LOGI_CHUNK_SIZE_X, j*LOGI_CHUNK_SIZE_Y, k*LOGI_CHUNK_SIZE_Z, NULL);
+               if (c != NULL) {
+                  int n,e;
+                  vec chunk_base;
+                  chunk_base.x = (float) (i << LOGI_CHUNK_SIZE_X_LOG2);
+                  chunk_base.y = (float) (j << LOGI_CHUNK_SIZE_Y_LOG2);
+                  chunk_base.z = (float) (k << LOGI_CHUNK_SIZE_Z_LOG2);
+
+                  for (n=0; n < obarr_len(c->belts); ++n) {
+                     belt_run *b = &c->belts[n];
+
+                     if (b->turn == 0) {
+                        float z = chunk_base.z + 1.0f + b->z_off + 0.125f;
+                        float x1 = chunk_base.x + b->x_off;
+                        float y1 = chunk_base.y + b->y_off;
+                        float x2,y2;
+                        int len = b->len * ITEMS_PER_BELT_SIDE;
+                        int d0 = b->dir;
+                        int d1 = (d0 + 1) & 3;
+
+                        x1 += face_orig[b->dir][0];
+                        y1 += face_orig[b->dir][1];
+
+                        x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
+                        y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
+
+                        x2 = x1 + face_dir[d1][0]*(0.9f - 0.5/ITEMS_PER_BELT_SIDE);
+                        x1 = x1 + face_dir[d1][0]*(0.1f + 0.5/ITEMS_PER_BELT_SIDE);
+
+                        y2 = y1 + face_dir[d1][1]*(0.9f - 0.5/ITEMS_PER_BELT_SIDE);
+                        y1 = y1 + face_dir[d1][1]*(0.1f + 0.5/ITEMS_PER_BELT_SIDE);
+
+                        for (e=0; e < len; ++e) {
+                           float ax,ay,az;
+                           if (b->items[e+0].type != 0) {
+                              ax = x1, ay = y1, az=z;
+                              if (IS_ITEM_MOBILE(b,e,RIGHT)) {
+                                 ax += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                                 ay += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                                 az += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE) * offset;
+                              }
+                              if (should_vacuum(ax,ay,az, &pmin, &pmax))
+                                 vacuum_item(b, e+0);
+                           }
+                           if (b->items[e+len].type != 0) {
+                              ax = x2, ay = y2, az=z;
+                              if (IS_ITEM_MOBILE(b,e,LEFT)) {
+                                 ax += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                                 ay += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE) * offset;
+                                 az += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE) * offset;
+                              }
+                              if (should_vacuum(ax,ay,az, &pmin, &pmax))
+                                 vacuum_item(b, e+len);
+                           }
+                           x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE);
+                           y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE);
+                           x2 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE);
+                           y2 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE);
+                           z += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE);
+                        }
+                     } else {
+                        float z = chunk_base.z + 1.0f + b->z_off + 0.125f;
+                        float x1 = chunk_base.x + b->x_off;
+                        float y1 = chunk_base.y + b->y_off;
+                        float x2,y2;
+                        float ox,oy;
+                        int d0 = b->dir;
+                        int d1 = (d0 + 1) & 3;
+                        int left_len = b->turn > 0 ? SHORT_SIDE : LONG_SIDE;
+                        int right_len = SHORT_SIDE+LONG_SIDE - left_len;
+
+                        x1 += face_orig[b->dir][0];
+                        y1 += face_orig[b->dir][1];
+
+                        ox = x1;
+                        oy = y1;
+                        if (b->turn > 0) {
+                           ox += face_dir[(b->dir+1)&3][0];
+                           oy += face_dir[(b->dir+1)&3][1];
+                        }
+
+                        x1 += face_dir[d0][0]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
+                        y1 += face_dir[d0][1]*(1.0/ITEMS_PER_BELT_SIDE)*0.5;
+
+                        x2 = x1 + face_dir[d1][0]*(0.9f - 0.5/ITEMS_PER_BELT_SIDE);
+                        y2 = y1 + face_dir[d1][1]*(0.9f - 0.5/ITEMS_PER_BELT_SIDE);
+
+                        x1 = x1 + face_dir[d1][0]*(0.1f + 0.5/ITEMS_PER_BELT_SIDE);
+                        y1 = y1 + face_dir[d1][1]*(0.1f + 0.5/ITEMS_PER_BELT_SIDE);
+
+                        for (e=0; e < right_len; ++e) {
+                           if (b->items[0+e].type != 0) {
+                              float bx,by,ax,ay;
+                              float ang = e, s,c;
+                              if (IS_ITEM_MOBILE(b,e,RIGHT))
+                                 ang += offset;
+                              ang = (ang / right_len) * 3.141592/2;
+                              if (b->turn > 0) ang = -ang;
+                              ax = x1-ox;
+                              ay = y1-oy;
+                              s = sin(ang);
+                              c = cos(ang);
+                              bx = c*ax + s*ay;
+                              by = -s*ax + c*ay;
+                              if (should_vacuum(ox+bx, oy+by, z, &pmin, &pmax))
+                                 vacuum_item(b, 0+e);
+                           }
+                        }
+                        for (e=0; e < left_len; ++e) {
+                           if (b->items[right_len+e].type != 0) {
+                              float bx,by,ax,ay;
+                              float ang = e, s,c;
+                              if (IS_ITEM_MOBILE(b,e,LEFT))
+                                 ang += offset;
+                              ang = (ang / left_len) * 3.141592/2;
+                              if (b->turn > 0) ang = -ang;
+                              ax = x2-ox;
+                              ay = y2-oy;
+                              s = sin(ang);
+                              c = cos(ang);
+                              bx = c*ax + s*ay;
+                              by = -s*ax + c*ay;
+                              if (should_vacuum(ox+bx, oy+by, z, &pmin, &pmax))
+                                 vacuum_item(b, right_len+e);
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+}
+
 void logistics_render(void)
 {
    float offset;
@@ -2057,6 +2286,7 @@ void logistics_render(void)
          SDL_SemPost(logistics_copy_start);
          SDL_SemWait(logistics_copy_done);
       } else {
+         non_logistics_interactions();
          logistics_do_long_tick();
          logistics_update_block_queue_process();
          copy_logistics_database();
@@ -2067,22 +2297,21 @@ void logistics_render(void)
 }
 
 // Order of operations:
+//    3. Belt & machine contents updates from non-logistics sources
 //    1. Copy
 //    2. Tick
-//    3. Belt & machine contents updates
 //    4. Block updates
 static int logistics_thread_main(void *data)
 {
    data=0;
    for(;;) {
       SDL_SemWait(logistics_copy_start);
+      non_logistics_interactions();
       copy_logistics_database();
       SDL_SemPost(logistics_copy_done);
 
       // tick!
       logistics_do_long_tick();
-
-      // do player & non-logistics interactions with logistics contents
 
       // process block update queue
       logistics_update_block_queue_process();

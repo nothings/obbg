@@ -118,7 +118,7 @@ texture_info textures[] =
    0,0,   0,0,   0,0, 0,0,   0,0,   0,0,   0,0,   0,0,
 };
 
-static float camera_bounds[2][3];
+float camera_bounds[2][3];
 
 void game_init(void)
 {
@@ -391,6 +391,7 @@ player_controls client_player_input;
 float pending_dt;
 
 int program_mode = MODE_single_player;
+Bool player_is_vacuuming;
 
 void process_tick(float dt)
 {
@@ -408,6 +409,7 @@ void process_tick(float dt)
             client_net_tick();
             break;
          case MODE_single_player:
+            player_vacuum(player_is_vacuuming, &obj[player_id].position);
             client_view_physics(player_id, &client_player_input, dt);
             p_input[player_id] = client_player_input;
             process_tick_raw(1.0f/60);

@@ -491,6 +491,8 @@ void  process_mouse_move(int dx, int dy)
    }
 }
 
+extern Bool player_is_vacuuming;
+
 void process_key_down(int k, int s, SDL_Keymod mod)
 {
    if (k == SDLK_ESCAPE)
@@ -506,6 +508,8 @@ void process_key_down(int k, int s, SDL_Keymod mod)
    if (s == SDL_SCANCODE_S)    active_control_set(6);
    if (s == SDL_SCANCODE_D)    active_control_set(7);
    if (s == SDL_SCANCODE_F)    client_player_input.flying = !client_player_input.flying;
+
+   if (s == SDL_SCANCODE_V)    player_is_vacuuming = True;
 
    // debugging
    if (s == SDL_SCANCODE_H) global_hack = !global_hack;
@@ -596,6 +600,7 @@ void process_key_up(int k, int s)
    if (s == SDL_SCANCODE_LCTRL)   active_control_clear(5);
    if (s == SDL_SCANCODE_S)   active_control_clear(6);
    if (s == SDL_SCANCODE_D)   active_control_clear(7);
+   if (s == SDL_SCANCODE_V)   player_is_vacuuming = False;
 }
 
 void draw_block(int x, int y, int z, int blocktype, int rot)

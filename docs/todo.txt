@@ -213,6 +213,7 @@ Ideas:
    -  networking
 
    Code quality
+   -  vector lib
    -  check for memory leaks
    -  check what happens if same mesh_chunk_status is allocated, abandoned, and reallocated
    -  organize obbg_funcs.h by source file
