@@ -176,10 +176,10 @@ void add_sprite(float x, float y, float z, int id)
    s->pos.z = z;
    s->size = 0.25;
    assert(id >= 1 && id < sizeof(it_color)/12);
-   s->id = 0;
-   s->color.x = it_color[id][0];
-   s->color.y = it_color[id][1];
-   s->color.z = it_color[id][2];
+   s->id = id;
+   //s->color.x = it_color[id][0];
+   //s->color.y = it_color[id][1];
+   //s->color.z = it_color[id][2];
 }
 
 void premultiply_alpha(uint8 *pixels, int w, int h)
@@ -217,6 +217,28 @@ GLuint load_sprite(char *filename)
    return tex;
 }
 
+struct
+{
+   int itemtype;
+   char *filename;
+} sprite_filenames[] =
+{
+   { 0, "shadow" },
+//   { IT_conveyor_belt,           "conveyor"           },
+//   { IT_splitter,                "splitter"           },
+//   { IT_furnace,                 "furnace"            },
+//   { IT_iron_gear_maker,         "iron_gear_maker"    },
+//   { IT_conveyor_belt_maker,     "conveyor_belt_maker"},
+//   { IT_picker,                  "picker"             },
+//   { IT_ore_drill,               "drill"              },
+//   { IT_balancer,                "balancer"           },
+   { IT_coal    ,                "coal"               },
+   { IT_iron_ore,                "iron_ore"           },
+   { IT_copper_ore,              "copper_ore"         },
+   { IT_iron_bar,                "iron_bar"           },
+   { IT_iron_gear,               "iron_gear"          },
+//   { IT_steel_plate,             "steel_plate"        },
+};
 
 
 void render_init(void)
@@ -310,23 +332,25 @@ void render_init(void)
    glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D_ARRAY_EXT, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
-   for (i=0; i < 11; ++i) {
+   for (i=0; i < 8; ++i) {
       glTexImage3DEXT(GL_TEXTURE_2D_ARRAY_EXT, i,
                          GL_RGBA,
-                         256>>i,256>>i,256,0,
+                         128>>i,128>>i,256,0,
                          GL_RGBA,GL_UNSIGNED_BYTE,NULL);
    }
 
-   {
-      char *filename = stb_sprintf("data/sprites/ore.png", textures[i].filename);
+   for (i=0; i < sizeof(sprite_filenames)/sizeof(sprite_filenames[0]); ++i) {
+      char *filename = stb_sprintf("data/sprites/%s.png", sprite_filenames[i].filename);
+      int slot = sprite_filenames[i].itemtype;
       int w,h;
       uint8 *pixels = stbi_load(filename, &w, &h, 0, 4);
-      premultiply_alpha(pixels, w, h);
       if (pixels) {
-         load_bitmap_to_texture_array(0, pixels, w, h, 0, 1);
+         premultiply_alpha(pixels, w, h);
+         load_bitmap_to_texture_array(slot, pixels, w, h, 0, 1);
          free(pixels);
-      } else
+      } else {
          assert(0);
+      }
    }
 
    init_ui_render();
@@ -672,27 +696,59 @@ int alpha_test_sprites=1;
 void render_sprites(void)
 {
    int i;
-   vec s_off, t_off;
+   vec s_off, t_off, shadow_s_off = { 0.5,0,0}, shadow_t_off = { 0,0.5,0 };
    stbglUseProgram(dumb_prog);
    
-   if (alpha_test_sprites) {
-      glEnable(GL_ALPHA_TEST);
-      glDisable(GL_BLEND);
-   } else {
-      glEnable(GL_BLEND);
-      glDepthMask(GL_FALSE);
-      glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-   }
+   glDisable(GL_ALPHA_TEST);
+   glDepthMask(GL_FALSE);
+   glEnable(GL_BLEND);
+   glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
    glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, sprite_tex);
    stbglUniform1i(stbgl_find_uniform(dumb_prog, "tex"), 0);
 
    objspace_to_worldspace(&s_off.x, player_id, 0.5,0,0);
    objspace_to_worldspace(&t_off.x, player_id, 0,0,0.5);
 
+   glColor3f(1,1,1);
+
+
+   glPolygonOffset(1,1);
+   glEnable(GL_POLYGON_OFFSET_FILL);
    glBegin(GL_QUADS);
    for (i=0; i < num_sprites; ++i) {
       sprite *s = &sprites[i];
       vec p0,p1,p2,p3;
+
+      // draw shadow
+      p0 = vec_add_scale(&s->pos, &shadow_s_off, s->size);
+      p1 = vec_sub_scale(&s->pos, &shadow_s_off, s->size);
+      p2 = vec_add_scale(&p1, &shadow_t_off, s->size);
+      p3 = vec_add_scale(&p0, &shadow_t_off, s->size);
+      p0 = vec_sub_scale(&p0, &shadow_t_off, s->size);
+      p1 = vec_sub_scale(&p1, &shadow_t_off, s->size);
+      glTexCoord3f(0,1,0); glVertex3fv(&p0.x);
+      glTexCoord3f(1,1,0); glVertex3fv(&p1.x);
+      glTexCoord3f(1,0,0); glVertex3fv(&p2.x);
+      glTexCoord3f(0,0,0); glVertex3fv(&p3.x);
+   }
+   glEnd();
+   glDisable(GL_POLYGON_OFFSET_FILL);
+   glPolygonOffset(0,0);
+
+   if (alpha_test_sprites) {
+      glEnable(GL_ALPHA_TEST);
+      glDisable(GL_BLEND);
+      glDepthMask(GL_TRUE);
+   } else {
+      glEnable(GL_BLEND);
+      glDepthMask(GL_FALSE);
+      glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+   }
+   glBegin(GL_QUADS);
+   for (i=0; i < num_sprites; ++i) {
+      sprite *s = &sprites[i];
+      vec p0,p1,p2,p3;
+      s->pos.z += s->size/2;
 
       p0 = vec_add_scale(&s->pos, &s_off, s->size);
       p1 = vec_sub_scale(&s->pos, &s_off, s->size);
@@ -700,7 +756,7 @@ void render_sprites(void)
       p3 = vec_add_scale(&p0, &t_off, s->size);
       p0 = vec_sub_scale(&p0, &t_off, s->size);
       p1 = vec_sub_scale(&p1, &t_off, s->size);
-      glColor3fv(&s->color.x);
+      //glColor3fv(&s->color.x);
       glTexCoord3f(0,1,s->id); glVertex3fv(&p0.x);
       glTexCoord3f(1,1,s->id); glVertex3fv(&p1.x);
       glTexCoord3f(1,0,s->id); glVertex3fv(&p2.x);

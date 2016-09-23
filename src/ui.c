@@ -78,8 +78,8 @@ typedef struct
    int count;
 } ui_rect_row;
 
-int sprite_for_blocktype[256];
-int sprite_for_itemtype[256];
+int icon_for_itemtype[256];
+int icon_for_blocktype[256];
 
 void get_coordinates(ui_rect_row *row, int item, int *x, int *y)
 {
@@ -155,7 +155,7 @@ void draw_ui_row(ui_rect_row *row, int *blockcodes, int *itemcodes, int hit_item
          glColor3f(1.0,1.0,1.0);
          obbg_drawRect(x0-3,y0-3,x1+3,y1+3);
       }
-      glColor3f(0.9,0.9,0.9);
+      glColor3f(0.75,0.75,0.75);
       obbg_drawRect(x0,y0,x1,y1);
 
       x0 += x_advance;
@@ -177,9 +177,9 @@ void draw_ui_row(ui_rect_row *row, int *blockcodes, int *itemcodes, int hit_item
       if (hide != i) {
          int sprite=0;
          if (blockcodes != NULL)
-            sprite = sprite_for_blocktype[blockcodes[i]];
+            sprite = icon_for_blocktype[blockcodes[i]];
          else if (itemcodes != NULL)
-            sprite = sprite_for_itemtype[itemcodes[i]];
+            sprite = icon_for_itemtype[itemcodes[i]];
          else
             assert(0);
 
@@ -395,7 +395,7 @@ static void inventory_mode_drop_item(void)
       temp = inventory_item[j][i];
       inventory_item[j][i] = inventory_item[drag_from_row][drag_from_column];
       inventory_item[drag_from_row][drag_from_column] = temp;
-      drag_sprite = sprite_for_itemtype[inventory_item[drag_from_row][drag_from_column]];
+      drag_sprite = icon_for_itemtype[inventory_item[drag_from_row][drag_from_column]];
       drag_distance_x = 0;
       drag_distance_y = 0;
    }
@@ -429,7 +429,7 @@ void mouse_down(int button)
                mouse_drag_offset_x = x - mouse_x;
                mouse_drag_offset_y = y - mouse_y;
                drag_item = select_blocktype[j][i];
-               drag_sprite = sprite_for_blocktype[drag_item];
+               drag_sprite = icon_for_blocktype[drag_item];
                drag_from_screen = ui_screen;
             }
          }
@@ -449,7 +449,7 @@ void mouse_down(int button)
                drag_from_row = j;
                drag_from_column = i;
                drag_from_screen = ui_screen;
-               drag_sprite = sprite_for_itemtype[inventory_item[j][i]];
+               drag_sprite = icon_for_itemtype[inventory_item[j][i]];
                drag_distance_x = 0;
                drag_distance_y = 0;
             }
@@ -687,7 +687,7 @@ void do_ui_rendering_2d(void)
          if (creative)
             draw_action_bar(-1);
          else {
-            draw_ui_row(&ui_inventory[3], NULL, inventory_item[3], -1, -1, -1); // @TODO compute second to last value
+            draw_ui_row(&ui_inventory[3], NULL, inventory_item[3], -1, block_choice, -1); // @TODO compute second to last value
          }
          break;
       }
@@ -790,33 +790,45 @@ void do_ui_rendering_3d(void)
 struct
 {
    int blocktype;
+   int itemtype;
    char *sprite_name;
-} sprite_filenames[] =
+} icon_filenames[] =
 {
-   { BT_conveyor               , "conveyor"         },
-   { BT_conveyor_90_left       , "conveyor_90_ccw"  },
-   { BT_conveyor_90_right      , "conveyor_90_cw"   },
-   { BT_conveyor_ramp_up_low   , "conveyor_up"      },
-   { BT_conveyor_ramp_down_high, "conveyor_down"    },
-   { BT_splitter               , "splitter"         },
-   { BT_furnace                , "furnace"          },
-   { BT_stone                  , "iron_block"       },
-   { BT_asphalt                , "coal"             },
-   { BT_iron_gear_maker        , "iron_gear_maker"  },
-   { BT_conveyor_belt_maker    , "conveyor_belt_maker" },
-   { BT_picker                 , "picker"           },
-   { BT_ore_drill              , "drill"            },
-   { BT_balancer               , "arrow"            },
+   { BT_conveyor               , IT_conveyor_belt,           "conveyor"           },
+   { BT_conveyor_90_left       , IT_conveyor_90_right,       "conveyor_90_ccw"    },
+   { BT_conveyor_90_right      , IT_conveyor_90_left,        "conveyor_90_cw"     },
+   { BT_conveyor_ramp_up_low   , IT_conveyor_ramp_up_low   , "conveyor_up"        },
+   { BT_conveyor_ramp_down_high, IT_conveyor_ramp_down_high, "conveyor_down"      },
+   { BT_splitter               , IT_splitter,                "splitter"           },
+   { BT_furnace                , IT_furnace,                 "furnace"            },
+   { BT_stone                  , IT_stone,                   "iron_block"         },
+   { BT_asphalt                , IT_asphalt,                 "coal_block"         },
+   { BT_iron_gear_maker        , IT_iron_gear_maker,         "iron_gear_maker"    },
+   { BT_conveyor_belt_maker    , IT_conveyor_belt_maker,     "conveyor_belt_maker"},
+   { BT_picker                 , IT_picker,                  "picker"             },
+   { BT_ore_drill              , IT_ore_drill,               "drill"              },
+   { BT_balancer               , IT_balancer,                "arrow"              },
+   { 0                         , IT_coal    ,                "coal"               },
+   { 0                         , IT_iron_ore,                "iron_ore"           },
+   { 0                         , IT_copper_ore,              "copper_ore"         },
+   { 0                         , IT_iron_bar,                "iron_bar"           },
+   { 0                         , IT_iron_gear,               "iron_gear"          },
+   { 0                         , IT_steel_plate,             "steel_plate"        },
 };
+
 
 void init_ui_render(void)
 {
    int i;
-   icon_arrow = load_sprite("data/sprites/icon_arrow.png");
+   icon_arrow = load_sprite("data/icons/icon_arrow.png");
    compute_ui_inventory();
 
-   for (i=0; i < sizeof(sprite_filenames)/sizeof(sprite_filenames[0]); ++i)
-      sprite_for_blocktype[sprite_filenames[i].blocktype] = load_sprite(stb_sprintf("data/sprites/icon_%s.png", sprite_filenames[i].sprite_name));
+   for (i=0; i < sizeof(icon_filenames)/sizeof(icon_filenames[0]); ++i)
+      icon_for_blocktype[icon_filenames[i].blocktype] =
+      icon_for_itemtype[icon_filenames[i].itemtype] =
+         load_sprite(stb_sprintf("data/icons/icon_%s.png", icon_filenames[i].sprite_name));
+   icon_for_blocktype[0] = 0;
+   icon_for_itemtype[0] = 0;
 
    blocktype_for_itemtype[IT_asphalt]                 = BT_asphalt;
    blocktype_for_itemtype[IT_stone]                   = BT_stone;
@@ -844,8 +856,4 @@ void init_ui_render(void)
    blocktype_for_itemtype[IT_conveyor_belt_maker]     = BT_conveyor_belt_maker;
    blocktype_for_itemtype[IT_splitter]                = BT_splitter;
    blocktype_for_itemtype[IT_balancer]                = BT_balancer;
-
-   for (i=0; i < 256; ++i)
-      if (blocktype_for_itemtype[i] != 0)
-         sprite_for_itemtype[i] = sprite_for_blocktype[blocktype_for_itemtype[i]];
 }

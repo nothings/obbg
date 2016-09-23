@@ -828,7 +828,7 @@ static void logistics_update_chunk(int x, int y, int z)
       int i,j;
       for (i=0; i < obarr_len(c->belts); ++i) {
          if (1) { //c->belts[i].target_id == TARGET_unknown) {
-            logi_chunk *d = c;
+            logi_chunk *d;
             belt_run *b = &c->belts[i];
             int turn = b->type == BR_splitter ? 3 : b->turn;
             int outdir = (b->dir + turn)&3;
@@ -840,8 +840,10 @@ static void logistics_update_chunk(int x, int y, int z)
                ex = LOGI_CHUNK_MASK_X(ex);
                ey = LOGI_CHUNK_MASK_Y(ey);
                b->target_is_neighbor = 1;
-            } else
+            } else {
+               d = c;
                b->target_is_neighbor = 0;
+            }
 
             if (d != NULL) {
                for (j=0; j < obarr_len(d->belts); ++j) {
@@ -2370,8 +2372,11 @@ void logistics_record_ore(int x, int y, int z1, int z2, int type)
 void logistics_update_block(int x, int y, int z, int type, int rot)
 {
    if (type == BT_conveyor_ramp_up_low) {
-      logistics_update_block_core_queue(x,y,z, BT_down_marker, 0, True);
+      // place ramp up one lower in logistics world than in physics world, so
+      // other belts feed onto it automagically
       logistics_update_block_core_queue(x,y,z-1,type,rot, True);
+      // put a placeholder where the ramp is in the physics world
+      logistics_update_block_core_queue(x,y,z, BT_down_marker, 0, True);
    } else
       logistics_update_block_core_queue(x,y,z,type,rot, True);
 }

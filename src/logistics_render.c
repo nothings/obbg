@@ -196,13 +196,18 @@ void logistics_render_from_copy(render_logi_chunk **arr, float offset)
          for (a=0; a < c->num_belts; ++a) {
             render_belt_run *b = &c->belts[a];
             if (b->turn == 0) {
-               float z = c->chunk_z * LOGI_CHUNK_SIZE_Z + 1.0f + b->pos.unpacked.z + 0.125f;
+               float z = c->chunk_z * LOGI_CHUNK_SIZE_Z + 1.0f + b->pos.unpacked.z;
                float x1 = (float) c->slice_x * LOGI_CHUNK_SIZE_X + b->pos.unpacked.x;
                float y1 = (float) c->slice_y * LOGI_CHUNK_SIZE_Y + b->pos.unpacked.y;
                float x2,y2;
                int len = b->len * ITEMS_PER_BELT_SIDE;
                int d0 = b->dir;
                int d1 = (d0 + 1) & 3;
+
+               if (b->end_dz > 0)
+                  z += 0.125/2;
+               else if (b->end_dz < 0)
+                  z -= 0.125/4;
 
                x1 += face_orig[b->dir][0];
                y1 += face_orig[b->dir][1];
@@ -244,7 +249,7 @@ void logistics_render_from_copy(render_logi_chunk **arr, float offset)
                   z += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE);
                }
             } else {
-               float z = c->chunk_z * LOGI_CHUNK_SIZE_Z + 1.0f + b->pos.unpacked.z + 0.125f;
+               float z = c->chunk_z * LOGI_CHUNK_SIZE_Z + 1.0f + b->pos.unpacked.z;
                float x1 = (float) c->slice_x * LOGI_CHUNK_SIZE_X + b->pos.unpacked.x;
                float y1 = (float) c->slice_y * LOGI_CHUNK_SIZE_Y + b->pos.unpacked.y;
                float x2,y2;
