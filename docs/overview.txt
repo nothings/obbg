@@ -9,9 +9,10 @@ obbg:
   : save/load to disk
   : networking
 
+Done in today's stream (43):
 
-Done in today's stream (42):
-   - 
+Previous stream (42):
+   - ???
 
 Previous stream (41)
    - inventory select screen

@@ -1908,7 +1908,7 @@ static void copy_belt(render_belt_run *rbr, belt_run *br)
    uint i;
    size_t max_items = ITEMS_PER_BELT*br->len;
    size_t size = sizeof(beltside_item) * max_items;
-   rbr->items = malloc(size);
+   rbr->items = obbg_malloc(size, "/thread/logi/copy/belt");
 
    rbr->pos.unpacked.x = br->x_off;
    rbr->pos.unpacked.y = br->y_off;
@@ -1964,7 +1964,7 @@ static render_logi_chunk *copy_logi_chunk(logi_chunk *c, int slice_x, int slice_
 
    render_logi_chunk *rc;
 
-   rc = malloc(sizeof(*rc));
+   rc = obbg_malloc(sizeof(*rc), "/thread/logi/copy/chunk");
    rc->slice_x = slice_x;
    rc->slice_y = slice_y;
    rc->chunk_z = chunk_z;
@@ -1974,10 +1974,10 @@ static render_logi_chunk *copy_logi_chunk(logi_chunk *c, int slice_x, int slice_
    rc->num_belt_machines = obarr_len(c->belt_machine);
    rc->num_pickers       = obarr_len(c->pickers);
 
-   rc->belts        = malloc(sizeof(rc->belts       [0]) * rc->num_belts        );
-   rc->machine      = malloc(sizeof(rc->machine     [0]) * rc->num_machines     );
-   rc->belt_machine = malloc(sizeof(rc->belt_machine[0]) * rc->num_belt_machines);
-   rc->pickers      = malloc(sizeof(rc->pickers     [0]) * rc->num_pickers      );
+   rc->belts        = obbg_malloc(sizeof(rc->belts       [0]) * rc->num_belts        ,"/thread/logi/copy/belt");
+   rc->machine      = obbg_malloc(sizeof(rc->machine     [0]) * rc->num_machines     ,"/thread/logi/copy/machine");
+   rc->belt_machine = obbg_malloc(sizeof(rc->belt_machine[0]) * rc->num_belt_machines,"/thread/logi/copy/machine");
+   rc->pickers      = obbg_malloc(sizeof(rc->pickers     [0]) * rc->num_pickers      ,"/thread/logi/copy/pickers");
 
    for (i=0; i < rc->num_belts        ; ++i) copy_belt        (&rc->belts       [i], &c->belts       [i]);
    for (i=0; i < rc->num_belt_machines; ++i) copy_belt_machine(&rc->belt_machine[i], &c->belt_machine[i]);
@@ -1991,19 +1991,25 @@ static void free_render_logi_chunk(render_logi_chunk *rc)
 {
    int i;
    for (i=0; i < rc->num_belts; ++i)
-      free(rc->belts[i].items);
-   free(rc->belts);
-   free(rc->machine);
-   free(rc->pickers);
-   free(rc->belt_machine);
-   free(rc);
+      obbg_free(rc->belts[i].items);
+   obbg_free(rc->belts);
+   obbg_free(rc->machine);
+   obbg_free(rc->pickers);
+   obbg_free(rc->belt_machine);
+   obbg_free(rc);
 }
 
 volatile render_logi_chunk **render_copy;
 void copy_logistics_database(void)
 {
    int i,j,k;
+   render_logi_chunk **rlc = (render_logi_chunk **) render_copy;
+
+   // free old render state, since renderer must be done with it
+   for (i=0; i < obarr_len(rlc); ++i)
+      free_render_logi_chunk(rlc[i]);
    obarr_free(render_copy);
+
    for (j=0; j < LOGI_CACHE_SIZE; ++j) {
       for (i=0; i < LOGI_CACHE_SIZE; ++i) {
          logi_slice *s = &logi_world[j][i];

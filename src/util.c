@@ -266,8 +266,10 @@ void *obbg_realloc(void *p, size_t size, char *info)
 
 void obbg_malloc_dump(obbg_malloc_dump_func *f)
 {
-   meminfo *m = memlist_head;
+   meminfo *m;
    meminfo *p=NULL;
+   SDL_LockMutex(memory_mutex);
+   m = memlist_head;
    while (m != NULL) {
       assert((size_t) m->next != 0xfeeefeee);
       assert(m->guard != 0xfeeefeee);
@@ -277,4 +279,5 @@ void obbg_malloc_dump(obbg_malloc_dump_func *f)
       p = m;
       m = m->next;
    }
+   SDL_UnlockMutex(memory_mutex);
 }
