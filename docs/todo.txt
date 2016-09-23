@@ -166,7 +166,7 @@ Ideas:
       - procedural animation of characters?
    -  fix walking physics
       + push smoothly along walls
-      - smooth camera height when stepping up
+      * smooth camera height when stepping up
       * don't stick to walls when falling one block
       - core physics model should steer existing momentum to new direction instead of being so Newtonian
    -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)

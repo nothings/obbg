@@ -139,7 +139,7 @@ typedef struct
       ((pos) < (br)->mobile_slots[side]-1)
 
 // lengths for turning conveyor
-#define SHORT_SIDE  1
+#define SHORT_SIDE  2
 #define LONG_SIDE   5
 
 enum
