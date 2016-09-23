@@ -103,12 +103,20 @@ void client_view_physics(objid oid, player_controls *con, float dt)
    }
 }
 
+#define TIME_TO_MOVE_HEAD_UP_AFTER_STEP_UP  0.35f
+
 void player_physics(objid oid, player_controls *con, float dt)
 {
    int i;
    object *o = &obj[oid];
    float thrust[3] = { 0,0,0 };
    float world_thrust[3];
+
+   if (o->iz.t) {
+      o->iz.t -= dt/TIME_TO_MOVE_HEAD_UP_AFTER_STEP_UP;
+      if (o->iz.t < 0)
+         o->iz.t = 0;
+   }
 
    // choose direction to apply thrust
 
@@ -153,7 +161,7 @@ void player_physics(objid oid, player_controls *con, float dt)
       z = o->position.z + o->velocity.z * dt;
 
       if (!con->flying) {
-         if (!physics_move_walkable(&o->position, &o->velocity, dt, camera_bounds))
+         if (!physics_move_walkable(&o->position, &o->velocity, dt, camera_bounds, &o->iz))
             o->velocity.z -= 20.0f * dt;
       } else {
          o->position.x = x;

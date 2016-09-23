@@ -315,6 +315,8 @@ objid create_player(void)
    obj[pid].position.y = (float) (rand() & 31);
    obj[pid].position.z = 200;
 
+   obj[pid].iz.t = 0;
+
    obj[pid].ang.x = 0;
    obj[pid].ang.y = 0;
    obj[pid].ang.z = 0;

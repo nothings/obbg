@@ -10,6 +10,10 @@ obbg:
   : networking
 
 Done in today's stream (43):
+   - smooth camera movement when stepping up
+   - fix leaking render_logi_chunks
+   - new sprite art replaces old everything-is-ore
+   - bad shadows under sprites
 
 Previous stream (42):
    - ???

@@ -222,10 +222,11 @@ int collision_test_box(collision_geometry *cg, float x, float y, float z, float 
 #define Z_EPSILON 0.001f
 #define STEP_UP_VELOCITY -0.75
 
-int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
+int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interpolate_z *lerpz)
 {
    int result=0;
    int ix,iy,iz;
+   Bool step_up=False;
    float x = pos->x;
    float y = pos->y;
    float z = pos->z;
@@ -261,16 +262,19 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
             x += dx;
             y += dy;
             z = (float) ceil(z);
+            step_up = True;
          } else if (vel->z > STEP_UP_VELOCITY && !collision_test_box(&cg, x+dx, y   , (float) ceil(z), size) && collision_test_box(&cg, x+dx, y   , (float) ceil(z)-1, size)) {
             vel->z = 0;
             x += dx;
             vel->y = 0;
             z = (float) ceil(z);
+            step_up = True;
          } else if (vel->z > STEP_UP_VELOCITY && !collision_test_box(&cg, x   , y+dy, (float) ceil(z), size) && collision_test_box(&cg, x   , y+dy, (float) ceil(z)-1, size)) {
             vel->z = 0;
             vel->x = 0;
             y += dy;
             z = (float) ceil(z);
+            step_up = True;
          } else {
             // move bottom to floor of current voxel
             if (dz > 0) {
@@ -314,6 +318,7 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
             x += dx;
             y += dy;
             z += 1;
+            step_up = True;
          } else {
             if (!collision_test_box(&cg, x+dx, y+0, z, size)) {
                x += dx;
@@ -338,6 +343,11 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3])
          x += dx;
          y += dy;
       }
+   }
+
+   if (step_up) {
+      lerpz->old_z = smoothed_z_for_rendering(pos, lerpz);
+      lerpz->t = 1;
    }
 
    pos->x = x;

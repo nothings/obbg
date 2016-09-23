@@ -770,6 +770,12 @@ void render_sprites(void)
    stbglUseProgram(0);
 }
 
+float smoothed_z_for_rendering(vec *pos, interpolate_z *iz)
+{
+   float t = iz->t * iz->t;
+   return stb_lerp(t, pos->z, iz->old_z);
+}
+
 void render_objects(void)
 {
    int i;
@@ -789,7 +795,7 @@ void render_objects(void)
          sz.z = camera_bounds[1][2] - camera_bounds[0][2];
          pos.x = obj[i].position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
          pos.y = obj[i].position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
-         pos.z = obj[i].position.z + (camera_bounds[1][2] + camera_bounds[0][2])/2;
+         pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz) + (camera_bounds[1][2] + camera_bounds[0][2])/2;
          stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
       }
    }
@@ -854,11 +860,11 @@ void draw_main(void)
       objspace_to_worldspace(camloc, player_id, 0,-5,0);
       camloc[0] += obj[player_id].position.x;
       camloc[1] += obj[player_id].position.y;
-      camloc[2] += obj[player_id].position.z;
+      camloc[2] += smoothed_z_for_rendering(&obj[player_id].position, &obj[player_id].iz);
    } else {
       camloc[0] = obj[player_id].position.x;
       camloc[1] = obj[player_id].position.y;
-      camloc[2] = obj[player_id].position.z;
+      camloc[2] = smoothed_z_for_rendering(&obj[player_id].position, &obj[player_id].iz);
    }
 
    camang[0] = obj[player_id].ang.x;

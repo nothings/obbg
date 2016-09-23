@@ -64,13 +64,14 @@ extern void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc);
 extern mesh_chunk *get_mesh_chunk_for_coord(int x, int y);
 extern mesh_chunk *get_physics_chunk_for_coord(int x, int y);
 //extern int collision_test_box(float x, float y, float z, float bounds[2][3]);
-extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3]);
+extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interpolate_z *iz);
 extern void build_picker(void);
 extern void add_draw_picker(float x, float y, float z, int rot, float states[4]);
 extern void finished_caching_mesh_chunk(int x, int y, Bool needs_triangles);
 extern void player_vacuum(Bool enable, vec *loc);
 extern Bool available_inventory_slot(int type);
 extern void add_to_inventory(int type);
+extern float smoothed_z_for_rendering(vec *pos, interpolate_z *iz);
 
 extern void physics_process_mesh_chunk(mesh_chunk *mc);
 extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py);

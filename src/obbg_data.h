@@ -301,9 +301,17 @@ typedef int32 objid;
 
 typedef struct
 {
+   float old_z;
+   float t;
+} interpolate_z;
+
+typedef struct
+{
    vec position;
    vec ang;
    vec velocity;
+
+   interpolate_z iz;  // only needed for players
 
    uint32 valid;
    uint32 sent_fields; // used only as part of the server version history
@@ -338,6 +346,7 @@ extern player_controls client_player_input;
 #endif
 
 extern object obj[MAX_OBJECTS];
+//extern player_data players[PLAYER_OBJECT_MAX];
 
 extern float texture_scales[256];
 

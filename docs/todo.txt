@@ -89,17 +89,17 @@ Ideas:
    -  manufacturing tree
       -  data-drive manufacturing tree
       -  expand tree
-      -  better placeholder art
+      +  better placeholder art
          - draw actual blocks/machines on belt, or just sprites???
    -  machines are 2x2x2 blocks
    -  animated machines
    -  player inventory
       *  action bar
       *  MC-creative-mode select
-      -  more placeholder
+      +  more placeholder
       +  real inventory
    +  belt placement UI
-      -  ghost shapes
+      +  ghost shapes
       -  place-and-drag
       -  automatic rotation
    *  machine placement UI (ghost shapes)
@@ -143,7 +143,7 @@ Ideas:
         - graphical representation how?!?
           - encode as second texture on block so can have many degraded blocks?
             - if state changes frequently have to rebuild chunk frequently
-   -  player inventory
+   +  player inventory
    -  player crafting(?)
    -  tool-equipping system(?)
 
