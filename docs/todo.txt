@@ -23,24 +23,6 @@ Factorio-esque features:
    -  control circuits - factorio & infinifactory
    -  enemies & tower defense-ish gameplay - factorio?
 
-
->              _.+--+
-  ,,,,,,,   _.+  |  |
-> +--+--+  +--+--+--+
-  |  |  |   _.+
-> +--+--+  +--+
-
->
-  ,,,,,,,
-> +--+--+
-  +--+--+
->              ,,,,
-            _.+--+--+
->  ,,,,, _.+--+--+--+
-  +--+--+  |  |
-> +--+--+--+--+
-
->
 Initial crafting tree:
 
    -  Furnace:
@@ -116,6 +98,27 @@ Ideas:
          - draw actual blocks/machines on belt, or just sprites???
    -  machines are 2x2x2 blocks
    -  animated machines
+      -  pass in sin & cos as "bone data"
+         - NO store (sin+1) + (cos > 0 ? 4 : 0), shader computes sin, sqrt(1-sin^2)
+         - around x axis or around z axis
+         -   8 bone values, 12 bone weights
+         -
+         -   2 bone value, 4 weights
+         -  pos   += bone1.xyz * bone_value.x;
+         -  pos.z += bone1.w   * bone_value.y;
+         -
+         -   should I just compute sin/cos in the shader?!?
+         -   y2 = y*(bone_weight[0]||bone_weight[1] ? bone_data[0] : 1) + z*(bone_weight[0] ?  bone_data[1] : 0)
+         -   z2 = z*(bone_weight[0] ? bone_data[0] : 1) + y*(bone_weight[0] ? -bone_data[1] : 0);
+         -   x2 = x*(bone_weight[1] ? bone_data[0] : 1) + y*(bone_weight[1] ? -bone_data[1] : 0);
+         -
+         -   4 bone values, and 6 weights
+         -  pos.xy+= bone1.xy  * bone_value.x;
+         -  pos.z += bone1.z   * bone_value.y;
+         -  pos.xy+= bone2.xy  * bone_value.z;
+         -  pos.z += bone2.z   * bone_value.w;
+
+
    -  player inventory
       *  action bar
       *  MC-creative-mode select

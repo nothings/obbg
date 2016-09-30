@@ -854,7 +854,8 @@ void load_edits(void)
                for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
                   for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
                      if (ec.blocks[k][j][i].type != BT_no_change)
-                        change_block(ec.x*GEN_CHUNK_SIZE_X+i, ec.y*GEN_CHUNK_SIZE_Y+j, ec.z*EDIT_CHUNK_Z_COUNT+k, ec.blocks[k][j][i].type, ec.blocks[k][j][i].rotate);
+                        change_block(ec.x*GEN_CHUNK_SIZE_X+i, ec.y*GEN_CHUNK_SIZE_Y+j, ec.z*EDIT_CHUNK_Z_COUNT+k,
+                                      ec.blocks[k][j][i].type, ec.blocks[k][j][i].rotate);
       fclose(f);
    }
 }

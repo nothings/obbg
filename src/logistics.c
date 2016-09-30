@@ -906,7 +906,7 @@ static void logistics_update_chunk(int x, int y, int z)
          int oy = base_y + p->pos.unpacked.y + face_dir[p->rot^2][1];
          int id;
 
-         id = get_belt_id_noramp(ix,iy, base_z + p->pos.unpacked.z-1);
+         id = get_belt_id_noramp(ix,iy, base_z + p->pos.unpacked.z);
          if (id >= 0) {
             p->input_id = id;
             p->input_is_belt = True;
@@ -916,7 +916,7 @@ static void logistics_update_chunk(int x, int y, int z)
             p->input_is_belt = False;
          }
 
-         id = get_belt_id_noramp(ox, oy, base_z + p->pos.unpacked.z-1);
+         id = get_belt_id_noramp(ox, oy, base_z + p->pos.unpacked.z);
          if (id >= 0) {
             p->output_id = id;
             p->output_is_belt = True;
@@ -1433,27 +1433,37 @@ static void visit(belt_ref *ref)
    if (br->mark == M_temporary) return;
    if (br->mark == M_unmarked) {
       br->mark = M_temporary;
-      if (br->target_id != TARGET_none) {
-         vtarget_chunk tc;
-         belt_ref target;
-         vec3i beltloc;
-         beltloc.x = ref->slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off;
-         beltloc.y = ref->slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off;
-         beltloc.z = ref->cid * LOGI_CHUNK_SIZE_Z+br->z_off;
-         if (br->type == BR_normal) {
+      if (br->type == BR_normal) {
+         if (br->target_id != TARGET_none) {
+            vtarget_chunk tc;
+            belt_ref target;
+            vec3i beltloc;
+            beltloc.x = ref->slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off;
+            beltloc.y = ref->slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off;
+            beltloc.z = ref->cid * LOGI_CHUNK_SIZE_Z+br->z_off;
             vget_target_chunk(&tc, beltloc.x, beltloc.y, beltloc.z, br);
             target.belt_id = br->target_id;
             target.cid = tc.cid;
             target.slice = tc.s;
             if (target.belt_id != TARGET_none) assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
             visit(&target);
-         } else {
-            vget_dir_chunk(&tc, beltloc.x, beltloc.y, beltloc.z, (br->dir+3)&3);
+         }
+      } else {
+         vtarget_chunk tc;
+         belt_ref target;
+         vec3i beltloc;
+         beltloc.x = ref->slice->slice_x * LOGI_CHUNK_SIZE_X+br->x_off;
+         beltloc.y = ref->slice->slice_y * LOGI_CHUNK_SIZE_Y+br->y_off;
+         beltloc.z = ref->cid * LOGI_CHUNK_SIZE_Z+br->z_off;
+         vget_dir_chunk(&tc, beltloc.x, beltloc.y, beltloc.z, (br->dir+3)&3);
+         if (br->target_id != TARGET_none) {
             target.belt_id = br->target_id;
             target.cid = tc.cid;
             target.slice = tc.s;
             if (target.belt_id != TARGET_none) assert(target.belt_id < obarr_len(target.slice->chunk[target.cid]->belts));
             visit(&target);
+         }
+         if (br->target2_id != TARGET_none) {
             vget_dir_chunk(&tc, beltloc.x, beltloc.y, beltloc.z, (br->dir+1)&3);
             target.belt_id = br->target2_id;
             target.cid = tc.cid;
@@ -1462,6 +1472,7 @@ static void visit(belt_ref *ref)
             visit(&target);
          }
       }
+
       if (br->mark == M_temporary) {
          br->mark = M_permanent;
          obarr_push(sorted_ref, *ref, "/logi/tick/sorted_ref");
@@ -1748,7 +1759,7 @@ static void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int bas
             int iz = base_z + pi->pos.unpacked.z;
             if (pi->input_is_belt) {
                int slot;
-               belt_run *b = find_belt_slot_for_picker(pi->input_id, ix,iy,iz-1, pi->rot, &slot);
+               belt_run *b = find_belt_slot_for_picker(pi->input_id, ix,iy,iz, pi->rot, &slot);
                if (b->items[slot].type != 0) {
                   if (!pi->output_is_belt) {
                      int ox = base_x + pi->pos.unpacked.x + face_dir[pi->rot^2][0];
@@ -1789,7 +1800,7 @@ static void logistics_longtick_chunk_machines(logi_chunk *c, int base_x, int bas
             assert(pi->item != 0);
             if (pi->output_is_belt) {
                int slot;
-               belt_run *b = find_belt_slot_for_picker(pi->output_id, ox,oy,oz-1, pi->rot^2, &slot);
+               belt_run *b = find_belt_slot_for_picker(pi->output_id, ox,oy,oz, pi->rot^2, &slot);
                if (b->items[slot].type == 0) {
                   add_item_to_belt(b, slot, pi->item);
                   pi->item = 0;
