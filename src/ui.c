@@ -3,7 +3,7 @@
 #define STB_GLEXT_DECLARE "glext_list.h"
 #include "stb_gl.h"
 
-Bool creative = False;
+Bool creative = True;
 
 #pragma warning(disable:4305; disable:4244)
 enum

@@ -1,10 +1,15 @@
+   -  upload annotations starting with 22-part2
+   -  finish uploading videos
+   -  install photoshop
+   -  install sony vegas
+
    -  add mesh cache with explicit storing of coordinates & call function to access it instead of accessing inline
    -  why is set_mesh_chunk_for_coord either
       - (a) not just getting x & y from the mesh_chunk
       - (b) or writing mc->cx & mc->y with the passed-in-coordinates
       - (c) or at least asserting that they match
    -  num_gen_chunk_alloc is statistics output but is accessed thread-unsafely
-
+   -  balancer should only swap if one or the other lane is moving
 
 Factorio-esque features:
    -  basic pickers (factorio "inserters")
@@ -18,6 +23,24 @@ Factorio-esque features:
    -  control circuits - factorio & infinifactory
    -  enemies & tower defense-ish gameplay - factorio?
 
+
+>              _.+--+
+  ,,,,,,,   _.+  |  |
+> +--+--+  +--+--+--+
+  |  |  |   _.+
+> +--+--+  +--+
+
+>
+  ,,,,,,,
+> +--+--+
+  +--+--+
+>              ,,,,
+            _.+--+--+
+>  ,,,,, _.+--+--+--+
+  +--+--+  |  |
+> +--+--+--+--+
+
+>
 Initial crafting tree:
 
    -  Furnace:
@@ -83,7 +106,7 @@ Ideas:
         deal with the verticality and do sub-ideal placement initially
 
    Factorio-esque TODO:
-   -  store 'promises' on conveyor belts
+   -  store 'reservations' on conveyor belts
    -  more splitter/balancer variants
    -  fast vs slow belts
    -  manufacturing tree
@@ -111,7 +134,7 @@ Ideas:
       * raycast
          * physics representation
       * rebuild chunks
-         - make sure we rebuild if we change a block while we're already rebuilding
+         * make sure we rebuild if we change a block while we're already rebuilding
    *  load textures from JPG
    *  conveyor belts
       * animation by scrolling textures
@@ -132,7 +155,7 @@ Ideas:
       x maybe require multi-block things to be supported by multiple conveyors
       * factorio-style stuff stops at end of conveyor, not infinifactory falling-off-esque
    *  basic pickers (factorio "inserters")
-   -  speed up texture loading
+   -  speed up texture loading (threads at startup)
    -  fixed "objects" can be blocks
       - any machinery that you can have a lot of should be (geometrically) blocks
       * machinery that is rare can go through a simpler polygon engine (same as 'moving object' system?)
@@ -169,7 +192,7 @@ Ideas:
       * smooth camera height when stepping up
       * don't stick to walls when falling one block
       - core physics model should steer existing momentum to new direction instead of being so Newtonian
-   -  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
+   *  physics representation (1 bit per block? run-length? 1-byte min, 1-byte max, bits within that range?)
       - 1 byte length
       - 1 byte type
    -  raycast (needs physics rep)

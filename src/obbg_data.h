@@ -200,7 +200,6 @@ enum
 
    BT_belt_machines=250,
    BT_balancer=252,
-   BT_down_marker=255,
    BT_no_change=255,
 };
 

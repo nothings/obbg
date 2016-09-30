@@ -76,17 +76,23 @@ void init_mesh_building(void)
    for (i=1; i < 256; ++i)
       geom_for_blocktype[i] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid,0,0);
       
-   //geom_for_blocktype[BT_conveyor] = STBVOX_GEOM_slab_upper;
-
    geom_for_blocktype[BT_conveyor_ramp_up_low    ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
    geom_for_blocktype[BT_conveyor_ramp_up_high   ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
    geom_for_blocktype[BT_conveyor_ramp_down_high ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
    geom_for_blocktype[BT_conveyor_ramp_down_low  ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_floor_vheight_03, 0, 0),
 
-   vheight_for_blocktype[BT_conveyor_ramp_up_low    ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half),
-   vheight_for_blocktype[BT_conveyor_ramp_up_high   ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1),
-   vheight_for_blocktype[BT_conveyor_ramp_down_high ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1, STBVOX_VERTEX_HEIGHT_half),
-   vheight_for_blocktype[BT_conveyor_ramp_down_low  ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0, STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0),
+   geom_for_blocktype[BT_conveyor         ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_lower, 0, 0);
+   geom_for_blocktype[BT_conveyor_90_right] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_lower, 0, 0);
+   geom_for_blocktype[BT_conveyor_90_left ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_lower, 0, 0);
+   geom_for_blocktype[BT_splitter         ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_slab_lower, 0, 0);
+
+   geom_for_blocktype[BT_picker   ] = 0;
+   geom_for_blocktype[BT_balancer ] = 0;
+
+   vheight_for_blocktype[BT_conveyor_ramp_up_high   ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_0   , STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0   , STBVOX_VERTEX_HEIGHT_half);
+   vheight_for_blocktype[BT_conveyor_ramp_up_low    ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1   , STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1   );
+   vheight_for_blocktype[BT_conveyor_ramp_down_low  ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_1   , STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_1   , STBVOX_VERTEX_HEIGHT_half);
+   vheight_for_blocktype[BT_conveyor_ramp_down_high ] = STBVOX_MAKE_VHEIGHT(STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0   , STBVOX_VERTEX_HEIGHT_half, STBVOX_VERTEX_HEIGHT_0   );
 
    set_blocktype_texture(BT_sand, 25);
    set_blocktype_texture(BT_grass, 5);
@@ -116,17 +122,8 @@ void init_mesh_building(void)
    set_blocktype_texture(BT_iron_gear_maker, 10)  ; tex1_for_blocktype[BT_iron_gear_maker][FACE_up] = 17;
    set_blocktype_texture(BT_conveyor_belt_maker,9); tex1_for_blocktype[BT_conveyor_belt_maker][FACE_up] = 21;
 
-   geom_for_blocktype[BT_ore_drill] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
-   geom_for_blocktype[BT_ore_eater] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
-   geom_for_blocktype[BT_splitter ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
-   geom_for_blocktype[BT_furnace  ] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
-   geom_for_blocktype[BT_iron_gear_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
-   geom_for_blocktype[BT_conveyor_belt_maker] = STBVOX_MAKE_GEOMETRY(STBVOX_GEOM_solid, 0, 0);
    set_blocktype_texture(BT_splitter, 21);
    tex1_for_blocktype[BT_splitter][FACE_up] = 22;
-
-   geom_for_blocktype[BT_picker   ] = 0;
-   geom_for_blocktype[BT_balancer ] = 0;
 
    for (i=0; i < 256; ++i)
       texture_scales[i] = 1.0f/4;// textures[i].scale;
@@ -840,32 +837,24 @@ void save_edits(void)
 {
    FILE *f = fopen("savegame.dat", "wb");
    int i;
-   for (i=0; i < obarr_len(edit_chunks); ++i) {
+   for (i=0; i < obarr_len(edit_chunks); ++i)
       fwrite(edit_chunks[i], sizeof(edit_chunk), 1, f);
-   }
    fclose(f);
 }
 
 void load_edits(void)
 {
+   int i,j,k;
+   edit_chunk ec;
    FILE *f = fopen("savegame.dat", "rb");
    if (f) {
-      while (!feof(f)) {
-         edit_chunk ec;
-         if (fread(&ec, sizeof(edit_chunk), 1, f)) {
-            int i,j,k;
-            for (k=0; k < EDIT_CHUNK_Z_COUNT; ++k) {
-               for (j=0; j < GEN_CHUNK_SIZE_Y; ++j) {
-                  for (i=0; i < GEN_CHUNK_SIZE_X; ++i) {
-                     if (ec.blocks[k][j][i].type != BT_no_change) {
+      while (!feof(f))
+         if (fread(&ec, sizeof(edit_chunk), 1, f))
+            for (k=0; k < EDIT_CHUNK_Z_COUNT; ++k)
+               for (j=0; j < GEN_CHUNK_SIZE_Y; ++j)
+                  for (i=0; i < GEN_CHUNK_SIZE_X; ++i)
+                     if (ec.blocks[k][j][i].type != BT_no_change)
                         change_block(ec.x*GEN_CHUNK_SIZE_X+i, ec.y*GEN_CHUNK_SIZE_Y+j, ec.z*EDIT_CHUNK_Z_COUNT+k, ec.blocks[k][j][i].type, ec.blocks[k][j][i].rotate);
-                     }
-                  }
-               }
-            }
-         
-         }
-      }
       fclose(f);
    }
 }

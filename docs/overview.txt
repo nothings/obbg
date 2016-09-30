@@ -9,7 +9,10 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (43):
+Done in today's stream (44):
+   - halfheight conveyor belts (unfinished)
+
+Previous stream (43):
    - smooth camera movement when stepping up
    - fix leaking render_logi_chunks
    - new sprite art replaces old everything-is-ore
@@ -26,9 +29,6 @@ Previous stream (41)
 Previous stream (40)
    - separate iron ore and coal
    - tweaks & bugs
-
-Previous stream (38.2? 39?)
-   - initial crafting tree
 
 Previous stream (38)
    - furnace, iron gear maker, conveyor belt maker

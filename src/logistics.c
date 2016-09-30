@@ -1043,6 +1043,7 @@ static void logistics_update_block_core(int x, int y, int z, int type, int rot, 
    logistics_update_chunk(x, y, z - LOGI_CHUNK_SIZE_Z);
    logistics_update_chunk(x, y, z + LOGI_CHUNK_SIZE_Z);
 
+   // why do we have to update the diagonally-adjacent chunks?!?
    logistics_update_chunk(x - LOGI_CHUNK_SIZE_X, y, z - LOGI_CHUNK_SIZE_Z);
    logistics_update_chunk(x - LOGI_CHUNK_SIZE_X, y, z + LOGI_CHUNK_SIZE_Z);
    logistics_update_chunk(x + LOGI_CHUNK_SIZE_X, y, z - LOGI_CHUNK_SIZE_Z);
@@ -1051,9 +1052,6 @@ static void logistics_update_block_core(int x, int y, int z, int type, int rot, 
    logistics_update_chunk(x, y - LOGI_CHUNK_SIZE_Y, z + LOGI_CHUNK_SIZE_Z);
    logistics_update_chunk(x, y + LOGI_CHUNK_SIZE_Y, z - LOGI_CHUNK_SIZE_Z);
    logistics_update_chunk(x, y + LOGI_CHUNK_SIZE_Y, z + LOGI_CHUNK_SIZE_Z);
-
-   if (oldtype == BT_down_marker)
-      logistics_update_block_core(x,y,z-1,BT_empty,0,True);
 }
 
 typedef struct
@@ -2374,9 +2372,9 @@ void logistics_update_block(int x, int y, int z, int type, int rot)
    if (type == BT_conveyor_ramp_up_low) {
       // place ramp up one lower in logistics world than in physics world, so
       // other belts feed onto it automagically
-      logistics_update_block_core_queue(x,y,z-1,type,rot, True);
+      logistics_update_block_core_queue(x,y,z,type,rot, True);
       // put a placeholder where the ramp is in the physics world
-      logistics_update_block_core_queue(x,y,z, BT_down_marker, 0, True);
+//      logistics_update_block_core_queue(x,y,z, BT_down_marker, 0, True);
    } else
       logistics_update_block_core_queue(x,y,z,type,rot, True);
 }

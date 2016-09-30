@@ -50,6 +50,7 @@ void logistics_render_from_copy(render_logi_chunk **arr, float offset)
 {
    //float offset = (float) logistics_long_tick / LONG_TICK_LENGTH;// + stb_frand();
    int i,a,e;
+   float belt_zoff= -0.5;
    assert(offset >= 0 && offset <= 1);
    for (i=0; i < obarr_len(arr); ++i) {
       render_logi_chunk *c = arr[i];
@@ -82,8 +83,6 @@ void logistics_render_from_copy(render_logi_chunk **arr, float offset)
          for (a=0; a < c->num_belt_machines; ++a) {
             render_belt_machine_info *m = &c->belt_machine[a];
             switch (m->type) {
-               case BT_down_marker:
-                  break;
                case BT_balancer:
                   draw_balancer(base_x+m->pos.unpacked.x,base_y+m->pos.unpacked.y,base_z+m->pos.unpacked.z, m->rot, 1.0);
                   break;
@@ -196,7 +195,7 @@ void logistics_render_from_copy(render_logi_chunk **arr, float offset)
          for (a=0; a < c->num_belts; ++a) {
             render_belt_run *b = &c->belts[a];
             if (b->turn == 0) {
-               float z = c->chunk_z * LOGI_CHUNK_SIZE_Z + 1.0f + b->pos.unpacked.z;
+               float z = c->chunk_z * LOGI_CHUNK_SIZE_Z + 1.0f + b->pos.unpacked.z + belt_zoff;
                float x1 = (float) c->slice_x * LOGI_CHUNK_SIZE_X + b->pos.unpacked.x;
                float y1 = (float) c->slice_y * LOGI_CHUNK_SIZE_Y + b->pos.unpacked.y;
                float x2,y2;
@@ -249,7 +248,7 @@ void logistics_render_from_copy(render_logi_chunk **arr, float offset)
                   z += b->end_dz / 2.0 * (1.0 / ITEMS_PER_BELT_SIDE);
                }
             } else {
-               float z = c->chunk_z * LOGI_CHUNK_SIZE_Z + 1.0f + b->pos.unpacked.z;
+               float z = c->chunk_z * LOGI_CHUNK_SIZE_Z + 1.0f + b->pos.unpacked.z + belt_zoff;
                float x1 = (float) c->slice_x * LOGI_CHUNK_SIZE_X + b->pos.unpacked.x;
                float y1 = (float) c->slice_y * LOGI_CHUNK_SIZE_Y + b->pos.unpacked.y;
                float x2,y2;
