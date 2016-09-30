@@ -802,7 +802,7 @@ void render_objects(void)
 
    logistics_render();
 
-   draw_pickers_flush(1.0f);
+   draw_instanced_flush(1.0f);
 
    render_sprites();
 }

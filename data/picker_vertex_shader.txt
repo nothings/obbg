@@ -21,8 +21,8 @@ void main()
    vec3 tpos;
    uint rot;
 
-   vec4 transform  = texelFetch(xform_data, gl_InstanceID*2+0);
-   vec4 bone_value = texelFetch(xform_data, gl_InstanceID*2+1);
+   vec4 transform  = texelFetch(xform_data, gl_InstanceID*3+0);
+   vec4 bone_value = texelFetch(xform_data, gl_InstanceID*3+1);
 
    // bone weighting:
    // #1: x,y,z  <- bone1.xyz
