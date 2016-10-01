@@ -33,7 +33,7 @@ void world_init(void)
 
       obj[player_id].position.x = 0;
       obj[player_id].position.y = 0;
-      obj[player_id].position.z = 80;
+      obj[player_id].position.z = 79;
    }
 }
 

@@ -364,8 +364,6 @@ void render_init(void)
       s->size = stb_rand() & 1 ? 0.5 : 0.125;
    }                
    #endif
-
-   build_picker();
 }
 
 
@@ -881,6 +879,10 @@ void draw_main(void)
 
    player_zoom = 1;
 
+   {
+      float bone_values[8] = { 0 };
+      add_draw_machine(1,1,90, 0, bone_values);
+   }
    render_objects();
 
    end_time = SDL_GetPerformanceCounter();

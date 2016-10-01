@@ -2,6 +2,7 @@
    -  finish uploading videos
    -  install photoshop
    -  install sony vegas
+   -  sort obbg_funcs.h
 
    -  add mesh cache with explicit storing of coordinates & call function to access it instead of accessing inline
    -  why is set_mesh_chunk_for_coord either

@@ -67,6 +67,7 @@ extern mesh_chunk *get_physics_chunk_for_coord(int x, int y);
 extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interpolate_z *iz);
 extern void build_picker(void);
 extern void add_draw_picker(float x, float y, float z, int rot, float states[4]);
+extern void add_draw_machine(float x, float y, float z, int rot, float states[8]);
 extern void finished_caching_mesh_chunk(int x, int y, Bool needs_triangles);
 extern void player_vacuum(Bool enable, vec *loc);
 extern Bool available_inventory_slot(int type);

@@ -85,8 +85,8 @@ static int build_picker_box(picker_vertex *pv, float x, float y, float z, float 
    return 24;
 }
 
-static GLuint picker_vbuf, machine_vbuf;
-static int picker_vertices=0, machine_vertices=0;
+static GLuint picker_vbuf;
+static int picker_vertices=0;
 
 #pragma warning(disable:4305)
 void build_picker(void)
@@ -132,6 +132,82 @@ void build_picker(void)
    glGenBuffersARB(1, &picker_vbuf);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, picker_vbuf);
    glBufferDataARB(GL_ARRAY_BUFFER_ARB, picker_vertices * sizeof(picker_vertex), picker_mesh_storage, GL_STATIC_DRAW_ARB);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+}
+
+static GLuint machine_vbuf;
+static machine_vertex machine_mesh_storage[1024];
+static uint16 machine_indices[4096];
+static int num_machine_indices;
+static int machine_vertices;
+
+static unsigned char machine_boneweights[12];
+static void mvertex(float nx, float ny, float nz, float px, float py, float pz)
+{
+   machine_vertex *mv = &machine_mesh_storage[machine_vertices++];
+   mv->pos [0] = px, mv->pos [1] = py, mv->pos [2] = pz;
+   mv->norm[0] = nx, mv->norm[1] = ny, mv->norm[2] = nz;
+   memcpy(mv->boneweights, machine_boneweights, sizeof(mv->boneweights));
+}
+
+static void machine_box(float x, float y, float z, float sx, float sy, float sz)
+{
+   int idx, i;
+   float x0,y0,z0,x1,y1,z1;
+   sx /=2, sy/=2, sz/=2;
+   x0 = x-sx; y0 = y-sy; z0 = z-sz;
+   x1 = x+sx; y1 = y+sy; z1 = z+sz;
+
+   idx = machine_vertices;
+
+   mvertex(0,0,-1, x0,y0,z0);
+   mvertex(0,0,-1, x1,y0,z0);
+   mvertex(0,0,-1, x1,y1,z0);
+   mvertex(0,0,-1, x0,y1,z0);
+
+   mvertex(0,0,1, x1,y0,z1);
+   mvertex(0,0,1, x0,y0,z1);
+   mvertex(0,0,1, x0,y1,z1);
+   mvertex(0,0,1, x1,y1,z1);
+
+   mvertex(-1,0,0, x0,y1,z1);
+   mvertex(-1,0,0, x0,y0,z1);
+   mvertex(-1,0,0, x0,y0,z0);
+   mvertex(-1,0,0, x0,y1,z0);
+
+   mvertex(1,0,0, x1,y0,z1);
+   mvertex(1,0,0, x1,y1,z1);
+   mvertex(1,0,0, x1,y1,z0);
+   mvertex(1,0,0, x1,y0,z0);
+
+   mvertex(0,-1,0, x0,y0,z1);
+   mvertex(0,-1,0, x1,y0,z1);
+   mvertex(0,-1,0, x1,y0,z0);
+   mvertex(0,-1,0, x0,y0,z0);
+
+   mvertex(0,1,0, x1,y1,z1);
+   mvertex(0,1,0, x0,y1,z1);
+   mvertex(0,1,0, x0,y1,z0);
+   mvertex(0,1,0, x1,y1,z0);
+
+   for (i=0; i < 6; ++i) {
+      machine_indices[num_machine_indices++] = idx  ;
+      machine_indices[num_machine_indices++] = idx+1;
+      machine_indices[num_machine_indices++] = idx+2;
+      machine_indices[num_machine_indices++] = idx  ;
+      machine_indices[num_machine_indices++] = idx+2;
+      machine_indices[num_machine_indices++] = idx+3;
+      idx += 4;
+   }
+}
+
+void build_machine(void)
+{
+   machine_box(0,0,0, 20,20,20);
+
+   glGenBuffersARB(1, &machine_vbuf);
+   glBindBufferARB(GL_ARRAY_BUFFER_ARB, machine_vbuf);
+   glBufferDataARB(GL_ARRAY_BUFFER_ARB, machine_vertices * sizeof(machine_vertex), machine_mesh_storage, GL_STATIC_DRAW_ARB);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
 }
 
@@ -264,7 +340,7 @@ void draw_instanced_flush(float alpha)
 
    stbglEnableVertexAttribArray(4);
 
-   glDrawArraysInstancedARB(GL_QUADS, 0, machine_vertices, num_drawn_machines);
+   glDrawElementsInstancedARB(GL_TRIANGLES, num_machine_indices, GL_UNSIGNED_SHORT, machine_indices, num_drawn_machines);
    num_drawn_machines = 0;
 
    stbglDisableVertexAttribArray(0);
@@ -307,4 +383,7 @@ void init_object_render(void)
    machine_prog = compile_object_shader("machine");
 
    create_picker_buffers();
+
+   build_picker();
+   build_machine();
 }

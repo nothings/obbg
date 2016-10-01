@@ -165,6 +165,14 @@ SOURCE=..\src\obbg_funcs.h
 # PROP Default_Filter ""
 # Begin Source File
 
+SOURCE=..\data\machine_fragment_shader.txt
+# End Source File
+# Begin Source File
+
+SOURCE=..\data\machine_vertex_shader.txt
+# End Source File
+# Begin Source File
+
 SOURCE=..\data\picker_fragment_shader.txt
 # End Source File
 # Begin Source File
