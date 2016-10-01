@@ -9,7 +9,11 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (44):
+Done in today's stream (45):
+   - half-height conveyor belts
+   - animated machines
+
+Previous stream (44):
    - halfheight conveyor belts (unfinished)
 
 Previous stream (43):

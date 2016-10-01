@@ -136,12 +136,18 @@ void build_picker(void)
 }
 
 static GLuint machine_vbuf;
-static machine_vertex machine_mesh_storage[1024];
-static uint16 machine_indices[4096];
+static machine_vertex machine_mesh_storage[8192];
+static uint16 machine_indices[4096*4];
 static int num_machine_indices;
 static int machine_vertices;
 
 static signed char machine_boneweights[12];
+static Bool machine_faceted;
+
+static void mc_faceted_lighting(Bool flag)
+{
+   machine_faceted = flag;
+}
 
 static void mc_rotate_x(float x) // x = -1..1
 {
@@ -161,7 +167,7 @@ static void mc_no_rotate(void)
 
 static int8 coded(float v)
 {
-   return (int8) stb_linear_remap(v, -1, 1, -127, 127);
+   return (int8) (stb_linear_remap(v, -1, 1, -127, 127)+0.5);
 }
 
 static void mc_rot_center(float x, float y, float z)
@@ -184,7 +190,10 @@ static void mvertex(float nx, float ny, float nz, float px, float py, float pz)
 {
    machine_vertex *mv = &machine_mesh_storage[machine_vertices++];
    mv->pos [0] = px, mv->pos [1] = py, mv->pos [2] = pz;
-   mv->norm[0] = nx, mv->norm[1] = ny, mv->norm[2] = nz;
+   if (machine_faceted)
+      mv->norm[0] = mv->norm[1] = mv->norm[2] = 0;
+   else
+      mv->norm[0] = nx, mv->norm[1] = ny, mv->norm[2] = nz;
    memcpy(mv->boneweights, machine_boneweights, sizeof(mv->boneweights));
 }
 
@@ -199,6 +208,33 @@ static void mquad(int i, int j, int k, int l)
 {
    mtri(i,j,k);
    mtri(i,k,l);
+}
+
+static void machine_box_fast(float x, float y, float z, float sx, float sy, float sz)
+{
+   int idx;
+   float x0,y0,z0,x1,y1,z1;
+   sx /=2, sy/=2, sz/=2;
+   x0 = x-sx; y0 = y-sy; z0 = z-sz;
+   x1 = x+sx; y1 = y+sy; z1 = z+sz;
+
+   idx = machine_vertices;
+
+   mvertex(0,0,0, x0,y0,z0);
+   mvertex(0,0,0, x1,y0,z0);
+   mvertex(0,0,0, x0,y1,z0);
+   mvertex(0,0,0, x1,y1,z0);
+   mvertex(0,0,0, x0,y0,z1);
+   mvertex(0,0,0, x1,y0,z1);
+   mvertex(0,0,0, x0,y1,z1);
+   mvertex(0,0,0, x1,y1,z1);
+
+   mquad(idx+0,idx+1,idx+3,idx+2);
+   mquad(idx+5,idx+4,idx+6,idx+7);
+   mquad(idx+6,idx+4,idx+0,idx+2);
+   mquad(idx+5,idx+7,idx+3,idx+1);
+   mquad(idx+4,idx+5,idx+1,idx+0);
+   mquad(idx+7,idx+6,idx+2,idx+3);
 }
 
 static void machine_box(float x, float y, float z, float sx, float sy, float sz)
@@ -247,6 +283,7 @@ static void machine_box(float x, float y, float z, float sx, float sy, float sz)
    }
 }
 
+Bool phase;
 #pragma warning(disable:4244)
 void machine_cylinder_z(float x, float y, float z, float sx, float sz, int sides)
 {
@@ -258,8 +295,8 @@ void machine_cylinder_z(float x, float y, float z, float sx, float sz, int sides
    mvertex(0,0,-1, x,y,z-sz/2);
    idx = machine_vertices;
    for (i=0; i < sides; ++i) {
-      float cs = cos(3.141592*2/(2*sides)*(2*i+1));
-      float sn = sin(3.141592*2/(2*sides)*(2*i+1));
+      float cs = cos(3.141592*2/(2*sides)*(2*i+phase));
+      float sn = sin(3.141592*2/(2*sides)*(2*i+phase));
       mvertex(cs,sn, 1, x + cs*sx, y + sn*sx, z + sz/2);
       mvertex(cs,sn,-1, x + cs*sx, y + sn*sx, z - sz/2);
    }
@@ -321,20 +358,37 @@ void machine_teeth_z(float x, float y, float z, float sx, float sy, float sz, fl
 
 void build_machine(void)
 {
+   mc_no_rotate();
+   //machine_box(0.5,0.5,0.4, 0.45,0.45,0.4);
+
    mc_rotate_x(1.0);
    mc_rot_center(0.25,0.25,0.25);
-   machine_box(0,0,0, 0.25,0.25,0.25);
+   machine_box_fast(0,0,0, 0.25,0.25,0.25);
 
-   mc_no_rotate();
-   mc_rot_center(0.25,0.5,0.5);
+   phase = 1;
+   mc_rot_center(0.25,0.35,0.5);
    mc_rotate_z(32.0/127);
    machine_cylinder_z(0,0,0, 0.4/4,0.1/2, 10);
    machine_teeth_z(0,0,0,  0.52/4,0.3/4,0.95*0.1/2,0.95*0.1/2, 0.08/4, 10);
 
-   mc_rot_center(0.50,0.5,0.5);
+   mc_rot_center(0.50,0.35,0.5);
    mc_rotate_z(-32.0/127 * 10/16);
    machine_cylinder_z(0,0,0, 0.4/4,0.1/2, 16);
    machine_teeth_z(0,0,0,  0.52/4,0.3/4,0.95*0.1/2,0.95*0.1/2, 0.08/5, 16);
+
+
+   mc_faceted_lighting(True);
+   phase = 0;
+
+   mc_rot_center(0.25,0.75,0.5);
+   mc_rotate_z(32.0/127);
+   machine_cylinder_z(0,0,0, 0.4/4,0.1/2, 10);
+   machine_teeth_z(0,0,0,  0.52/4,0.3/4,0.1/2,0.1/2, 0.08/4, 10);
+
+   mc_rot_center(0.50,0.75,0.5);
+   mc_rotate_z(-32.0/127 * 10/16);
+   machine_cylinder_z(0,0,0, 0.4/4,0.1/2, 16);
+   machine_teeth_z(0,0,0,  0.52/4,0.3/4,0.1/2,0.1/2, 0.08/5, 16);
 
 #if 0
    mc_rotate_z(1.0);
@@ -364,7 +418,7 @@ typedef struct
 static instance_data pickers[MAX_DRAW_PICKERS];
 static int num_drawn_pickers;
 
-#define MAX_DRAW_MACHINES  20000
+#define MAX_DRAW_MACHINES  120000
 static instance_data machines[MAX_DRAW_MACHINES];
 static int num_drawn_machines;
 

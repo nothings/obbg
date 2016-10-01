@@ -882,14 +882,19 @@ void draw_main(void)
    player_zoom = 1;
 
    {
-      int i;
+      int i,j,k;
       float bone_values[8] = { 0 };
       bone_values[5] = global_timer*4;
       bone_values[4] = 1;
       add_draw_machine(-15,1,78, 0, bone_values);
-      for (i=0; i < 1000; ++i) {
-         add_draw_machine(-15,1+i,78, i&3, bone_values);
+      for (k=0; k < 1; ++k) {
+      for (j=0; j < 1; ++j) {
+      for (i=0; i < 50; ++i) {
+         add_draw_machine(-15+j,1+i,78+k, 0, bone_values);
          bone_values[5] += 0.5;
+      }
+      }
+      bone_values[5] = global_timer*4;
       }
    }
    render_objects();
@@ -1238,7 +1243,7 @@ int SDL_main(int argc, char **argv)
    if (program_mode != MODE_single_player)
       networking = net_init(program_mode == MODE_server, server_port);
 
-   //SDL_GL_SetSwapInterval(0);   // disable vsync
+   SDL_GL_SetSwapInterval(0);   // disable vsync
    game_init();
    render_init();
 
