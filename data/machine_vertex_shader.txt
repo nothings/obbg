@@ -33,25 +33,35 @@ void main()
    pos.xyz += bone3.xyz * bone_value2.z;
    pos.z   += bone3.w   * bone_value2.w;
 
-   float val = (bone2.w < 0 ? pos.x : pos.z);
+   vec3 norm = normal;
 
-   float res =  val  * cs - pos.y * sn;
-   pos.y     = pos.y * cs +  val  * sn;
-   pos.x     = (bone2.w < 0 ? val : pos.x);
-   pos.z     = (bone2.w > 0 ? val : pos.z);
+   if (bone1.w == 0.) {
+      float val = pos.x;
+      pos.x     =  val * cs - pos.y  * sn;
+      pos.y     =  val * sn + pos.y  * cs;
+      val = norm.x;
+      norm.x    =  val * cs - norm.y * sn;
+      norm.y    =  val * sn + norm.y * cs;
+   } else {
+      float val = pos.z;
+      pos.z     = val * cs - pos.y  * sn;
+      pos.y     = val * sn + pos.y  * cs;
+      val = norm.z;
+      norm.z    = val * cs - norm.y * sn;
+      norm.y    = val * sn + norm.y * cs;
+   }
 
    pos.xyz += bone2.xyz * bone_value2.x;
-   pos.xyz += bone3.xyz * bone_value2.z;
-   pos.z   += bone3.w   * bone_value2.w;
+   pos.xyz += bone1.xyz * bone_value2.z;
 
    rot = uint(transform.w);
    tpos.x = dot(rotate[rot].xy, pos.xy);
    tpos.y = dot(rotate[rot].zw, pos.xy);
    tpos.z = pos.z;
 
-   vnormal.x = dot(rotate[rot].xy, normal.xy);
-   vnormal.y = dot(rotate[rot].zw, normal.xy);
-   vnormal.z = normal.z;
+   vnormal.x = dot(rotate[rot].xy, norm.xy);
+   vnormal.y = dot(rotate[rot].zw, norm.xy);
+   vnormal.z = norm.z;
 
    tpos += transform.xyz;
    rpos = tpos - camera_pos;

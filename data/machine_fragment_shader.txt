@@ -20,7 +20,7 @@ vec3 compute_fog(vec3 color, vec3 relative_pos)
 void main()
 {
    vec4 color = vec4(1.0,1.0,1.0,1.0);
-   color.rgb *= (dot(vnormal, vec3(0.6,0,0.8))+1.0)/2.0f;
+   color.rgb *= (dot(normalize(vnormal), vec3(0.6,0,0.8))+1.0)/2.0f;
    color.rgba *= recolor.rgba;
    #if 1
    outcolor.xyz = compute_fog(color.xyz, rpos);

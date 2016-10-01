@@ -141,13 +141,64 @@ static uint16 machine_indices[4096];
 static int num_machine_indices;
 static int machine_vertices;
 
-static unsigned char machine_boneweights[12];
+static signed char machine_boneweights[12];
+
+static void mc_rotate_x(float x) // x = -1..1
+{
+   machine_boneweights[3] = 127;
+   machine_boneweights[7] = (int8) (-x * 127);
+}
+static void mc_rotate_z(float z)
+{
+   machine_boneweights[3] = 0;
+   machine_boneweights[7] = (int8) (z * 127);
+}
+static void mc_no_rotate(void)
+{
+   machine_boneweights[3] = 0;
+   machine_boneweights[7] = 0;
+}
+
+static int8 coded(float v)
+{
+   return (int8) stb_linear_remap(v, -1, 1, -127, 127);
+}
+
+static void mc_rot_center(float x, float y, float z)
+{
+   machine_boneweights[4] = coded(x);
+   machine_boneweights[5] = coded(y);
+   machine_boneweights[6] = coded(z);
+}
+
+#if 0
+   pos.xyz += bone3.xyz * bone_value2.z;
+   pos.z   += bone3.w   * bone_value2.w;
+
+   pos.xyz += bone2.xyz * bone_value2.x;
+   pos.xyz += bone3.xyz * bone_value2.z;
+   pos.z   += bone3.w   * bone_value2.w;
+#endif
+
 static void mvertex(float nx, float ny, float nz, float px, float py, float pz)
 {
    machine_vertex *mv = &machine_mesh_storage[machine_vertices++];
    mv->pos [0] = px, mv->pos [1] = py, mv->pos [2] = pz;
    mv->norm[0] = nx, mv->norm[1] = ny, mv->norm[2] = nz;
    memcpy(mv->boneweights, machine_boneweights, sizeof(mv->boneweights));
+}
+
+static void mtri(int i, int j, int k)
+{
+   machine_indices[num_machine_indices++] = i;
+   machine_indices[num_machine_indices++] = j;
+   machine_indices[num_machine_indices++] = k;
+}
+
+static void mquad(int i, int j, int k, int l)
+{
+   mtri(i,j,k);
+   mtri(i,k,l);
 }
 
 static void machine_box(float x, float y, float z, float sx, float sy, float sz)
@@ -191,19 +242,111 @@ static void machine_box(float x, float y, float z, float sx, float sy, float sz)
    mvertex(0,1,0, x1,y1,z0);
 
    for (i=0; i < 6; ++i) {
-      machine_indices[num_machine_indices++] = idx  ;
-      machine_indices[num_machine_indices++] = idx+1;
-      machine_indices[num_machine_indices++] = idx+2;
-      machine_indices[num_machine_indices++] = idx  ;
-      machine_indices[num_machine_indices++] = idx+2;
-      machine_indices[num_machine_indices++] = idx+3;
+      mquad(idx,idx+1,idx+2,idx+3);
       idx += 4;
+   }
+}
+
+#pragma warning(disable:4244)
+void machine_cylinder_z(float x, float y, float z, float sx, float sz, int sides)
+{
+   int i;
+   int center = machine_vertices;
+   int idx;
+   int prev_idx;
+   mvertex(0,0,1, x,y,z+sz/2);
+   mvertex(0,0,-1, x,y,z-sz/2);
+   idx = machine_vertices;
+   for (i=0; i < sides; ++i) {
+      float cs = cos(3.141592*2/(2*sides)*(2*i+1));
+      float sn = sin(3.141592*2/(2*sides)*(2*i+1));
+      mvertex(cs,sn, 1, x + cs*sx, y + sn*sx, z + sz/2);
+      mvertex(cs,sn,-1, x + cs*sx, y + sn*sx, z - sz/2);
+   }
+
+   prev_idx = machine_vertices - 2;
+   for (i=0; i < sides; ++i) {
+      // sides
+      mtri(idx, prev_idx, center);
+      mtri(prev_idx+1, idx+1, center+1);
+      // faces
+      mquad(idx, idx+1, prev_idx+1, prev_idx);
+      prev_idx = idx;
+      idx += 2;
+   }
+}
+
+void machine_teeth_z(float x, float y, float z, float sx, float sy, float sz, float center_sz, float teeth_width, int sides)
+{
+   float gear_width_in_radians = teeth_width / sx;
+
+   int idx = machine_vertices;
+   int prev_idx,i;
+
+   for (i=0; i < sides; ++i) {
+      float nx,ny;
+      float cs,sn;
+      cs = cos(3.141592*2/(2*sides)*(2*i-1));
+      sn = sin(3.141592*2/(2*sides)*(2*i-1));
+      mvertex(cs,sn, 0, x + cs*sy, y + sn*sy, z + center_sz/2);
+      mvertex(cs,sn, 0, x + cs*sy, y + sn*sy, z - center_sz/2);
+
+      nx = cos(3.141592*2/sides*i-0.45);
+      ny = cos(3.141592*2/sides*i-0.45);
+      cs = cos(3.141592*2/sides*i - gear_width_in_radians/2);
+      sn = sin(3.141592*2/sides*i - gear_width_in_radians/2);
+      mvertex(nx,ny, 1, x + cs*sx, y + sn*sx, z + sz/2);
+      mvertex(nx,ny, 1, x + cs*sx, y + sn*sx, z - sz/2);
+
+      nx = cos(3.141592*2/sides*i+0.45);
+      ny = cos(3.141592*2/sides*i+0.45);
+      cs = cos(3.141592*2/sides*i + gear_width_in_radians/2);
+      sn = sin(3.141592*2/sides*i + gear_width_in_radians/2);
+      mvertex(nx,ny, 1, x + cs*sx, y + sn*sx, z + sz/2);
+      mvertex(nx,ny,-1, x + cs*sx, y + sn*sx, z - sz/2);
+   }
+
+   prev_idx = machine_vertices-6;
+   for (i=0; i < sides; ++i) {
+      mquad(prev_idx+5, prev_idx+4, idx+0, idx+1);
+      mquad(idx+1,idx+0,idx+2,idx+3);
+      mquad(idx+4,idx+5,idx+3,idx+2);
+
+      mquad(idx, prev_idx+4, prev_idx+2 , prev_idx);
+      mquad(prev_idx+1, prev_idx+3, prev_idx+5, idx+1);
+      prev_idx = idx;
+      idx += 6;
    }
 }
 
 void build_machine(void)
 {
-   machine_box(0,0,0, 20,20,20);
+   mc_rotate_x(1.0);
+   mc_rot_center(0.25,0.25,0.25);
+   machine_box(0,0,0, 0.25,0.25,0.25);
+
+   mc_no_rotate();
+   mc_rot_center(0.25,0.5,0.5);
+   mc_rotate_z(32.0/127);
+   machine_cylinder_z(0,0,0, 0.4/4,0.1/2, 10);
+   machine_teeth_z(0,0,0,  0.52/4,0.3/4,0.95*0.1/2,0.95*0.1/2, 0.08/4, 10);
+
+   mc_rot_center(0.50,0.5,0.5);
+   mc_rotate_z(-32.0/127 * 10/16);
+   machine_cylinder_z(0,0,0, 0.4/4,0.1/2, 16);
+   machine_teeth_z(0,0,0,  0.52/4,0.3/4,0.95*0.1/2,0.95*0.1/2, 0.08/5, 16);
+
+#if 0
+   mc_rotate_z(1.0);
+   mc_rot_center(0.75,0.75,0.25);
+   machine_box(0,0,0, 0.25,0.25,0.25);
+   mc_rotate_x(-0.5);
+   mc_rot_center(0.25,0.75,0.25);
+   machine_box(0,0,0, 0.25,0.25,0.25);
+   mc_rotate_z(-0.5);
+   mc_rot_center(0.75,0.25,0.25);
+   machine_box(0,0,0, 0.25,0.25,0.25);
+#endif
 
    glGenBuffersARB(1, &machine_vbuf);
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, machine_vbuf);
@@ -233,7 +376,6 @@ void upload_instance_buffer(size_t *machine_offset)
    size_t machine_size = num_drawn_machines * sizeof(machines[0]);
    size_t total_size = picker_size + machine_size;
    *machine_offset = picker_size;
-
 
    glBindBufferARB(GL_TEXTURE_BUFFER_ARB, instance_data_buf);
    glBufferDataARB(GL_TEXTURE_BUFFER_ARB, total_size, NULL, GL_STREAM_DRAW_ARB);
@@ -279,7 +421,7 @@ void setup_instanced_uniforms(int prog, int instance_offset, float alpha)
    int fogdata    = stbgl_find_uniform(prog, "fogdata");
    int camera_pos = stbgl_find_uniform(prog, "camera_pos");
    int recolor    = stbgl_find_uniform(prog, "recolor");
-   int offset     = stbgl_find_uniform(prog, "instance_offset");
+   int offset     = stbgl_find_uniform(prog, "buffer_start");
 
    float fog_table[4];
    float recolor_value[4] = { 1.0,1.0,1.0,alpha };
@@ -305,11 +447,13 @@ void setup_instanced_uniforms(int prog, int instance_offset, float alpha)
 void draw_instanced_flush(float alpha)
 {
    size_t machine_offset;
+   //num_drawn_pickers=0;
    upload_instance_buffer(&machine_offset);
       
    glDisable(GL_LIGHTING);
    glDisable(GL_TEXTURE_2D);
    stbglUseProgram(picker_prog);
+   glTexCoord2f(0,0);
 
    setup_instanced_uniforms(picker_prog, 0, alpha);
 
@@ -329,7 +473,7 @@ void draw_instanced_flush(float alpha)
 
    stbglUseProgram(machine_prog);
 
-   setup_instanced_uniforms(machine_prog, 0, alpha);
+   setup_instanced_uniforms(machine_prog, machine_offset, alpha);
 
    glBindBufferARB(GL_ARRAY_BUFFER_ARB, machine_vbuf);
    stbglVertexAttribPointer(0, 3, GL_FLOAT, 0, sizeof(machine_vertex), (void*) 0);

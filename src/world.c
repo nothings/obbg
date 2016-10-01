@@ -59,7 +59,7 @@ void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y,
 }
 
 float pending_view_x;
-float pending_view_z;
+float pending_view_z = 180+75;
 
 static float view_x_vel = 0;
 static float view_z_vel = 0;

@@ -735,6 +735,7 @@ void render_sprites(void)
 
    if (alpha_test_sprites) {
       glEnable(GL_ALPHA_TEST);
+      glAlphaFunc(GL_GREATER, 0.5);
       glDisable(GL_BLEND);
       glDepthMask(GL_TRUE);
    } else {
@@ -814,6 +815,7 @@ int face_dir[6][3] = {
    { 0,0,-1 },
 };
 
+float global_timer;
 void draw_main(void)
 {
    Uint64 start_time, end_time; // render time
@@ -880,8 +882,15 @@ void draw_main(void)
    player_zoom = 1;
 
    {
+      int i;
       float bone_values[8] = { 0 };
-      add_draw_machine(1,1,90, 0, bone_values);
+      bone_values[5] = global_timer*4;
+      bone_values[4] = 1;
+      add_draw_machine(-15,1,78, 0, bone_values);
+      for (i=0; i < 1000; ++i) {
+         add_draw_machine(-15,1+i,78, i&3, bone_values);
+         bone_values[5] += 0.5;
+      }
    }
    render_objects();
 
@@ -987,7 +996,6 @@ float tex2_alpha = 1.0;
 
 int raw_level_time;
 
-float global_timer;
 int global_hack;
 int quit;
 
