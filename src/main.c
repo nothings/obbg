@@ -890,7 +890,7 @@ void draw_main(void)
       add_draw_machine(-15,1,78, 0, bone_values);
       for (k=0; k < 1; ++k) {
       for (j=0; j < 1; ++j) {
-      for (i=0; i < 50; ++i) {
+      for (i=0; i < 1; ++i) {
          add_draw_machine(-15+j,1+i,78+k, 0, bone_values);
          bone_values[5] += 0.5;
       }

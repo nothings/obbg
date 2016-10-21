@@ -422,6 +422,7 @@ typedef struct
 } consider_mesh_t;
 
 static consider_mesh_t consider_mesh[MAX_CONSIDER_MESHES];
+static requested_mesh physics_mesh[MAX_CONSIDER_MESHES];
 
 #define PRIORITY_unused   (50000.0f*50000.0f*2.0f)
 #define PRIORITY_discard  (PRIORITY_unused*2.0f)
@@ -429,7 +430,7 @@ static consider_mesh_t consider_mesh[MAX_CONSIDER_MESHES];
 void request_mesh_generation(int cam_x, int cam_y)
 {
    size_t storage=0;
-   int i,j, n=0, m=0;
+   int i,j, n=0, m=0, num_phys_req;
    int rad = (view_distance >> MESH_CHUNK_SIZE_X_LOG2) + 1;
    requested_mesh *rm = get_requested_mesh_alternate();
    int qchunk_x = C_MESH_CHUNK_X_FOR_WORLD_X(cam_x);
@@ -476,7 +477,7 @@ void request_mesh_generation(int cam_x, int cam_y)
 
    qsort(consider_mesh, n, sizeof(consider_mesh[0]), stb_floatcmp(offsetof(consider_mesh_t, priority)));
 
-   storage = 0;      
+   storage = 0;
    for (i=0; i < n; ++i) {
       if (consider_mesh[i].mc != NULL) {
          size_t new_storage = storage + consider_mesh[i].mc->total_size;
@@ -495,17 +496,29 @@ void request_mesh_generation(int cam_x, int cam_y)
    // next in priority order does not.
 
    // fill out start of requested_meshes with physics meshes, which are always higher priority
-   m = physics_set_player_coord(rm, MAX_BUILT_MESHES, cam_x, cam_y);
+   num_phys_req = physics_set_player_coord(physics_mesh, MAX_BUILT_MESHES, cam_x, cam_y);
 
-   // now add the rendering meshes we want built
-   for (i=0; i < n && m < MAX_BUILT_MESHES; ++i) {
-      if (consider_mesh[i].mc == NULL || consider_mesh[i].mc->placeholder_for_size_info) {
+   i = 0;
+   j = 0;
+   m = 0;
+
+   // merge sorted arrays
+   while (i < n || j < num_phys_req) {
+      if (m >= MAX_BUILT_MESHES)
+         break;
+      while (i < n && !(consider_mesh[i].mc == NULL || consider_mesh[i].mc->placeholder_for_size_info))
+         ++i;
+
+      if ((i < n && j < num_phys_req && physics_mesh[j].priority < consider_mesh[i].priority) || i >= n) {
+         rm[m++] = physics_mesh[j++];
+      } else if (i < n) {
          rm[m].x = consider_mesh[i].x;
          rm[m].y = consider_mesh[i].y;
          rm[m].state = RMS_requested;
          rm[m].needs_triangles = True;
          rm[m].rebuild_chunks = consider_mesh[i].dirty;
          rm[m].priority = consider_mesh[i].priority;
+         ++i;
          ++m;
       }
    }

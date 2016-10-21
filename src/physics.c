@@ -2,8 +2,8 @@
 #include <math.h>
 
 
-#define S_PHYSICS_CACHE_X_LOG2  2
-#define S_PHYSICS_CACHE_Y_LOG2  2
+#define S_PHYSICS_CACHE_X_LOG2  3
+#define S_PHYSICS_CACHE_Y_LOG2  3
 
 #define S_PHYSICS_CACHE_X  (1 << S_PHYSICS_CACHE_X_LOG2)
 #define S_PHYSICS_CACHE_Y  (1 << S_PHYSICS_CACHE_Y_LOG2)
@@ -36,7 +36,7 @@ void update_physics_cache_feedback(void)
 
 int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py)
 {
-   int i,j,n=0;
+   int i,j,k,n=0;
 
    int player_cx, player_cy;
 
@@ -47,23 +47,33 @@ int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py)
    player_cy = C_MESH_CHUNK_Y_FOR_WORLD_Y(player_y);
 
    if (rm != NULL) {
-      for (j=0; j < S_PHYSICS_CACHE_Y; ++j) {
-         for (i=0; i < S_PHYSICS_CACHE_X; ++i) {
-            int rx = player_cx - S_PHYSICS_CACHE_X/2 + i;
-            int ry = player_cy - S_PHYSICS_CACHE_Y/2 + j;
-            mesh_chunk *phys_cache_mc = &s_phys_cache[ry & (S_PHYSICS_CACHE_Y-1)][rx & (S_PHYSICS_CACHE_X-1)];
-            if (phys_cache_mc->chunk_x != rx || phys_cache_mc->chunk_y != ry) {
-               if (n < max_req) {
-                  rm[n].x = rx << MESH_CHUNK_SIZE_X_LOG2;
-                  rm[n].y = ry << MESH_CHUNK_SIZE_Y_LOG2;
-                  rm[n].state = RMS_requested;
-                  rm[n].needs_triangles = False;
-                  ++n;
+      for (k=0; k < stb_max(S_PHYSICS_CACHE_X, S_PHYSICS_CACHE_Y); ++k) {
+         for (j=0; j < S_PHYSICS_CACHE_Y; ++j) {
+            for (i=0; i < S_PHYSICS_CACHE_X; ++i) {
+               int dy = j - S_PHYSICS_CACHE_Y/2;
+               int dx = i - S_PHYSICS_CACHE_X/2;
+               if (abs(dx)+abs(dy) == k) {
+                  int rx = player_cx + dx;
+                  int ry = player_cy + dy;
+                  mesh_chunk *phys_cache_mc = &s_phys_cache[ry & (S_PHYSICS_CACHE_Y-1)][rx & (S_PHYSICS_CACHE_X-1)];
+                  if (phys_cache_mc->chunk_x != rx || phys_cache_mc->chunk_y != ry) {
+                     if (n < max_req) {
+                        int dx_w = dx * MESH_CHUNK_SIZE_X;
+                        int dy_w = dy * MESH_CHUNK_SIZE_Y;
+                        rm[n].x = rx << MESH_CHUNK_SIZE_X_LOG2;
+                        rm[n].y = ry << MESH_CHUNK_SIZE_Y_LOG2;
+                        rm[n].state = RMS_requested;
+                        rm[n].needs_triangles = False;
+                        rm[n].priority = (dx_w * dx_w + dy_w * dy_w)/2.0f - 100.0f;
+                        ++n;
+                     }
+                  }
                }
             }
          }
       }
    }
+   qsort(rm, n, sizeof(rm[0]), stb_floatcmp(offsetof(requested_mesh, priority)));
 
    update_physics_cache_feedback();
 
