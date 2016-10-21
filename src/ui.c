@@ -2,6 +2,7 @@
 #include "SDL.h"
 #define STB_GLEXT_DECLARE "glext_list.h"
 #include "stb_gl.h"
+#include <math.h>
 
 Bool creative = True;
 
@@ -527,6 +528,45 @@ void throw_thing(void)
    objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,22,0);
 }
 
+int path_length;
+vec3i path_step[256];
+
+vec3i last_pos, prev_end;
+
+void test_pathfind(Bool repeat)
+{
+   path_behavior pb = { 0 };
+   vec3i start;
+
+   pb.max_step_down = 2;
+   pb.estimate_down_cost = 2;
+   pb.step_down_cost[1] = 2;
+   pb.step_down_cost[2] = 9;
+
+   pb.max_step_up = 1;
+   pb.step_up_cost[1] = 3;
+   pb.estimate_up_cost = 3;
+
+   pb.size.x = 1;
+   pb.size.y = 1;
+   pb.size.z = 1;
+
+   pb.flying = False;
+
+   start.x = (int) floor(obj[player_id].position.x);
+   start.y = (int) floor(obj[player_id].position.y);
+   start.z = (int) (obj[player_id].position.z + size_for_type[OTYPE_player][0][2] + 0.01f);
+
+   if (repeat == False) {
+      if (last_pos.x != 0 || last_pos.y != 0 || last_pos.z != 0)
+         path_length = path_find(&pb, start, last_pos, path_step, sizeof(path_step)/sizeof(path_step[0]));
+      prev_end = last_pos;
+      last_pos = start;
+   } else {
+      path_length = path_find(&pb, last_pos, prev_end, path_step, sizeof(path_step)/sizeof(path_step[0]));
+   }
+}
+
 extern Bool player_is_vacuuming;
 
 void process_key_down(int k, int s, SDL_Keymod mod)
@@ -554,6 +594,8 @@ void process_key_down(int k, int s, SDL_Keymod mod)
    if (s == SDL_SCANCODE_H) global_hack = !global_hack;
    if (s == SDL_SCANCODE_P) debug_render = !debug_render;
    if (s == SDL_SCANCODE_C) show_memory = !show_memory;//examine_outstanding_genchunks();
+   if (s == SDL_SCANCODE_O) test_pathfind(False);
+   if (s == SDL_SCANCODE_L) test_pathfind(True);
 
    if (s == SDL_SCANCODE_E) {
       if (ui_screen != UI_SCREEN_none) {
@@ -724,11 +766,36 @@ void do_ui_rendering_2d(void)
    }
 }
 
+extern path_node nodes[];
+extern int node_alloc;
+
 void do_ui_rendering_3d(void)
 {
    int i;
    vec pos[2];
    RaycastResult result;
+
+   glColor3f(1.0f,1.0f,0.5f);
+
+   stbgl_drawBox(last_pos.x+0.5f,last_pos.y+0.5f,last_pos.z+0.5, 0.2f,0.2f,0.2f, 0);
+   stbgl_drawBox(prev_end.x+0.5f,prev_end.y+0.5f,prev_end.z+0.5, 0.2f,0.2f,0.2f, 0);
+
+   for (i=0; i < node_alloc; ++i) {
+      float x = last_pos.x + nodes[i].x + 0.5f;
+      float y = last_pos.y + nodes[i].y + 0.5f;
+      float z = last_pos.z + nodes[i].z + 0.1f;
+      stbgl_drawBox(x,y,z, 0.1f,0.1f,0.1f, 0);
+   }
+
+   glColor3f(1.0f,1.0f,1.0f);
+   for (i=0; i < path_length; ++i) {
+      float x = path_step[i].x + 0.5f;
+      float y = path_step[i].y + 0.5f;
+      float z = path_step[i].z + 0.15f;
+      stbgl_drawBox(x,y,z, 0.15f,0.15f,0.15f, 0);
+   }
+
+
    // show wireframe of currently 'selected' block
    objspace_to_worldspace(&pos[1].x, player_id, 0,9,0);
    pos[0] = obj[player_id].position;
@@ -747,6 +814,7 @@ void do_ui_rendering_3d(void)
          selected_block_to_create[i] = (&result.bx)[i] + face_dir[result.face][i];
       }
 
+      glDepthMask(GL_FALSE);
       if (block != BT_empty) {
          //glColor3f(
          draw_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block, block_rotation);
@@ -765,6 +833,7 @@ void do_ui_rendering_3d(void)
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       draw_instanced_flush(0.4f);
    }
+   glDepthMask(GL_TRUE);
 }
 
 struct

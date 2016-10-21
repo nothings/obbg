@@ -1392,6 +1392,19 @@ phys_chunk_run *build_phys_column(mesh_chunk *mc, gen_chunk *gc, int x, int y)
    return pr;
 }
 
+void build_pathdata(pathing_info *pi, gen_chunk *gc, int x, int y)
+{
+   int z,dz;
+   for (z=0; z < MAX_Z_POW2CEIL/16; ++z) {
+      uint16 total=0;
+      for (dz=0; dz < 16; ++dz) {
+         int type = (gc->partial[z].block[y][x][dz] != BT_empty);
+         total |= type << dz;
+      }
+      pi->data[z] = total;
+   }
+}
+
 void build_phys_chunk(mesh_chunk *mc, chunk_set *chunks, int wx, int wy)
 {
    int j,i,x,y;
@@ -1404,6 +1417,7 @@ void build_phys_chunk(mesh_chunk *mc, chunk_set *chunks, int wx, int wy)
          for (y=0; y < GEN_CHUNK_SIZE_Y; ++y)
             for (x=0; x < GEN_CHUNK_SIZE_X; ++x) {
                mc->pc.column[y_off+y][x_off+x] = build_phys_column(mc, chunks->chunk[j][i], x,y);
+               build_pathdata(&mc->pc.pathdata[y_off+y][x_off+x], chunks->chunk[j][i], x,y);
             }
       }
    }

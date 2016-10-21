@@ -263,7 +263,13 @@ typedef struct
 
 typedef struct
 {
+   uint16 data[MAX_Z_POW2CEIL/16]; // 32 bytes
+} pathing_info;
+
+typedef struct
+{
    phys_chunk_run *column[MESH_CHUNK_SIZE_Y][MESH_CHUNK_SIZE_X];
+   pathing_info pathdata[MESH_CHUNK_SIZE_Y][MESH_CHUNK_SIZE_X];
 } phys_chunk;
 
 typedef struct
@@ -351,6 +357,29 @@ typedef struct
 } player_controls;
 
 extern player_controls client_player_input;
+
+typedef struct
+{
+   vec3i size;
+   int max_step_up;
+   int max_step_down;
+   Bool flying;
+   int step_up_cost[8];
+   int step_down_cost[8];
+   int estimate_up_cost;
+   int estimate_down_cost;
+} path_behavior;
+
+typedef struct
+{
+   int8 x,y,z;
+   uint8 status:1;
+   uint8 dir:3;
+   int8 dz:4;
+   uint16 cost;
+   uint16 estimated_remaining;
+} path_node;
+
 
 #ifdef IS_64_BIT  // this doesn't exist yet and should be a different symbol
 #define MAX_OBJECTS        32768

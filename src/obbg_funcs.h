@@ -75,6 +75,7 @@ extern Bool available_inventory_slot(int type);
 extern void add_to_inventory(int type);
 extern float smoothed_z_for_rendering(vec *pos, interpolate_z *iz);
 
+extern int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_path);
 extern void physics_process_mesh_chunk(mesh_chunk *mc);
 extern int physics_set_player_coord(requested_mesh *rm, int max_req, int px, int py);
 extern void player_physics(objid oid, player_controls *con, float dt);
