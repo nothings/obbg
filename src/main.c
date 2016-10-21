@@ -1,5 +1,6 @@
 #define _WIN32_WINNT 0x400
 //#define GL_DEBUG
+//#define PROFILING
 
 #include <assert.h>
 
@@ -1243,7 +1244,9 @@ int SDL_main(int argc, char **argv)
    if (program_mode != MODE_single_player)
       networking = net_init(program_mode == MODE_server, server_port);
 
+   #ifdef PROFILING
    SDL_GL_SetSwapInterval(0);   // disable vsync
+   #endif
    game_init();
    render_init();
 

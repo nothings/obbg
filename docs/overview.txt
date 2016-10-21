@@ -12,6 +12,7 @@ obbg:
 Done in today's stream (45):
    - half-height conveyor belts
    - animated machines
+   - faster faceted lighting
 
 Previous stream (44):
    - halfheight conveyor belts (unfinished)
