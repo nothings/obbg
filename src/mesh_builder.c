@@ -1478,6 +1478,10 @@ void update_phys_chunk(mesh_chunk *mc, int ex, int ey, int ez, int type)
    }
    arena_free_all(mc->allocs);
    mc->allocs = new_chunks;
+   if (type == 0)
+      mc->pc.pathdata[ey][ex].data[ez>>4] &= ~(1 << (ez&15));
+   else
+      mc->pc.pathdata[ey][ex].data[ez>>4] |=  (1 << (ez&15));
 }
 
 static stbvox_mesh_maker small_mm;

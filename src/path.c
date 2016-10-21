@@ -151,8 +151,8 @@ static int estimate_distance_lowerbound(path_behavior *pb, int x, int y, int z, 
 int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_path)
 {
    //FILE *f = fopen("c:/x/path.txt", "w");
-   static int dx[4] = { 1,0,-1,0 };
-   static int dy[4] = { 0,1,0,-1 };
+   static int dx[8] = { 1,0,-1,0, 1,1,-1,-1 };
+   static int dy[8] = { 0,1,0,-1, -1,1,-1,1 };
    vec3i relative_dest;
    path_node *n;
    node_alloc = 0;
@@ -182,11 +182,12 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
          break;
 
       for (dz= -pb->max_step_down; dz <= pb->max_step_up; ++dz) {
-         for (d=0; d < 4; ++d) {
+         for (d=0; d < 8; ++d) {
             Bool allowed=False;
             int x = n->x+dx[d];
             int y = n->y+dy[d];
             int z = n->z+dz;
+
             if (can_stand(pb, x,y,z, start)) {
                if (dz < 0) {
                   if (can_fit(pb, x,y, n->z, start))
@@ -198,11 +199,22 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
                   allowed = True;
                }
             }
+            if (allowed && d >= 4) {
+               if (dz <= 0) {
+                  if (!(can_fit(pb, x,n->y,n->z, start) && can_fit(pb, n->x,y,n->z, start)))
+                     allowed = False;
+               } else {
+                  if (!(can_fit(pb, x,n->y,z, start) && can_fit(pb, n->x,y,z, start)))
+                     allowed = False;
+               }
+            }
             if (allowed) {
                int cost;
                path_node *m;
 
                cost = n->cost + 4 + (dz < 0 ? pb->step_down_cost[-dz] : pb->step_up_cost[dz]);
+               if (d >= 4)
+                  cost += 2;
 
                m = get_node(x,y,z);
                assert(m != n);
@@ -235,6 +247,7 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
       return 0;
    } else {
       int i;
+      n->status = A_closed;
       for (i=0; i < max_path; ++i) {
          int x,y,z;
          path_node *m;
