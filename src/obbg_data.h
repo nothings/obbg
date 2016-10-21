@@ -63,6 +63,7 @@ typedef int Bool;
 #define LOGI_CHUNK_SIZE_Z           (1 << LOGI_CHUNK_SIZE_Z_LOG2)
 
 #define LONG_TICK_LENGTH   12
+#define GRAVITY_IN_BLOCKS  20.0f
 
 typedef struct
 {
@@ -295,6 +296,8 @@ typedef struct
    phys_chunk pc;
    arena_chunk **allocs;
 } mesh_chunk;
+
+float size_for_type[][2][3];
 
 typedef int32 objid;
 

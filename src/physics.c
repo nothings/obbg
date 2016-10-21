@@ -232,6 +232,22 @@ int collision_test_box(collision_geometry *cg, float x, float y, float z, float 
 #define Z_EPSILON 0.001f
 #define STEP_UP_VELOCITY -0.75
 
+vec find_collision_point(collision_geometry *cg, vec *a, vec *b, float size[2][3])
+{
+   vec delta = vec_sub(b,a);
+   float t0 = 0.0f, t1 = 1.0f;
+   int i;
+   for (i=0; i < 8; ++i) {
+      float t = (t0 + t1) / 2.0f;
+      vec m = vec_add_scale(a, &delta, t);
+      if (collision_test_box(cg, m.x, m.y, m.z, size))
+         t1 = t;
+      else
+         t0 = t;
+   }
+   return vec_add_scale(a, &delta, t0);
+}
+
 Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground)
 {
    int ix,iy,iz;
@@ -247,21 +263,40 @@ Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool
    iy = (int) floor(y);
    iz = (int) floor(z + size[0][2] + (size[1][2] - size[0][2])/2);
 
-   gather_collision_geometry(&cg, ix - COLLIDE_BLOB_X/2, iy - COLLIDE_BLOB_Y/2, iz - COLLIDE_BLOB_Z/2);
-
    if (on_ground) {
       // sliding or immobile
       return True;
    } else {
+      Bool started_colliding;
       vec v;
       // free-fall
       v = vec_add_scale(pos, vel, dt);
+
+      gather_collision_geometry(&cg, ix - COLLIDE_BLOB_X/2, iy - COLLIDE_BLOB_Y/2, iz - COLLIDE_BLOB_Z/2);
+      started_colliding = collision_test_box(&cg, pos->x, pos->y, pos->z, size);
+
+      // test if end point is non-colliding
       if (collision_test_box(&cg, v.x, v.y, v.z, size)) {
-         memset(vel, 0, sizeof(*vel));
-         return True;
+         *pos = find_collision_point(&cg, pos, &v, size);
+
+         // new location shouldn't be colliding
+         if (!started_colliding)
+            assert(!collision_test_box(&cg, pos->x, pos->y, pos->z, size));
+
+         // test if it's on the ground
+         if (collision_test_box(&cg, pos->x, pos->y, pos->z - 2*Z_EPSILON, size)) {
+            memset(vel, 0, sizeof(*vel));
+            return TRUE;
+         }
+         vel->x = vel->y = 0;
+         if (vel->z > 0)
+            vel->z = 0;
+         else
+            vel->z /= 2.0f;
+         return False;
       }
       *pos = v;
-      vel->z -= 20.0f * dt;
+      vel->z -= GRAVITY_IN_BLOCKS * dt;
    }
    return False;
 }

@@ -17,10 +17,23 @@
 extern float light_pos[3];
 extern float light_vel[3];
 
-static float camera_bounds[2][3] =
+float size_for_type[3][2][3] =
 {
-   { - 0.45f, - 0.45f, - 2.25f },
-   {   0.45f,   0.45f,   0.25f },
+   { // OTYPE_none
+      { 0 }, { 0 },
+   },
+   { // OTYPE_player
+      { - 0.45f, - 0.45f, - 2.25f },
+      {   0.45f,   0.45f,   0.25f },
+   },
+   { // OTYPE_test
+      {  -0.25f, -0.25f, -0.15f },
+      {   0.25f,  0.25f,  0.15f },
+   },
+   { // OTYPE_bounce
+      {  -0.15f, -0.15f, -0.15f },
+      {   0.15f,  0.15f,  0.15f },
+   },
 };
 
 objid player_id;
@@ -172,8 +185,8 @@ void player_physics(objid oid, player_controls *con, float dt)
       z = o->position.z + o->velocity.z * dt;
 
       if (!con->flying) {
-         if (!physics_move_walkable(&o->position, &o->velocity, dt, camera_bounds, &o->iz))
-            o->velocity.z -= 20.0f * dt;
+         if (!physics_move_walkable(&o->position, &o->velocity, dt, size_for_type[o->type], &o->iz))
+            o->velocity.z -= GRAVITY_IN_BLOCKS * dt;
       } else {
          o->position.x = x;
          o->position.y = y;
@@ -193,18 +206,6 @@ void player_physics(objid oid, player_controls *con, float dt)
       #endif
    }
 }
-
-float size_for_type[2][2][3] =
-{
-   { // OTYPE_player
-      { - 0.45f, - 0.45f, - 2.25f },
-      {   0.45f,   0.45f,   0.25f },
-   },
-   { // OTYPE_test
-      {  -0.5f, -0.5f, -0.5f },
-      {   0.5f,  0.5f,  0.5f },
-   },
-};
 
 void object_physics(objid oid, float dt)
 {

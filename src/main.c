@@ -800,8 +800,18 @@ void render_objects(void)
    }
 
    for (i=PLAYER_OBJECT_MAX; i < max_obj_id; ++i) {
-      if (obj[i].valid) {
-         stbgl_drawBox(obj[i].position.x, obj[i].position.y, obj[i].position.z, 1,1,1, 1);
+      object *o = &obj[i];
+      if (o->valid) {
+         vec center;
+         float (*sz)[3] = size_for_type[o->type];
+         if (o->on_ground)
+            glColor3f(0.85f,0.95f,1.0f);
+         else
+            glColor3f(1.0f,1.0f,0.9f);
+         center.x = o->position.x + (sz[1][0]+sz[0][0])/2;
+         center.y = o->position.y + (sz[1][1]+sz[0][1])/2;
+         center.z = o->position.z + (sz[1][2]+sz[0][2])/2;
+         stbgl_drawBox(center.x, center.y, center.z, sz[1][0]-sz[0][0], sz[1][1]-sz[0][1], sz[1][2]-sz[0][2], 1);
       }
    }
 

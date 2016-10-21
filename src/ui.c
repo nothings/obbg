@@ -523,8 +523,8 @@ void  process_mouse_move(int dx, int dy)
 
 void throw_thing(void)
 {
-   int t = create_object(1, obj[player_id].position);
-   objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,32,0);
+   int t = create_object(OTYPE_test, obj[player_id].position);
+   objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,22,0);
 }
 
 extern Bool player_is_vacuuming;
