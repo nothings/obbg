@@ -232,6 +232,41 @@ int collision_test_box(collision_geometry *cg, float x, float y, float z, float 
 #define Z_EPSILON 0.001f
 #define STEP_UP_VELOCITY -0.75
 
+Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground)
+{
+   int ix,iy,iz;
+   float x = pos->x;
+   float y = pos->y;
+   float z = pos->z;
+   float dx = vel->x * dt;
+   float dy = vel->y * dt;
+   float dz = vel->z * dt;
+   collision_geometry cg;
+
+   ix = (int) floor(x);
+   iy = (int) floor(y);
+   iz = (int) floor(z + size[0][2] + (size[1][2] - size[0][2])/2);
+
+   gather_collision_geometry(&cg, ix - COLLIDE_BLOB_X/2, iy - COLLIDE_BLOB_Y/2, iz - COLLIDE_BLOB_Z/2);
+
+   if (on_ground) {
+      // sliding or immobile
+      return True;
+   } else {
+      vec v;
+      // free-fall
+      v = vec_add_scale(pos, vel, dt);
+      if (collision_test_box(&cg, v.x, v.y, v.z, size)) {
+         memset(vel, 0, sizeof(*vel));
+         return True;
+      }
+      *pos = v;
+      vel->z -= 20.0f * dt;
+   }
+   return False;
+}
+
+
 int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interpolate_z *lerpz)
 {
    int result=0;

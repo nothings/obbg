@@ -194,11 +194,22 @@ void player_physics(objid oid, player_controls *con, float dt)
    }
 }
 
+float size_for_type[2][2][3] =
+{
+   { // OTYPE_player
+      { - 0.45f, - 0.45f, - 2.25f },
+      {   0.45f,   0.45f,   0.25f },
+   },
+   { // OTYPE_test
+      {  -0.5f, -0.5f, -0.5f },
+      {   0.5f,  0.5f,  0.5f },
+   },
+};
+
 void object_physics(objid oid, float dt)
 {
    object *o = &obj[oid];
-   o->position = vec_add_scale(&o->position, &o->velocity, dt);
-   o->velocity.z -= 30.0f * dt;
+   o->on_ground = physics_move_inanimate(&o->position, &o->velocity, dt, size_for_type[o->type], o->on_ground);
 }
 
 void process_tick_raw(float dt)
