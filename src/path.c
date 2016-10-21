@@ -40,7 +40,7 @@ Bool can_fit(path_behavior *pb, int x, int y, int z, vec3i start)
 }
 
 
-#define MAX_PATH_NODES   20000
+#define MAX_PATH_NODES   5000
 
 enum
 {
@@ -136,9 +136,9 @@ static int estimate_distance_lowerbound(path_behavior *pb, int x, int y, int z, 
    int flat_move_estimate;
 
    if (dx > dy) {
-      flat_move_estimate = dy*3 + 2 * (dx-dy);
+      flat_move_estimate = dy*6 + 4 * (dx-dy);
    } else {
-      flat_move_estimate = dx*2 + 3 * (dy-dx);
+      flat_move_estimate = dx*6 + 4 * (dy-dx);
    }
 
    if (dz > 0)
@@ -199,14 +199,12 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
                }
             }
             if (allowed) {
-               static int shack;
                int cost;
                path_node *m;
 
                cost = n->cost + 4 + (dz < 0 ? pb->step_down_cost[-dz] : pb->step_up_cost[dz]);
 
                m = get_node(x,y,z);
-               if (shack++ % 64 == 0) SDL_Delay(2);
                assert(m != n);
                if (m == NULL) {
                   m = create_node(x,y,z);
