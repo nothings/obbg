@@ -190,6 +190,11 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
             int y = n->y+dy[d];
             int z = n->z+dz;
 
+            // can't go outside limited range coordinates
+            if (x >= 128 || x < -128 || y >= 128 || y < -128 || z >= 128 || z < -128)
+               continue;
+
+            // check if fits at destination
             if (can_stand(pb, x,y,z, start)) {
                if (dz < 0) {
                   if (can_fit(pb, x,y, n->z, start))
@@ -201,6 +206,8 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
                   allowed = True;
                }
             }
+
+            // if diagonal, check that the adjacent orthogonals aren't blocked
             if (allowed && d >= 4) {
                if (dz <= 0) {
                   if (!(can_fit(pb, x,n->y,n->z, start) && can_fit(pb, n->x,y,n->z, start)))
@@ -210,6 +217,7 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
                      allowed = False;
                }
             }
+
             if (allowed) {
                int cost;
                path_node *m;

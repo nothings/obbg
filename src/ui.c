@@ -547,9 +547,9 @@ void test_pathfind(Bool repeat)
    pb.step_up_cost[1] = 3;
    pb.estimate_up_cost = 3;
 
-   pb.size.x = 1;
-   pb.size.y = 1;
-   pb.size.z = 1;
+   pb.size.x = 2;
+   pb.size.y = 2;
+   pb.size.z = 4;
 
    pb.flying = False;
 

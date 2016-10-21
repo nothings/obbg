@@ -9,7 +9,11 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (45):
+Done in today's stream (46):
+   - physics for inanimates
+   - A* pathfinding
+
+Previous stream (45):
    - half-height conveyor belts
    - animated machines
    - faster faceted lighting
