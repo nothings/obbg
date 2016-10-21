@@ -1,4 +1,5 @@
 #include "obbg_funcs.h"
+#include <stdlib.h>
 
 // does the object fit,
 // and is it allowed to stand on the object below
@@ -114,15 +115,16 @@ static void update_open_list(path_node *n, int cost)
 static path_node *get_smallest_open(void)
 {
    path_node *n;
-   int i;
-   int best_cost=open_list[0]->cost, best_i=0;
-   for (i=1; i < num_open; ++i) {
+   int i, best_i = -1;
+   int best_cost = 9999999;
+   for (i=0; i < num_open; ++i) {
       int cost = open_list[i]->cost + open_list[i]->estimated_remaining;
       if (cost < best_cost) {
          best_cost = cost;
          best_i = i;
       }
    }
+   assert(best_i >= 0);
    n = open_list[best_i];
    open_list[best_i] = open_list[--num_open];   
    return n;

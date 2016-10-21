@@ -541,7 +541,7 @@ void test_pathfind(Bool repeat)
    pb.max_step_down = 2;
    pb.estimate_down_cost = 2;
    pb.step_down_cost[1] = 2;
-   pb.step_down_cost[2] = 9;
+   pb.step_down_cost[2] = 15;
 
    pb.max_step_up = 1;
    pb.step_up_cost[1] = 3;
