@@ -23,7 +23,6 @@ static float camera_bounds[2][3] =
    {   0.45f,   0.45f,   0.25f },
 };
 
-
 objid player_id;
 
 void world_init(void)
@@ -34,7 +33,19 @@ void world_init(void)
       obj[player_id].position.x = 0;
       obj[player_id].position.y = 0;
       obj[player_id].position.z = 79;
+      obj[player_id].type = OTYPE_player;
    }
+}
+
+int create_object(int type, vec location)
+{
+   int id = allocate_object();
+   memset(&obj[id], 0, sizeof(obj[id]));
+   obj[id].position = location;
+   obj[id].valid = 1;
+   obj[id].type = type;
+
+   return id;
 }
 
 float square(float x) { return x*x; }
@@ -183,6 +194,13 @@ void player_physics(objid oid, player_controls *con, float dt)
    }
 }
 
+void object_physics(objid oid, float dt)
+{
+   object *o = &obj[oid];
+   o->position = vec_add_scale(&o->position, &o->velocity, dt);
+   o->velocity.z -= 30.0f * dt;
+}
+
 void process_tick_raw(float dt)
 {
    int i;
@@ -192,6 +210,10 @@ void process_tick_raw(float dt)
    for (i=1; i < max_player_id; ++i)
       if (obj[i].valid)
          player_physics((objid) i, &p_input[i], dt);
+
+   for (i=PLAYER_OBJECT_MAX; i < max_obj_id; ++i)
+      if (obj[i].valid)
+         object_physics((objid) i, dt);
 
    light_pos[0] += light_vel[0] * dt;
    light_pos[1] += light_vel[1] * dt;

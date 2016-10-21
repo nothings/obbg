@@ -784,7 +784,6 @@ void render_objects(void)
    glColor3f(1,1,1);
    glDisable(GL_TEXTURE_2D);
    glDisable(GL_BLEND);
-   stbgl_drawBox(light_pos[0], light_pos[1], light_pos[2], 3,3,3, 1);
 
    num_sprites = 0;
 
@@ -797,6 +796,12 @@ void render_objects(void)
          pos.y = obj[i].position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
          pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz) + (camera_bounds[1][2] + camera_bounds[0][2])/2;
          stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
+      }
+   }
+
+   for (i=PLAYER_OBJECT_MAX; i < max_obj_id; ++i) {
+      if (obj[i].valid) {
+         stbgl_drawBox(obj[i].position.x, obj[i].position.y, obj[i].position.z, 1,1,1, 1);
       }
    }
 

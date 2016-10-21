@@ -304,11 +304,21 @@ typedef struct
    float t;
 } interpolate_z;
 
+enum
+{
+   OTYPE__none,
+
+   OTYPE_player,
+   OTYPE_test
+};
+
 typedef struct
 {
    vec position;
    vec ang;
    vec velocity;
+   Bool on_ground;
+   int type;
 
    interpolate_z iz;  // only needed for players
 

@@ -521,12 +521,21 @@ void  process_mouse_move(int dx, int dy)
    }
 }
 
+void throw_thing(void)
+{
+   int t = create_object(1, obj[player_id].position);
+   objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,32,0);
+}
+
 extern Bool player_is_vacuuming;
 
 void process_key_down(int k, int s, SDL_Keymod mod)
 {
    if (k == SDLK_ESCAPE)
       quit = 1;
+
+   if (s == SDL_SCANCODE_T)
+      throw_thing();
 
    // player movement
    if (s == SDL_SCANCODE_D)    active_control_set(0);
@@ -587,35 +596,6 @@ void process_key_down(int k, int s, SDL_Keymod mod)
    if (s == SDL_SCANCODE_R) {
       objspace_to_worldspace(light_vel, player_id, 0,32,0);
       memcpy(light_pos, &obj[player_id].position, sizeof(light_pos));
-   }
-   #endif
-
-   #if 0
-   if (game_mode == GAME_editor) {
-      switch (k) {
-         case SDLK_RIGHT: editor_key(STBTE_scroll_right); break;
-         case SDLK_LEFT : editor_key(STBTE_scroll_left ); break;
-         case SDLK_UP   : editor_key(STBTE_scroll_up   ); break;
-         case SDLK_DOWN : editor_key(STBTE_scroll_down ); break;
-      }
-      switch (s) {
-         case SDL_SCANCODE_S: editor_key(STBTE_tool_select); break;
-         case SDL_SCANCODE_B: editor_key(STBTE_tool_brush ); break;
-         case SDL_SCANCODE_E: editor_key(STBTE_tool_erase ); break;
-         case SDL_SCANCODE_R: editor_key(STBTE_tool_rectangle ); break;
-         case SDL_SCANCODE_I: editor_key(STBTE_tool_eyedropper); break;
-         case SDL_SCANCODE_L: editor_key(STBTE_tool_link); break;
-         case SDL_SCANCODE_G: editor_key(STBTE_act_toggle_grid); break;
-      }
-      if ((e->key.keysym.mod & KMOD_CTRL) && !(e->key.keysym.mod & ~KMOD_CTRL)) {
-         switch (s) {
-            case SDL_SCANCODE_X: editor_key(STBTE_act_cut  ); break;
-            case SDL_SCANCODE_C: editor_key(STBTE_act_copy ); break;
-            case SDL_SCANCODE_V: editor_key(STBTE_act_paste); break;
-            case SDL_SCANCODE_Z: editor_key(STBTE_act_undo ); break;
-            case SDL_SCANCODE_Y: editor_key(STBTE_act_redo ); break;
-         }
-      }
    }
    #endif
 }

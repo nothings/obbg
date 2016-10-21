@@ -85,6 +85,11 @@ extern void update_physics_cache(int x, int y, int z, int type, int rot);
 extern void add_sprite(float x, float y, float z, int id);
 extern void stop_manager(void);
 
+extern vec vec_add(vec *b, vec *c);
+extern vec vec_sub(vec *b, vec *c);
+extern vec vec_add_scale(vec *b, vec *c, float d);
+extern vec vec_sub_scale(vec *b, vec *c, float d);
+
 typedef struct
 {
    int bx,by,bz;
@@ -107,7 +112,7 @@ extern void init_threadsafe_queue(threadsafe_queue *tq, int count, size_t size);
 extern int add_to_queue(threadsafe_queue *tq, void *item);
 extern int get_from_queue_nonblocking(threadsafe_queue *tq, void *item);
 
-
+extern int create_object(int type, vec location);
 extern objid allocate_object(void);
 extern objid allocate_player(void);
 extern void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z);
