@@ -312,7 +312,10 @@ enum
    OTYPE__none,
 
    OTYPE_player,
-   OTYPE_test
+   OTYPE_test,
+   OTYPE_bounce,
+
+   OTYPE__count
 };
 
 typedef struct

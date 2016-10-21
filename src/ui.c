@@ -523,7 +523,7 @@ void  process_mouse_move(int dx, int dy)
 
 void throw_thing(void)
 {
-   int t = create_object(OTYPE_test, obj[player_id].position);
+   int t = create_object(OTYPE_test + (rand()>>3)%2, obj[player_id].position);
    objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,22,0);
 }
 

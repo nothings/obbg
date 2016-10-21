@@ -65,7 +65,7 @@ extern mesh_chunk *get_mesh_chunk_for_coord(int x, int y);
 extern mesh_chunk *get_physics_chunk_for_coord(int x, int y);
 //extern int collision_test_box(float x, float y, float z, float bounds[2][3]);
 extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interpolate_z *iz);
-extern Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground);
+extern Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground, float bouncy);
 extern void build_picker(void);
 extern void add_draw_picker(float x, float y, float z, int rot, float states[4]);
 extern void add_draw_machine(float x, float y, float z, int rot, float states[8]);

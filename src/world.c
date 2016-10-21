@@ -17,7 +17,7 @@
 extern float light_pos[3];
 extern float light_vel[3];
 
-float size_for_type[3][2][3] =
+float size_for_type[4][2][3] =
 {
    { // OTYPE_none
       { 0 }, { 0 },
@@ -207,10 +207,11 @@ void player_physics(objid oid, player_controls *con, float dt)
    }
 }
 
+float bouncy[OTYPE__count] = { 0,  0, 0,   0.35f };
 void object_physics(objid oid, float dt)
 {
    object *o = &obj[oid];
-   o->on_ground = physics_move_inanimate(&o->position, &o->velocity, dt, size_for_type[o->type], o->on_ground);
+   o->on_ground = physics_move_inanimate(&o->position, &o->velocity, dt, size_for_type[o->type], o->on_ground, bouncy[o->type]);
 }
 
 void process_tick_raw(float dt)

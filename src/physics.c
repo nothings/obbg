@@ -232,7 +232,7 @@ int collision_test_box(collision_geometry *cg, float x, float y, float z, float 
 #define Z_EPSILON 0.001f
 #define STEP_UP_VELOCITY -0.75
 
-vec find_collision_point(collision_geometry *cg, vec *a, vec *b, float size[2][3])
+vec find_collision_point(collision_geometry *cg, vec *a, vec *b, float size[2][3], float *p_t)
 {
    vec delta = vec_sub(b,a);
    float t0 = 0.0f, t1 = 1.0f;
@@ -245,10 +245,11 @@ vec find_collision_point(collision_geometry *cg, vec *a, vec *b, float size[2][3
       else
          t0 = t;
    }
+   *p_t = t0;
    return vec_add_scale(a, &delta, t0);
 }
 
-Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground)
+Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground, float bounce)
 {
    int ix,iy,iz;
    float x = pos->x;
@@ -268,25 +269,72 @@ Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool
       return True;
    } else {
       Bool started_colliding;
-      vec v;
+      vec v, new_vel;
       // free-fall
       v = vec_add_scale(pos, vel, dt);
 
       gather_collision_geometry(&cg, ix - COLLIDE_BLOB_X/2, iy - COLLIDE_BLOB_Y/2, iz - COLLIDE_BLOB_Z/2);
       started_colliding = collision_test_box(&cg, pos->x, pos->y, pos->z, size);
 
-      // test if end point is non-colliding
+      new_vel = *vel;
+      new_vel.z -= GRAVITY_IN_BLOCKS*dt;
+
+      // test if end point is colliding
       if (collision_test_box(&cg, v.x, v.y, v.z, size)) {
-         *pos = find_collision_point(&cg, pos, &v, size);
+         float t;
+         *pos = find_collision_point(&cg, pos, &v, size, &t);
+         new_vel.z = vel->z - GRAVITY_IN_BLOCKS * dt * t;
 
          // new location shouldn't be colliding
          if (!started_colliding)
             assert(!collision_test_box(&cg, pos->x, pos->y, pos->z, size));
 
+         if (bounce > 0) {
+            #define EPS   0.01f
+            #define BOUNCE_FRICTION  0.8f
+            static vec direction[6] =
+            {
+               { EPS,0,0},
+               {-EPS,0,0},
+               {0, EPS,0},
+               {0,-EPS,0},
+               {0,0, EPS},
+               {0,0,-EPS},
+            };
+            int i;
+            Bool bounce_dir[3] = { 0,0,0 };
+            for (i=0; i < 6; ++i)
+               if (collision_test_box(&cg, pos->x + direction[i].x, pos->y + direction[i].y, pos->z + direction[i].z, size))
+                  bounce_dir[i/2] = True;
+
+            if (!(bounce_dir[2] && vel->z < 0 && fabs(vel->z) < 1.0f)) {
+               *vel = new_vel;
+               if (bounce_dir[0])
+                  vel->x = -vel->x * bounce;
+               else
+                  vel->x = vel->x * BOUNCE_FRICTION;
+
+               if (bounce_dir[1])
+                  vel->y = -vel->y * bounce;
+               else
+                  vel->y = vel->y * BOUNCE_FRICTION;
+
+               if (bounce_dir[2])
+                  vel->z = -vel->z * bounce;
+               else
+                  vel->z = vel->z * BOUNCE_FRICTION;
+
+               return False;
+            }
+            // fall through to sliding case
+            assert(bounce_dir[2] && vel->z < 0);
+         }
+         *vel = new_vel;
+
          // test if it's on the ground
          if (collision_test_box(&cg, pos->x, pos->y, pos->z - 2*Z_EPSILON, size)) {
             memset(vel, 0, sizeof(*vel));
-            return TRUE;
+            return True;
          }
          vel->x = vel->y = 0;
          if (vel->z > 0)
@@ -294,9 +342,10 @@ Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool
          else
             vel->z /= 2.0f;
          return False;
+      } else {
+         *pos = v;
+         *vel = new_vel;
       }
-      *pos = v;
-      vel->z -= GRAVITY_IN_BLOCKS * dt;
    }
    return False;
 }
