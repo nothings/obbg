@@ -550,12 +550,15 @@ void trigger_pathfind(Bool spread)
 
 void throw_thing(void)
 {
-   int t;
-   //t = create_object(OTYPE_test + (rand()>>3)%2, obj[player_id].position);
-   t = create_object(OTYPE_critter, obj[player_id].position);
-   objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,22,0);
-   obj[t].position = vec_add_scale(&obj[t].position, &obj[t].velocity, 1.0);
-   memset(&obj[t].velocity, 0, sizeof(vec));
+   int i;
+   for (i=0; i < 1; ++i) {
+      int t;
+      //t = create_object(OTYPE_test + (rand()>>3)%2, obj[player_id].position);
+      t = create_object(OTYPE_critter, obj[player_id].position);
+      objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,22,0);
+      obj[t].position = vec_add_scale(&obj[t].position, &obj[t].velocity, 1.0);
+      memset(&obj[t].velocity, 0, sizeof(vec));
+   }
 }
 
 int path_length;

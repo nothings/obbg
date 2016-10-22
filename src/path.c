@@ -1,6 +1,8 @@
 #include "obbg_funcs.h"
 #include <stdlib.h>
 
+//#define OLD_PATHFIND
+
 // does the object fit,
 // and is it allowed to stand on the object below
 Bool can_stand_raw(path_behavior *pb, int x, int y, int z, vec3i start, Bool must_stand)
@@ -370,7 +372,9 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    static int dy[8] = { 0,1,0,-1, -1,1,-1,1 };
    vec3i relative_dest;
    path_node *n;
+   #ifndef OLD_PATHFIND
    int i;
+   #endif
 
    memset(pc, 0, sizeof(*pc));
 
