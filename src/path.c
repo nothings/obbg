@@ -148,8 +148,6 @@ static void add_to_primary_list(pathfind_context *pc, int cost, path_node *n)
    int list = (cost - pc->primary_base_value);
    assert(list >= 0 && list < NUM_PQ_PRIMARY);
 
-   assert(count_primary(pc) == pc->num_primary);
-
    if (pc->head[list] >= 0)
       pc->node_link[pc->head[list]].prev = x;
 
@@ -161,8 +159,6 @@ static void add_to_primary_list(pathfind_context *pc, int cost, path_node *n)
    n->cost = cost;
 
    ++pc->num_primary;
-
-   assert(count_primary(pc) == pc->num_primary);
 }
 
 static void add_to_secondary_list(pathfind_context *pc, int cost, path_node *n)
@@ -170,8 +166,6 @@ static void add_to_secondary_list(pathfind_context *pc, int cost, path_node *n)
    int x = n - pc->nodes;
    int list = secondary_list_index(pc, cost);
    assert(list >= 0 && list < NUM_PQ_SECONDARY);
-
-   assert(count_primary(pc) == pc->num_primary);
 
    if (pc->secondary[list] >= 0)
       pc->node_link[pc->secondary[list]].prev = x;
@@ -184,16 +178,12 @@ static void add_to_secondary_list(pathfind_context *pc, int cost, path_node *n)
    n->cost = cost;
 
    ++pc->num_secondary;
-
-   assert(count_primary(pc) == pc->num_primary);
 }
 
 static void remove_from_primary_list(pathfind_context *pc, path_node *n)
 {
    int x = n - pc->nodes;
    int list;
-
-   assert(count_primary(pc) == pc->num_primary);
 
    list = n->cost - pc->primary_base_value;
 
@@ -207,7 +197,6 @@ static void remove_from_primary_list(pathfind_context *pc, path_node *n)
       pc->node_link[pc->node_link[x].next].prev = pc->node_link[x].prev;
 
    --pc->num_primary;
-   assert(count_primary(pc) == pc->num_primary);
 
    assert(pc->num_primary >= 0 && pc->num_secondary >= 0);
 }
@@ -216,8 +205,6 @@ static void remove_from_secondary_list(pathfind_context *pc, path_node *n)
 {
    int x = n - pc->nodes;
    int list;
-
-   assert(count_primary(pc) == pc->num_primary);
 
    list = secondary_list_index(pc, n->cost);
 
@@ -231,7 +218,6 @@ static void remove_from_secondary_list(pathfind_context *pc, path_node *n)
       pc->node_link[pc->node_link[x].next].prev = pc->node_link[x].prev;
 
    --pc->num_secondary;
-   assert(count_primary(pc) == pc->num_primary);
    assert(pc->num_primary >= 0 && pc->num_secondary >= 0);
 }
 
@@ -241,7 +227,6 @@ static void add_to_open_list(pathfind_context *pc, path_node *n, int cost)
       add_to_primary_list(pc, cost, n);
    else
       add_to_secondary_list(pc, cost, n);
-   assert(count_primary(pc) == pc->num_primary);
 }
 
 static void update_open_list(pathfind_context *pc, path_node *n, int cost)
@@ -266,7 +251,6 @@ static void update_open_list(pathfind_context *pc, path_node *n, int cost)
          add_to_secondary_list(pc, cost, n);
       }
    }
-   assert(count_primary(pc) == pc->num_primary);
 }
 
 static path_node *get_smallest_open(pathfind_context *pc)
@@ -281,7 +265,6 @@ static path_node *get_smallest_open(pathfind_context *pc)
                path_node *n = &pc->nodes[pc->head[i]];
                pc->first_nonempty = i;
                remove_from_primary_list(pc, n);
-               assert(count_primary(pc) == pc->num_primary);
                return n;
             }
          }
