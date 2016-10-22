@@ -6,6 +6,9 @@
 object obj[MAX_OBJECTS];
 // player_object obj[PLAYER_OBJECT_MAX];
 player_controls p_input[PLAYER_OBJECT_MAX];
+brain_state brains[MAX_BRAINS];
+static int max_brain_id;
+
 
 objid max_obj_id, max_player_id;
 
@@ -33,6 +36,20 @@ objid allocate_player(void)
             max_player_id = (objid) i+1;
          obj[i].valid = True;
          return (objid) i;
+      }
+   return 0;
+}
+
+brain_state *allocate_brain(void)
+{
+   int i;
+   // @OPTIMIZE free list
+   for (i=0; i < MAX_BRAINS; ++i)
+      if (!brains[i].valid) {
+         if (i >= max_brain_id)
+            max_brain_id = i+1;
+         brains[i].valid = True;
+         return &brains[i];
       }
    return 0;
 }

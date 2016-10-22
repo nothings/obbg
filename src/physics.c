@@ -350,6 +350,15 @@ Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool
    return False;
 }
 
+Bool physics_move_animate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground, float bounce)
+{
+   if (!on_ground)
+      return physics_move_inanimate(pos,vel,dt,size,on_ground,bounce);
+   else {
+      *pos = vec_add_scale(pos, vel, dt);
+      return 1;
+   }
+}
 
 int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interpolate_z *lerpz)
 {

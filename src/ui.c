@@ -522,10 +522,40 @@ void  process_mouse_move(int dx, int dy)
    }
 }
 
+void trigger_pathfind(Bool spread)
+{
+   int i;
+   for (i=PLAYER_OBJECT_MAX; i < max_obj_id; ++i) {
+      object *o = &obj[i];
+      if (o->valid && o->type == OTYPE_critter) {
+         vec3i target;
+         target.x = (int) floor(obj[player_id].position.x);
+         target.y = (int) floor(obj[player_id].position.y);
+         target.z = (int) floor(obj[player_id].position.z + size_for_type[OTYPE_player][0][2] + 0.01f);
+
+         if (spread) {
+            target.x += (rand() >> 4) % 50 - 25;
+            target.y += (rand() >> 4) % 50 - 25;
+            target.z -= 20;
+            while (target.z < 200) {
+               if (ai_can_stand(o, target))
+                  break;
+               ++target.z;
+            }
+         }
+         ai_pathfind(o, target);
+      }
+   }
+}
+
 void throw_thing(void)
 {
-   int t = create_object(OTYPE_test + (rand()>>3)%2, obj[player_id].position);
+   int t;
+   //t = create_object(OTYPE_test + (rand()>>3)%2, obj[player_id].position);
+   t = create_object(OTYPE_critter, obj[player_id].position);
    objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,22,0);
+   obj[t].position = vec_add_scale(&obj[t].position, &obj[t].velocity, 1.0);
+   memset(&obj[t].velocity, 0, sizeof(vec));
 }
 
 int path_length;
@@ -594,8 +624,14 @@ void process_key_down(int k, int s, SDL_Keymod mod)
    if (s == SDL_SCANCODE_H) global_hack = !global_hack;
    if (s == SDL_SCANCODE_P) debug_render = !debug_render;
    if (s == SDL_SCANCODE_C) show_memory = !show_memory;//examine_outstanding_genchunks();
+
+   #if 0
    if (s == SDL_SCANCODE_O) test_pathfind(False);
    if (s == SDL_SCANCODE_L) test_pathfind(True);
+   #else
+   if (s == SDL_SCANCODE_O) trigger_pathfind(False);
+   if (s == SDL_SCANCODE_L) trigger_pathfind(True);
+   #endif
 
    if (s == SDL_SCANCODE_E) {
       if (ui_screen != UI_SCREEN_none) {

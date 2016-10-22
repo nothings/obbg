@@ -320,9 +320,23 @@ enum
    OTYPE_player,
    OTYPE_test,
    OTYPE_bounce,
+   OTYPE_critter,
 
    OTYPE__count
 };
+
+#define MAX_BRAINS 4000
+
+#define MAX_SHORT_PATH  64
+typedef struct
+{
+   Bool valid;
+   Bool has_target;
+   vec3i target;
+   vec3i path[MAX_SHORT_PATH];
+   int path_position;
+   int path_length;
+} brain_state;
 
 typedef struct
 {
@@ -331,6 +345,7 @@ typedef struct
    vec velocity;
    Bool on_ground;
    int type;
+   brain_state *brain;
 
    interpolate_z iz;  // only needed for players
 

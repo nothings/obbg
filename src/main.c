@@ -690,6 +690,16 @@ vec vec_sub_scale(vec *b, vec *c, float d)
    return a;
 }
 
+vec vec_norm(vec *a)
+{
+   float len = sqrt(a->x*a->x + a->y*a->y + a->z*a->z);
+   vec b;
+   b.x = a->x / len;
+   b.y = a->y / len;
+   b.z = a->z / len;
+   return b;
+}
+
 int alpha_test_sprites=1;
 
 void render_sprites(void)
@@ -808,6 +818,8 @@ void render_objects(void)
             glColor3f(0.85f,0.95f,1.0f);
          else
             glColor3f(1.0f,1.0f,0.9f);
+         if (o->type == OTYPE_critter)
+            glColor3f(1.0f,1.0f,0.6f);
          center.x = o->position.x + (sz[1][0]+sz[0][0])/2;
          center.y = o->position.y + (sz[1][1]+sz[0][1])/2;
          center.z = o->position.z + (sz[1][2]+sz[0][2])/2;

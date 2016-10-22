@@ -17,7 +17,7 @@
 extern float light_pos[3];
 extern float light_vel[3];
 
-float size_for_type[4][2][3] =
+float size_for_type[5][2][3] =
 {
    { // OTYPE_none
       { 0 }, { 0 },
@@ -33,6 +33,10 @@ float size_for_type[4][2][3] =
    { // OTYPE_bounce
       {  -0.15f, -0.15f, -0.15f },
       {   0.15f,  0.15f,  0.15f },
+   },
+   { // OTYPE_critter
+      { - 0.45f, - 0.45f, - 0.25f },
+      {   0.45f,   0.45f,   2.25f },
    },
 };
 
@@ -57,6 +61,8 @@ int create_object(int type, vec location)
    obj[id].position = location;
    obj[id].valid = 1;
    obj[id].type = type;
+   if (type == OTYPE_critter)
+      obj[id].brain = allocate_brain();
 
    return id;
 }
@@ -207,11 +213,137 @@ void player_physics(objid oid, player_controls *con, float dt)
    }
 }
 
-float bouncy[OTYPE__count] = { 0,  0, 0,   0.35f };
+void ai_set_behavior(path_behavior *pb, object *o)
+{
+   pb->max_step_down = 2;
+   pb->estimate_down_cost = 1;
+   pb->step_down_cost[1] = 1;
+   pb->step_down_cost[2] = 7;
+
+   pb->max_step_up = 1;
+   pb->step_up_cost[1] = 1;
+   pb->estimate_up_cost = 1;
+
+   pb->size.x = 1;
+   pb->size.y = 1;
+   pb->size.z = 3;
+
+   pb->flying = False;
+}
+
+Bool ai_can_stand(object *o, vec3i target)
+{
+   path_behavior pb;
+   ai_set_behavior(&pb, o);
+   return can_stand(&pb, 0,0,0, target);
+}
+
+
+#define MAX_PATH_LEN  1000
+static vec3i full_path[MAX_PATH_LEN];
+void ai_pathfind(object *o, vec3i target)
+{
+   path_behavior pb = { 0 };
+   vec3i start;
+   int len;
+
+   ai_set_behavior(&pb, o);
+
+   start.x = (int) floor(o->position.x);
+   start.y = (int) floor(o->position.y);
+   start.z = (int) floor(o->position.z + size_for_type[OTYPE_critter][0][2] + 0.01f);
+
+   o->brain->target = target;
+   len = path_find(&pb, start, target, full_path, MAX_PATH_LEN);
+   o->velocity.x = 0;
+   o->velocity.y = 0;
+   o->velocity.z = 0;
+
+   if (len == 0) {
+      o->brain->has_target = False;
+   } else {
+      int i;
+      o->brain->path_length = stb_min(len, MAX_SHORT_PATH);
+      for (i=0; i < o->brain->path_length; ++i)
+         o->brain->path[i] = full_path[len-1 - i];
+      o->brain->path_position = 0;
+      o->brain->has_target = True;
+   }
+}
+
+#define CRITTER_SPEED 4
+
+void ai_tick(object *o)
+{
+   brain_state *b = o->brain;
+   if (!o->on_ground)
+      return;
+
+   if (b->has_target) {
+      vec3i pos, *cur;
+      pos.x = (int) floor(o->position.x);
+      pos.y = (int) floor(o->position.y);
+      pos.z = (int) floor(o->position.z);
+      if (b->path_position+1 < b->path_length) {
+         cur = &b->path[b->path_position+1];
+         if (pos.x != cur->x || pos.y != cur->y) {
+            if (o->velocity.x != 0 || o->velocity.y != 0 || o->velocity.z != 0) {
+               if (abs(pos.x - cur->x) > 1 || abs(pos.y - cur->y) > 1) {
+                  // got off path
+                  b->has_target = False;
+                  goto refind;
+               }
+            }
+         } else {
+            ++b->path_position;
+            if (b->path_position == b->path_length-1) {
+               if (pos.x == b->target.x && pos.y == b->target.y && pos.z == b->target.z) {
+                  b->has_target = False;
+                  o->velocity.x = 0;
+                  o->velocity.y = 0;
+                  o->velocity.z = 0;
+                  return;
+               } else {
+                 refind:
+                  ai_pathfind(o, b->target);
+                  if (b->has_target == False)
+                     return;
+               }
+            }
+         }
+      }
+
+      if (b->path_position+1 < b->path_length) {
+         vec3i next = b->path[b->path_position+1];
+         vec delta;
+         delta.x = (next.x + 0.5f) - o->position.x;
+         delta.y = (next.y + 0.5f) - o->position.y;
+         delta.z = (next.z + 0.35f + 0.01f) - o->position.z;
+         delta = vec_norm(&delta);
+
+         o->velocity.x = delta.x * CRITTER_SPEED;
+         o->velocity.y = delta.y * CRITTER_SPEED;
+         o->velocity.z = delta.z * CRITTER_SPEED;
+      }
+
+      assert(b->path_position+1 < b->path_length);
+   }
+}
+
+float bouncy[OTYPE__count] = { 0,  0, 0,   0.35f, 0 };
 void object_physics(objid oid, float dt)
 {
    object *o = &obj[oid];
-   o->on_ground = physics_move_inanimate(&o->position, &o->velocity, dt, size_for_type[o->type], o->on_ground, bouncy[o->type]);
+   switch (o->type) {
+      case OTYPE_test:
+      case OTYPE_bounce:
+         o->on_ground = physics_move_inanimate(&o->position, &o->velocity, dt, size_for_type[o->type], o->on_ground, bouncy[o->type]);
+         break;
+      case OTYPE_critter:
+         ai_tick(o);
+         o->on_ground = physics_move_animate(&o->position, &o->velocity, dt, size_for_type[o->type], o->on_ground, bouncy[o->type]);
+         break;
+   }
 }
 
 void process_tick_raw(float dt)

@@ -58,6 +58,7 @@ extern void init_mesh_building(void);
 extern void do_ui_rendering_3d(void);
 extern void do_ui_rendering_2d(void);
 
+extern void ai_pathfind(object *o, vec3i target);
 extern mesh_chunk *build_mesh_chunk_for_coord(mesh_chunk *mc, int x, int y);
 extern void upload_mesh(mesh_chunk *mc, uint8 *vertex_build_buffer, uint8 *face_buffer);
 extern void set_mesh_chunk_for_coord(int x, int y, mesh_chunk *new_mc);
@@ -66,6 +67,7 @@ extern mesh_chunk *get_physics_chunk_for_coord(int x, int y);
 //extern int collision_test_box(float x, float y, float z, float bounds[2][3]);
 extern int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interpolate_z *iz);
 extern Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground, float bouncy);
+extern Bool physics_move_animate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground, float bouncy);
 extern void build_picker(void);
 extern void add_draw_picker(float x, float y, float z, int rot, float states[4]);
 extern void add_draw_machine(float x, float y, float z, int rot, float states[8]);
@@ -86,11 +88,14 @@ extern void free_phys_chunk(mesh_chunk *mc);
 extern void update_physics_cache(int x, int y, int z, int type, int rot);
 extern void add_sprite(float x, float y, float z, int id);
 extern void stop_manager(void);
+extern Bool can_stand(path_behavior *pb, int x, int y, int z, vec3i start);
+extern Bool ai_can_stand(object *o, vec3i target);
 
 extern vec vec_add(vec *b, vec *c);
 extern vec vec_sub(vec *b, vec *c);
 extern vec vec_add_scale(vec *b, vec *c, float d);
 extern vec vec_sub_scale(vec *b, vec *c, float d);
+extern vec vec_norm(vec *a);
 
 typedef struct
 {
@@ -117,6 +122,7 @@ extern int get_from_queue_nonblocking(threadsafe_queue *tq, void *item);
 extern int create_object(int type, vec location);
 extern objid allocate_object(void);
 extern objid allocate_player(void);
+extern brain_state *allocate_brain(void);
 extern void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z);
 
 typedef struct
