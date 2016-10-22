@@ -97,7 +97,7 @@ static path_node *get_smallest_open(pathfind_context *pc)
    int i, best_i = -1;
    int best_cost = 9999999;
    for (i=0; i < pc->num_open; ++i) {
-      int cost = pc->open_list[i]->cost + pc->open_list[i]->estimated_remaining;
+      int cost = pc->open_list[i]->cost;
       if (cost < best_cost) {
          best_cost = cost;
          best_i = i;
@@ -199,7 +199,7 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    vec3i relative_dest;
    path_node *n;
 
-   memset(pc, 0, sizeof(pc));
+   memset(pc, 0, sizeof(*pc));
    if (!can_stand(pb, 0,0,0, start))
       return 0;
    if (!can_stand(pb, 0,0,0, dest))
@@ -211,7 +211,8 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    n = create_node(pc, 0,0,0);
    n->dir = 0;
    n->dz = 0;
-   add_to_open_list(pc, n, 0);
+   n->estimated_remaining = estimate_distance_lowerbound(pb, 0,0,0, dest);
+   add_to_open_list(pc, n, 0 + n->estimated_remaining);
 
    relative_dest.x = dest.x - start.x;
    relative_dest.y = dest.y - start.y;
@@ -260,10 +261,12 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
             }
 
             if (allowed) {
-               int cost;
+               int cost, prev_cost;
                path_node *m;
 
-               cost = n->cost + 4 + (dz < 0 ? pb->step_down_cost[-dz] : pb->step_up_cost[dz]);
+               prev_cost = n->cost - n->estimated_remaining;
+
+               cost = prev_cost + 4 + (dz < 0 ? pb->step_down_cost[-dz] : pb->step_up_cost[dz]);
                if (d >= 4)
                   cost += 2;
 
@@ -275,17 +278,17 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
                   m->dir = d;
                   m->dz = dz;
                   m->estimated_remaining = estimate_distance_lowerbound(pb, m->x+start.x, m->y+start.y, m->z+start.z, dest);
-                  //cost += m->estimated_remaining;
+                  cost += m->estimated_remaining;
                   add_to_open_list(pc, m, cost);
                } else {
-                  //cost += m->estimated_remaining;
+                  cost += m->estimated_remaining;
                   if (cost < m->cost) {
                      m->dir = d;
                      m->dz = dz;
                      if (m->status == A_closed)
-                        add_to_open_list(pc, m, m->cost);
+                        add_to_open_list(pc, m, cost);
                      else
-                        update_open_list(pc, m, m->cost);
+                        update_open_list(pc, m, cost);
                   }
                }
             }
