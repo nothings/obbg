@@ -372,6 +372,8 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    path_node *n;
    int i;
 
+   memset(pc, 0, sizeof(*pc));
+
    if (!can_stand(pb, 0,0,0, start))
       return 0;
    if (!can_stand(pb, 0,0,0, dest))
@@ -379,7 +381,6 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    if (start.x == dest.x && start.y == dest.y && start.z == dest.z)
       return 0;
 
-   memset(pc, 0, sizeof(*pc));
    pc->astar_nodes = stb_ptrmap_new();
    n = create_node(pc, 0,0,0);
    n->dir = 0;
