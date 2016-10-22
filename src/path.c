@@ -42,6 +42,21 @@ Bool can_fit(path_behavior *pb, int x, int y, int z, vec3i start)
 
 
 #define MAX_PATH_NODES   5000
+#define NUM_PQ_LISTS     32
+#define PQ_SECONDARY_SPACING  (NUM_PQ_LISTS/2)
+#define NUM_PQ_SECONDARY      16
+
+
+enum
+{
+   A_open,
+   A_closed,
+};
+
+typedef struct
+{
+   int16 next,prev;
+} path_links;
 
 typedef struct
 {
@@ -51,14 +66,59 @@ typedef struct
 
    path_node *open_list[MAX_PATH_NODES];
    int num_open;
+
+   path_links node_link[MAX_PATH_NODES];
+   int16 head[NUM_PQ_LISTS];
+   int16 secondary[NUM_PQ_SECONDARY];
+   int head_base_value;
+   int secondary_base_value;
+   int num_primary;
+   int num_secondary;
 } pathfind_context;
 
-
-enum
+#define OLD_PATHFIND
+#ifdef OLD_PATHFIND
+static void add_to_open_list(pathfind_context *pc, path_node *n, int cost)
 {
-   A_open,
-   A_closed,
-};
+   assert(pc->num_open < MAX_PATH_NODES);
+   pc->open_list[pc->num_open++] = n;
+   n->status = A_open;
+   n->cost = cost;
+}
+
+static void update_open_list(pathfind_context *pc, path_node *n, int cost)
+{
+   n->cost = cost;
+}
+
+static path_node *get_smallest_open(pathfind_context *pc)
+{
+   path_node *n;
+   int i, best_i = -1;
+   int best_cost = 9999999;
+   for (i=0; i < pc->num_open; ++i) {
+      int cost = pc->open_list[i]->cost + pc->open_list[i]->estimated_remaining;
+      if (cost < best_cost) {
+         best_cost = cost;
+         best_i = i;
+      }
+   }
+   assert(best_i >= 0);
+   n = pc->open_list[best_i];
+   pc->open_list[best_i] = pc->open_list[--pc->num_open];
+   return n;
+}
+#else
+static void add_to_open_list(pathfind_context *pc, path_node *n, int cost)
+{
+   if (pc->num_primary == 0 && pc->num_secondary) {
+      add_to_list(&pc->head[0], n);
+      pc->head_base_value = cost;
+      pc->secondary_base_value = cost + NUM_PQ_LISTS;
+   }
+}
+#endif
+
 
 static path_node *get_node(pathfind_context *pc, int x, int y, int z)
 {
@@ -100,37 +160,6 @@ static path_node *create_node(pathfind_context *pc, int x, int y, int z)
       n->z = (int8) z;
       stb_ptrmap_set(pc->astar_nodes, convert.ptr, n);
    }
-   return n;
-}
-
-static void add_to_open_list(pathfind_context *pc, path_node *n, int cost)
-{
-   assert(pc->num_open < MAX_PATH_NODES);
-   pc->open_list[pc->num_open++] = n;
-   n->status = A_open;
-   n->cost = cost;
-}
-
-static void update_open_list(pathfind_context *pc, path_node *n, int cost)
-{
-   n->cost = cost;
-}
-
-static path_node *get_smallest_open(pathfind_context *pc)
-{
-   path_node *n;
-   int i, best_i = -1;
-   int best_cost = 9999999;
-   for (i=0; i < pc->num_open; ++i) {
-      int cost = pc->open_list[i]->cost + pc->open_list[i]->estimated_remaining;
-      if (cost < best_cost) {
-         best_cost = cost;
-         best_i = i;
-      }
-   }
-   assert(best_i >= 0);
-   n = pc->open_list[best_i];
-   pc->open_list[best_i] = pc->open_list[--pc->num_open];
    return n;
 }
 
@@ -246,8 +275,10 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
                   m->dir = d;
                   m->dz = dz;
                   m->estimated_remaining = estimate_distance_lowerbound(pb, m->x+start.x, m->y+start.y, m->z+start.z, dest);
+                  //cost += m->estimated_remaining;
                   add_to_open_list(pc, m, cost);
                } else {
+                  //cost += m->estimated_remaining;
                   if (cost < m->cost) {
                      m->dir = d;
                      m->dz = dz;
