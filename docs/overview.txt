@@ -9,7 +9,10 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (46):
+Done in today's stream (47):
+   - 
+
+Previous stream (46):
    - physics for inanimates
    - A* pathfinding
 

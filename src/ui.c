@@ -547,9 +547,9 @@ void test_pathfind(Bool repeat)
    pb.step_up_cost[1] = 3;
    pb.estimate_up_cost = 3;
 
-   pb.size.x = 2;
-   pb.size.y = 2;
-   pb.size.z = 4;
+   pb.size.x = 1;
+   pb.size.y = 1;
+   pb.size.z = 2;
 
    pb.flying = False;
 
@@ -766,8 +766,8 @@ void do_ui_rendering_2d(void)
    }
 }
 
-extern path_node nodes[];
-extern int node_alloc;
+extern path_node *debug_nodes;
+extern int debug_node_alloc;
 
 void do_ui_rendering_3d(void)
 {
@@ -780,10 +780,10 @@ void do_ui_rendering_3d(void)
    stbgl_drawBox(last_pos.x+0.5f,last_pos.y+0.5f,last_pos.z+0.5, 0.2f,0.2f,0.2f, 0);
    stbgl_drawBox(prev_end.x+0.5f,prev_end.y+0.5f,prev_end.z+0.5, 0.2f,0.2f,0.2f, 0);
 
-   for (i=0; i < node_alloc; ++i) {
-      float x = last_pos.x + nodes[i].x + 0.5f;
-      float y = last_pos.y + nodes[i].y + 0.5f;
-      float z = last_pos.z + nodes[i].z + 0.1f;
+   for (i=0; i < debug_node_alloc; ++i) {
+      float x = last_pos.x + debug_nodes[i].x + 0.5f;
+      float y = last_pos.y + debug_nodes[i].y + 0.5f;
+      float z = last_pos.z + debug_nodes[i].z + 0.1f;
       stbgl_drawBox(x,y,z, 0.1f,0.1f,0.1f, 0);
    }
 

@@ -43,17 +43,24 @@ Bool can_fit(path_behavior *pb, int x, int y, int z, vec3i start)
 
 #define MAX_PATH_NODES   5000
 
+typedef struct
+{
+   path_node nodes[MAX_PATH_NODES];
+   int node_alloc;
+   stb_ptrmap *astar_nodes;
+
+   path_node *open_list[MAX_PATH_NODES];
+   int num_open;
+} pathfind_context;
+
+
 enum
 {
    A_open,
    A_closed,
 };
 
-path_node nodes[MAX_PATH_NODES];
-int node_alloc;
-stb_ptrmap *astar_nodes;
-
-static path_node *get_node(int x, int y, int z)
+static path_node *get_node(pathfind_context *pc, int x, int y, int z)
 {
    union {
       void *ptr;
@@ -66,13 +73,13 @@ static path_node *get_node(int x, int y, int z)
    convert.i.y = (int8) y;
    convert.i.z = (int8) z;
    
-   n = stb_ptrmap_get(astar_nodes, convert.ptr);
+   n = stb_ptrmap_get(pc->astar_nodes, convert.ptr);
    if (n != NULL)
       assert(n->x == x && n->y == y && n->z == z);
    return n;
 }
 
-static path_node *create_node(int x, int y, int z)
+static path_node *create_node(pathfind_context *pc, int x, int y, int z)
 {
    union {
       void *ptr;
@@ -85,48 +92,45 @@ static path_node *create_node(int x, int y, int z)
    convert.i.y = (int8) y;
    convert.i.z = (int8) z;
    
-   assert(stb_ptrmap_get(astar_nodes, convert.ptr) == NULL);
-   if (node_alloc < MAX_PATH_NODES) {
-      n = &nodes[node_alloc++];
+   assert(stb_ptrmap_get(pc->astar_nodes, convert.ptr) == NULL);
+   if (pc->node_alloc < MAX_PATH_NODES) {
+      n = &pc->nodes[pc->node_alloc++];
       n->x = (int8) x;
       n->y = (int8) y;
       n->z = (int8) z;
-      stb_ptrmap_set(astar_nodes, convert.ptr, n);
+      stb_ptrmap_set(pc->astar_nodes, convert.ptr, n);
    }
    return n;
 }
 
-static path_node *open_list[MAX_PATH_NODES];
-static int num_open;
-
-static void add_to_open_list(path_node *n, int cost)
+static void add_to_open_list(pathfind_context *pc, path_node *n, int cost)
 {
-   assert(num_open < MAX_PATH_NODES);
-   open_list[num_open++] = n;
+   assert(pc->num_open < MAX_PATH_NODES);
+   pc->open_list[pc->num_open++] = n;
    n->status = A_open;
    n->cost = cost;
 }
 
-static void update_open_list(path_node *n, int cost)
+static void update_open_list(pathfind_context *pc, path_node *n, int cost)
 {
    n->cost = cost;
 }
 
-static path_node *get_smallest_open(void)
+static path_node *get_smallest_open(pathfind_context *pc)
 {
    path_node *n;
    int i, best_i = -1;
    int best_cost = 9999999;
-   for (i=0; i < num_open; ++i) {
-      int cost = open_list[i]->cost + open_list[i]->estimated_remaining;
+   for (i=0; i < pc->num_open; ++i) {
+      int cost = pc->open_list[i]->cost + pc->open_list[i]->estimated_remaining;
       if (cost < best_cost) {
          best_cost = cost;
          best_i = i;
       }
    }
    assert(best_i >= 0);
-   n = open_list[best_i];
-   open_list[best_i] = open_list[--num_open];   
+   n = pc->open_list[best_i];
+   pc->open_list[best_i] = pc->open_list[--pc->num_open];
    return n;
 }
 
@@ -149,16 +153,24 @@ static int estimate_distance_lowerbound(path_behavior *pb, int x, int y, int z, 
       return flat_move_estimate + pb->estimate_down_cost * abs(dz);
 }
 
+
+static pathfind_context pc_data;
+path_node *debug_nodes;
+int debug_node_alloc;
+
+
+
 // returns path length; path array is reversed
 int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_path)
 {
+   pathfind_context *pc = &pc_data; 
    //FILE *f = fopen("c:/x/path.txt", "w");
    static int dx[8] = { 1,0,-1,0, 1,1,-1,-1 };
    static int dy[8] = { 0,1,0,-1, -1,1,-1,1 };
    vec3i relative_dest;
    path_node *n;
-   node_alloc = 0;
-   num_open = 0;
+
+   memset(pc, 0, sizeof(pc));
    if (!can_stand(pb, 0,0,0, start))
       return 0;
    if (!can_stand(pb, 0,0,0, dest))
@@ -166,19 +178,19 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    if (start.x == dest.x && start.y == dest.y && start.z == dest.z)
       return 0;
 
-   astar_nodes = stb_ptrmap_new();
-   n = create_node(0,0,0);
+   pc->astar_nodes = stb_ptrmap_new();
+   n = create_node(pc, 0,0,0);
    n->dir = 0;
    n->dz = 0;
-   add_to_open_list(n, 0);
+   add_to_open_list(pc, n, 0);
 
    relative_dest.x = dest.x - start.x;
    relative_dest.y = dest.y - start.y;
    relative_dest.z = dest.z - start.z;
 
-   while (num_open > 0) {
+   while (pc->num_open > 0) {
       int dz,d;
-      n = get_smallest_open();
+      n = get_smallest_open(pc);
 
       if (n->x == relative_dest.x && n->y == relative_dest.y && n->z == relative_dest.z)
          break;
@@ -226,23 +238,23 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
                if (d >= 4)
                   cost += 2;
 
-               m = get_node(x,y,z);
+               m = get_node(pc, x,y,z);
                assert(m != n);
                if (m == NULL) {
-                  m = create_node(x,y,z);
+                  m = create_node(pc,x,y,z);
                   if (m == NULL) break;
                   m->dir = d;
                   m->dz = dz;
                   m->estimated_remaining = estimate_distance_lowerbound(pb, m->x+start.x, m->y+start.y, m->z+start.z, dest);
-                  add_to_open_list(m, cost);
+                  add_to_open_list(pc, m, cost);
                } else {
                   if (cost < m->cost) {
                      m->dir = d;
                      m->dz = dz;
                      if (m->status == A_closed)
-                        add_to_open_list(m, m->cost);
+                        add_to_open_list(pc, m, m->cost);
                      else
-                        update_open_list(m, m->cost);
+                        update_open_list(pc, m, m->cost);
                   }
                }
             }
@@ -251,9 +263,12 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
       n->status = A_closed;
    }
 
-   if (num_open == 0) {
-      stb_ptrmap_delete(astar_nodes, NULL);
-      astar_nodes = 0;
+   debug_nodes = pc->nodes;
+   debug_node_alloc = pc->node_alloc;
+
+   if (pc->num_open == 0) {
+      stb_ptrmap_delete(pc->astar_nodes, NULL);
+      pc->astar_nodes = 0;
       return 0;
    } else {
       int i;
@@ -272,7 +287,7 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
          y = n->y - dy[n->dir];
          z = n->z - n->dz;
 
-         m = get_node(x,y,z);
+         m = get_node(pc,x,y,z);
          assert(m != NULL);
          assert(m->status == A_closed);
          n = m;
@@ -312,8 +327,7 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
          assert(n != NULL);
          #endif
       }
-      stb_ptrmap_delete(astar_nodes, NULL);
-      astar_nodes = 0;
+      stb_ptrmap_delete(pc->astar_nodes, NULL);
 
       if (i == max_path)
          return 0;
