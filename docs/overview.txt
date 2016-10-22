@@ -10,7 +10,8 @@ obbg:
   : networking
 
 Done in today's stream (47):
-   - 
+   - fix pathfinding bug
+   - O(1) priority queue
 
 Previous stream (46):
    - physics for inanimates

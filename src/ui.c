@@ -539,13 +539,13 @@ void test_pathfind(Bool repeat)
    vec3i start;
 
    pb.max_step_down = 2;
-   pb.estimate_down_cost = 2;
-   pb.step_down_cost[1] = 2;
-   pb.step_down_cost[2] = 15;
+   pb.estimate_down_cost = 1;
+   pb.step_down_cost[1] = 1;
+   pb.step_down_cost[2] = 7;
 
    pb.max_step_up = 1;
-   pb.step_up_cost[1] = 3;
-   pb.estimate_up_cost = 3;
+   pb.step_up_cost[1] = 1;
+   pb.estimate_up_cost = 1;
 
    pb.size.x = 1;
    pb.size.y = 1;

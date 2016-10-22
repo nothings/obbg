@@ -42,10 +42,14 @@ Bool can_fit(path_behavior *pb, int x, int y, int z, vec3i start)
 
 
 #define MAX_PATH_NODES   5000
-#define NUM_PQ_LISTS     32
-#define PQ_SECONDARY_SPACING  (NUM_PQ_LISTS/2)
+#define NUM_PQ_PRIMARY   32
+#define PQ_SECONDARY_SPACING  (NUM_PQ_PRIMARY/2)
+#define PQ_SECONDARY_SPACING_LOG2  4
 #define NUM_PQ_SECONDARY      16
 
+#if (1 << PQ_SECONDARY_SPACING_LOG2) != PQ_SECONDARY_SPACING
+#error "mismatched defines"
+#endif
 
 enum
 {
@@ -68,15 +72,15 @@ typedef struct
    int num_open;
 
    path_links node_link[MAX_PATH_NODES];
-   int16 head[NUM_PQ_LISTS];
+   int16 head[NUM_PQ_PRIMARY];
    int16 secondary[NUM_PQ_SECONDARY];
-   int head_base_value;
+   int primary_base_value;
    int secondary_base_value;
    int num_primary;
    int num_secondary;
+   int first_nonempty;
 } pathfind_context;
 
-#define OLD_PATHFIND
 #ifdef OLD_PATHFIND
 static void add_to_open_list(pathfind_context *pc, path_node *n, int cost)
 {
@@ -96,6 +100,8 @@ static path_node *get_smallest_open(pathfind_context *pc)
    path_node *n;
    int i, best_i = -1;
    int best_cost = 9999999;
+   if (pc->num_open == 0)
+      return NULL;
    for (i=0; i < pc->num_open; ++i) {
       int cost = pc->open_list[i]->cost;
       if (cost < best_cost) {
@@ -109,12 +115,195 @@ static path_node *get_smallest_open(pathfind_context *pc)
    return n;
 }
 #else
+
+static int count_primary(pathfind_context *pc)
+{
+   int n = 0;
+   int i;
+   for (i=0; i < NUM_PQ_PRIMARY; ++i) {
+      int x = pc->head[i];
+      while (x >= 0) {
+         ++n;
+         if (pc->node_link[x].prev == -1)
+            assert(pc->head[i] == x);
+         x = pc->node_link[x].next;
+      }
+   }
+   return n;
+}
+
+static Bool is_primary_cost(pathfind_context *pc, int cost)
+{
+   return cost < pc->primary_base_value + NUM_PQ_PRIMARY;
+}
+
+static int secondary_list_index(pathfind_context *pc, int cost)
+{
+   return (cost - pc->secondary_base_value) >> PQ_SECONDARY_SPACING_LOG2;
+}
+
+static void add_to_primary_list(pathfind_context *pc, int cost, path_node *n)
+{
+   int x = n - pc->nodes;
+   int list = (cost - pc->primary_base_value);
+   assert(list >= 0 && list < NUM_PQ_PRIMARY);
+
+   assert(count_primary(pc) == pc->num_primary);
+
+   if (pc->head[list] >= 0)
+      pc->node_link[pc->head[list]].prev = x;
+
+   pc->node_link[x].next = pc->head[list];
+   pc->node_link[x].prev = -1;
+      
+   pc->head[list] = x;
+
+   n->cost = cost;
+
+   ++pc->num_primary;
+
+   assert(count_primary(pc) == pc->num_primary);
+}
+
+static void add_to_secondary_list(pathfind_context *pc, int cost, path_node *n)
+{
+   int x = n - pc->nodes;
+   int list = secondary_list_index(pc, cost);
+   assert(list >= 0 && list < NUM_PQ_SECONDARY);
+
+   assert(count_primary(pc) == pc->num_primary);
+
+   if (pc->secondary[list] >= 0)
+      pc->node_link[pc->secondary[list]].prev = x;
+
+   pc->node_link[x].next = pc->secondary[list];
+   pc->node_link[x].prev = -1;
+      
+   pc->secondary[list] = x;
+
+   n->cost = cost;
+
+   ++pc->num_secondary;
+
+   assert(count_primary(pc) == pc->num_primary);
+}
+
+static void remove_from_primary_list(pathfind_context *pc, path_node *n)
+{
+   int x = n - pc->nodes;
+   int list;
+
+   assert(count_primary(pc) == pc->num_primary);
+
+   list = n->cost - pc->primary_base_value;
+
+   if (pc->node_link[x].prev < 0) {
+      assert(pc->head[list] == x);
+      pc->head[list] = pc->node_link[x].next;
+   } else
+      pc->node_link[pc->node_link[x].prev].next = pc->node_link[x].next;
+
+   if (pc->node_link[x].next >= 0)
+      pc->node_link[pc->node_link[x].next].prev = pc->node_link[x].prev;
+
+   --pc->num_primary;
+   assert(count_primary(pc) == pc->num_primary);
+
+   assert(pc->num_primary >= 0 && pc->num_secondary >= 0);
+}
+
+static void remove_from_secondary_list(pathfind_context *pc, path_node *n)
+{
+   int x = n - pc->nodes;
+   int list;
+
+   assert(count_primary(pc) == pc->num_primary);
+
+   list = secondary_list_index(pc, n->cost);
+
+   if (pc->node_link[x].prev < 0) {
+      assert(pc->secondary[list] == x);
+      pc->secondary[list] = pc->node_link[x].next;
+   } else
+      pc->node_link[pc->node_link[x].prev].next = pc->node_link[x].next;
+
+   if (pc->node_link[x].next >= 0)
+      pc->node_link[pc->node_link[x].next].prev = pc->node_link[x].prev;
+
+   --pc->num_secondary;
+   assert(count_primary(pc) == pc->num_primary);
+   assert(pc->num_primary >= 0 && pc->num_secondary >= 0);
+}
+
 static void add_to_open_list(pathfind_context *pc, path_node *n, int cost)
 {
-   if (pc->num_primary == 0 && pc->num_secondary) {
-      add_to_list(&pc->head[0], n);
-      pc->head_base_value = cost;
-      pc->secondary_base_value = cost + NUM_PQ_LISTS;
+   if (is_primary_cost(pc, cost))
+      add_to_primary_list(pc, cost, n);
+   else
+      add_to_secondary_list(pc, cost, n);
+   assert(count_primary(pc) == pc->num_primary);
+}
+
+static void update_open_list(pathfind_context *pc, path_node *n, int cost)
+{
+   if (is_primary_cost(pc, n->cost)) {
+      // currently on primary list
+      remove_from_primary_list(pc, n);
+      add_to_primary_list(pc, cost, n);
+   } else {
+      // currently on secondary list
+      if (cost < pc->primary_base_value + NUM_PQ_PRIMARY) {
+         // moving to primary list
+         remove_from_secondary_list(pc, n);
+         add_to_primary_list(pc, cost, n);
+      } else {
+         int curlist = secondary_list_index(pc, n->cost);
+         int list = secondary_list_index(pc, cost);
+         if (curlist == list)
+            return;
+
+         remove_from_secondary_list(pc, n);
+         add_to_secondary_list(pc, cost, n);
+      }
+   }
+   assert(count_primary(pc) == pc->num_primary);
+}
+
+static path_node *get_smallest_open(pathfind_context *pc)
+{
+   // first check the existing primaries for a non-empty list
+   int i;
+
+   for(;;) {
+      if (pc->num_primary > 0) {
+         for (i=pc->first_nonempty; i < NUM_PQ_PRIMARY/2; ++i) {
+            if (pc->head[i] >= 0) {
+               path_node *n = &pc->nodes[pc->head[i]];
+               pc->first_nonempty = i;
+               remove_from_primary_list(pc, n);
+               assert(count_primary(pc) == pc->num_primary);
+               return n;
+            }
+         }
+      }
+      pc->primary_base_value += NUM_PQ_PRIMARY/2;
+
+      if (pc->num_secondary == 0)
+         return NULL;
+
+      memmove(pc->head, pc->head + NUM_PQ_PRIMARY/2, NUM_PQ_PRIMARY/2 * sizeof(pc->head[0]));
+      pc->first_nonempty = 0;
+      for (i=NUM_PQ_PRIMARY/2; i < NUM_PQ_PRIMARY; ++i)
+         pc->head[i] = -1;
+
+      while (pc->secondary[0] >= 0) {
+         path_node *n = &pc->nodes[pc->secondary[0]];
+         remove_from_secondary_list(pc, n);
+         add_to_primary_list(pc, n->cost, n);
+      }
+
+      memmove(pc->secondary, pc->secondary+1, (NUM_PQ_SECONDARY-1) * sizeof(pc->secondary[0]));
+      pc->secondary_base_value += PQ_SECONDARY_SPACING;
    }
 }
 #endif
@@ -171,9 +360,9 @@ static int estimate_distance_lowerbound(path_behavior *pb, int x, int y, int z, 
    int flat_move_estimate;
 
    if (dx > dy) {
-      flat_move_estimate = dy*6 + 4 * (dx-dy);
+      flat_move_estimate = dy*3 + 2 * (dx-dy);
    } else {
-      flat_move_estimate = dx*6 + 4 * (dy-dx);
+      flat_move_estimate = dx*3 + 2 * (dy-dx);
    }
 
    if (dz > 0)
@@ -198,8 +387,8 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    static int dy[8] = { 0,1,0,-1, -1,1,-1,1 };
    vec3i relative_dest;
    path_node *n;
+   int i;
 
-   memset(pc, 0, sizeof(*pc));
    if (!can_stand(pb, 0,0,0, start))
       return 0;
    if (!can_stand(pb, 0,0,0, dest))
@@ -207,20 +396,34 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    if (start.x == dest.x && start.y == dest.y && start.z == dest.z)
       return 0;
 
+   memset(pc, 0, sizeof(*pc));
    pc->astar_nodes = stb_ptrmap_new();
    n = create_node(pc, 0,0,0);
    n->dir = 0;
    n->dz = 0;
-   n->estimated_remaining = estimate_distance_lowerbound(pb, 0,0,0, dest);
+   n->estimated_remaining = estimate_distance_lowerbound(pb, start.x, start.y, start.z, dest);
+
+   #ifndef OLD_PATHFIND
+   pc->primary_base_value = n->estimated_remaining;
+   pc->secondary_base_value = n->estimated_remaining + NUM_PQ_PRIMARY;
+   pc->first_nonempty = 0;
+   for (i=0; i < NUM_PQ_PRIMARY; ++i)
+      pc->head[i] = -1;
+   for (i=0; i < NUM_PQ_SECONDARY; ++i)
+      pc->secondary[i] = -1;
+   #endif
+
    add_to_open_list(pc, n, 0 + n->estimated_remaining);
 
    relative_dest.x = dest.x - start.x;
    relative_dest.y = dest.y - start.y;
    relative_dest.z = dest.z - start.z;
 
-   while (pc->num_open > 0) {
+   for(;;) {
       int dz,d;
       n = get_smallest_open(pc);
+      if (n == NULL)
+         break;
 
       if (n->x == relative_dest.x && n->y == relative_dest.y && n->z == relative_dest.z)
          break;
@@ -266,9 +469,9 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
 
                prev_cost = n->cost - n->estimated_remaining;
 
-               cost = prev_cost + 4 + (dz < 0 ? pb->step_down_cost[-dz] : pb->step_up_cost[dz]);
+               cost = prev_cost + 2 + (dz < 0 ? pb->step_down_cost[-dz] : pb->step_up_cost[dz]);
                if (d >= 4)
-                  cost += 2;
+                  cost += 1;
 
                m = get_node(pc, x,y,z);
                assert(m != n);
@@ -300,7 +503,7 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    debug_nodes = pc->nodes;
    debug_node_alloc = pc->node_alloc;
 
-   if (pc->num_open == 0) {
+   if (n == NULL) {
       stb_ptrmap_delete(pc->astar_nodes, NULL);
       pc->astar_nodes = 0;
       return 0;
