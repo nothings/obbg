@@ -12,6 +12,7 @@ obbg:
 Done in today's stream (47):
    - fix pathfinding bug
    - O(1) priority queue
+   - simple critters follow paths
 
 Previous stream (46):
    - physics for inanimates
