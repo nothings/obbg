@@ -354,10 +354,8 @@ Bool physics_move_animate(vec *pos, vec *vel, float dt, float size[2][3], Bool o
 {
    if (!on_ground)
       return physics_move_inanimate(pos,vel,dt,size,on_ground,bounce);
-   else {
-      *pos = vec_add_scale(pos, vel, dt);
-      return 1;
-   }
+   else
+      return physics_move_walkable(pos, vel, dt, size, NULL);
 }
 
 int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interpolate_z *lerpz)
@@ -483,7 +481,7 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interp
       }
    }
 
-   if (step_up) {
+   if (step_up && lerpz) {
       lerpz->old_z = smoothed_z_for_rendering(pos, lerpz);
       lerpz->t = 1;
    }

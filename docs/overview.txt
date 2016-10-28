@@ -9,7 +9,9 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (47):
+Done in today's stream (48):
+
+Previous stream (47):
    - fix pathfinding bug
    - O(1) priority queue
    - simple critters follow paths

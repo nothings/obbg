@@ -243,31 +243,48 @@ Bool ai_can_stand(object *o, vec3i target)
 static vec3i full_path[MAX_PATH_LEN];
 void ai_pathfind(object *o, vec3i target)
 {
+   int x0,y0,x1,y1;
+   int i,j;
+   float (*size)[3] = size_for_type[OTYPE_critter];
    path_behavior pb = { 0 };
    vec3i start;
    int len;
 
    ai_set_behavior(&pb, o);
 
-   start.x = (int) floor(o->position.x);
-   start.y = (int) floor(o->position.y);
+   x0 = (int) floor(o->position.x + size[0][0]);
+   y0 = (int) floor(o->position.y + size[0][1]);
+   x1 = (int) floor(o->position.x + size[1][0]);
+   y1 = (int) floor(o->position.y + size[1][1]);
+
    start.z = (int) floor(o->position.z + size_for_type[OTYPE_critter][0][2] + 0.01f);
+   for (j=y0; j <= y1; ++j) {
+      for (i=x0; i <= x1; ++i) {
+         start.x = i;
+         start.y = j;
+         if (ai_can_stand(o, start))
+            goto findpath;
+      }
+   }
 
-   o->brain->target = target;
-   len = path_find(&pb, start, target, full_path, MAX_PATH_LEN);
-   o->velocity.x = 0;
-   o->velocity.y = 0;
-   o->velocity.z = 0;
+   if (0) {
+     findpath:
+      o->brain->target = target;
+      len = path_find(&pb, start, target, full_path, MAX_PATH_LEN);
+      o->velocity.x = 0;
+      o->velocity.y = 0;
+      o->velocity.z = 0;
 
-   if (len == 0) {
-      o->brain->has_target = False;
-   } else {
-      int i;
-      o->brain->path_length = stb_min(len, MAX_SHORT_PATH);
-      for (i=0; i < o->brain->path_length; ++i)
-         o->brain->path[i] = full_path[len-1 - i];
-      o->brain->path_position = 0;
-      o->brain->has_target = True;
+      if (len == 0) {
+         o->brain->has_target = False;
+      } else {
+         int i;
+         o->brain->path_length = stb_min(len, MAX_SHORT_PATH);
+         for (i=0; i < o->brain->path_length; ++i)
+            o->brain->path[i] = full_path[len-1 - i];
+         o->brain->path_position = 0;
+         o->brain->has_target = True;
+      }
    }
 }
 
@@ -297,7 +314,8 @@ void ai_tick(object *o)
          } else {
             ++b->path_position;
             if (b->path_position == b->path_length-1) {
-               if (pos.x == b->target.x && pos.y == b->target.y && pos.z == b->target.z) {
+               if (pos.x == b->target.x && pos.y == b->target.y) {
+                  // @TODO: if z mismatches, wait a bit to see if you get there, if not repathfind
                   b->has_target = False;
                   o->velocity.x = 0;
                   o->velocity.y = 0;

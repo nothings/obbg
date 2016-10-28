@@ -150,6 +150,8 @@ static void add_to_primary_list(pathfind_context *pc, int cost, path_node *n)
    int list = (cost - pc->primary_base_value);
    assert(list >= 0 && list < NUM_PQ_PRIMARY);
 
+   assert(list >= pc->first_nonempty);
+
    if (pc->head[list] >= 0)
       pc->node_link[pc->head[list]].prev = x;
 
@@ -270,11 +272,11 @@ static path_node *get_smallest_open(pathfind_context *pc)
                return n;
             }
          }
+      } else {
+         if (pc->num_secondary == 0)
+            return NULL;
       }
       pc->primary_base_value += NUM_PQ_PRIMARY/2;
-
-      if (pc->num_secondary == 0)
-         return NULL;
 
       memmove(pc->head, pc->head + NUM_PQ_PRIMARY/2, NUM_PQ_PRIMARY/2 * sizeof(pc->head[0]));
       pc->first_nonempty = 0;
@@ -410,8 +412,10 @@ int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_p
    for(;;) {
       int dz,d;
       n = get_smallest_open(pc);
-      if (n == NULL)
+      if (n == NULL) {
+         assert(pc->num_primary == 0 && pc->num_secondary == 0);
          break;
+      }
 
       if (n->x == relative_dest.x && n->y == relative_dest.y && n->z == relative_dest.z)
          break;

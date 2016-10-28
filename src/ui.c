@@ -565,11 +565,14 @@ int path_length;
 vec3i path_step[256];
 
 vec3i last_pos, prev_end;
+Bool can_path[64][64][64];
+vec3i can_path_base;
 
 void test_pathfind(Bool repeat)
 {
+   int i,j,k;
    path_behavior pb = { 0 };
-   vec3i start;
+   vec3i start, end;
 
    pb.max_step_down = 2;
    pb.estimate_down_cost = 1;
@@ -582,22 +585,29 @@ void test_pathfind(Bool repeat)
 
    pb.size.x = 1;
    pb.size.y = 1;
-   pb.size.z = 2;
+   pb.size.z = 3;
 
    pb.flying = False;
 
-   start.x = (int) floor(obj[player_id].position.x);
-   start.y = (int) floor(obj[player_id].position.y);
-   start.z = (int) (obj[player_id].position.z + size_for_type[OTYPE_player][0][2] + 0.01f);
+   can_path_base.x = (int) floor(obj[player_id].position.x) - 32;
+   can_path_base.y = (int) floor(obj[player_id].position.y) - 32;
+   can_path_base.z = (int) floor(obj[player_id].position.z) - 16;
 
-   if (repeat == False) {
-      if (last_pos.x != 0 || last_pos.y != 0 || last_pos.z != 0)
-         path_length = path_find(&pb, start, last_pos, path_step, sizeof(path_step)/sizeof(path_step[0]));
-      prev_end = last_pos;
-      last_pos = start;
-   } else {
-      path_length = path_find(&pb, last_pos, prev_end, path_step, sizeof(path_step)/sizeof(path_step[0]));
-   }
+   end.x = (int) floor(obj[player_id].position.x);
+   end.y = (int) floor(obj[player_id].position.y);
+   end.z = (int) floor(obj[player_id].position.z + size_for_type[OTYPE_player][0][2] + 0.01f);
+
+   for (j=0; j <= 64; ++j)
+      for (i=0; i <= 64; ++i)
+         for (k=0; k < 32; ++k) {
+            start.x = can_path_base.x + i;
+            start.y = can_path_base.y + j;
+            start.z = can_path_base.z + k;
+            if (ai_can_stand(NULL, start)) {
+               can_path[j][i][k] = (path_find(&pb, start, end, path_step, sizeof(path_step)/sizeof(path_step[0])) != 0);
+               last_pos = start;
+            }
+         }
 }
 
 extern Bool player_is_vacuuming;
@@ -810,20 +820,36 @@ extern int debug_node_alloc;
 
 void do_ui_rendering_3d(void)
 {
-   int i;
+   int i,j,k;
    vec pos[2];
    RaycastResult result;
 
+   glColor3f(0.3f,0.3f,0.8f);
+   for (j=0; j < 64; ++j)
+      for (i=0; i < 64; ++i)
+         for (k=0; k < 32; ++k) {
+            vec start;
+            start.x = can_path_base.x + i + 0.5f;
+            start.y = can_path_base.y + j + 0.5f;
+            start.z = can_path_base.z + k + 0.4f;
+            if (can_path[j][i][k])
+               stbgl_drawBox(start.x, start.y, start.z, 0.2f,0.2f,0.2f, 1);
+         }
    glColor3f(1.0f,1.0f,0.5f);
 
-   stbgl_drawBox(last_pos.x+0.5f,last_pos.y+0.5f,last_pos.z+0.5, 0.2f,0.2f,0.2f, 0);
-   stbgl_drawBox(prev_end.x+0.5f,prev_end.y+0.5f,prev_end.z+0.5, 0.2f,0.2f,0.2f, 0);
+   stbgl_drawBox(last_pos.x+0.5f,last_pos.y+0.5f,last_pos.z+0.5, 0.2f,0.2f,0.2f, 1);
+   stbgl_drawBox(prev_end.x+0.5f,prev_end.y+0.5f,prev_end.z+0.5, 0.2f,0.2f,0.2f, 1);
+
 
    for (i=0; i < debug_node_alloc; ++i) {
       float x = last_pos.x + debug_nodes[i].x + 0.5f;
       float y = last_pos.y + debug_nodes[i].y + 0.5f;
       float z = last_pos.z + debug_nodes[i].z + 0.1f;
-      stbgl_drawBox(x,y,z, 0.1f,0.1f,0.1f, 0);
+      if (debug_nodes[i].status)
+         glColor3f(1.0f,1.0f,0.5f);
+      else
+         glColor3f(1.0f,0.2f,0.2f);
+      stbgl_drawBox(x,y,z, 0.1f,0.1f,0.1f, 1);
    }
 
    glColor3f(1.0f,1.0f,1.0f);
@@ -831,7 +857,7 @@ void do_ui_rendering_3d(void)
       float x = path_step[i].x + 0.5f;
       float y = path_step[i].y + 0.5f;
       float z = path_step[i].z + 0.15f;
-      stbgl_drawBox(x,y,z, 0.15f,0.15f,0.15f, 0);
+      stbgl_drawBox(x,y,z, 0.15f,0.15f,0.15f, 1);
    }
 
 
