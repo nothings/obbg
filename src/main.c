@@ -779,14 +779,14 @@ float smoothed_z_for_rendering(vec *pos, interpolate_z *iz)
 
 void render_player(vec pos, vec sz, vec ang)
 {
-   float light_diffuse[] = { 1.0f,1.0f,1.0f,1.0f };
-   float light_ambient[] = { 0.9f,0.9f,0.9f,1.0f };
-   GLfloat light_position[] = { 1.0, 1.0, 2.0, 0.0 };
+   float light_diffuse [] = { 1.0f, 1.0f, 1.0f, 1.0f };
+   float light_ambient [] = { 0.9f, 0.9f, 0.9f, 1.0f };
+   float light_position[] = { 1.0f, 1.0f, 2.0f, 0.0f };
    float mat_specular[] = { 0,0,0,0 };
    float mat_diffuse[]  = { 1.0f,0.9f,0.8f,1.0 };
    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-   glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-   glLightfv(GL_LIGHT0, GL_DIFFUSE , light_diffuse);
+   glMaterialfv(GL_FRONT, GL_DIFFUSE , mat_diffuse );
+   glLightfv(GL_LIGHT0, GL_DIFFUSE , light_diffuse );
    glLightfv(GL_LIGHT0, GL_AMBIENT , light_ambient );
    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
    glDisable(GL_BLEND);
@@ -840,10 +840,10 @@ void render_objects(void)
          move = obj[i].velocity;
          move.z = 0;
          forward = vec_dot(move, face);
-         if (forward > 0)
-            ang.x = forward * 1;
+         if (forward < 0)
+            ang.x = forward * 1.2;
          else
-            ang.x = forward * 0.2f;
+            ang.x = forward * 0.7f;
             
          render_player(pos, sz, ang);
       }

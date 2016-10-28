@@ -135,12 +135,18 @@ void client_view_physics(objid oid, player_controls *con, float dt)
 
 #define TIME_TO_MOVE_HEAD_UP_AFTER_STEP_UP  0.35f
 
+#define RUN_SPEED 12.0f
+#define BACK_RUN_SPEED 12.0f
+#define SIDESTEP_SPEED 8.5f
+
+#define ZERO_TO_MAX_SPEED_TIME  0.5f
+#define MAX_PLAYER_ACCEL  (RUN_SPEED/ZERO_TO_MAX_SPEED_TIME)
+#define MAX_PLAYER_TURN_ACCEL (RUN_SPEED/0.3f)
+
 void player_physics(objid oid, player_controls *con, float dt)
 {
    int i;
    object *o = &obj[oid];
-   float thrust[3] = { 0,0,0 };
-   float world_thrust[3];
 
    if (o->iz.t) {
       o->iz.t -= dt/TIME_TO_MOVE_HEAD_UP_AFTER_STEP_UP;
@@ -150,37 +156,91 @@ void player_physics(objid oid, player_controls *con, float dt)
 
    // choose direction to apply thrust
 
-   thrust[0] = (con->buttons &  3)== 1 ? EFFECTIVE_ACCEL : (con->buttons &  3)== 2 ? -EFFECTIVE_ACCEL : 0;
-   thrust[1] = (con->buttons & 12)== 4 ? EFFECTIVE_ACCEL : (con->buttons & 12)== 8 ? -EFFECTIVE_ACCEL : 0;
-   thrust[2] = (con->buttons & 48)==16 ? EFFECTIVE_ACCEL : (con->buttons & 48)==32 ? -EFFECTIVE_ACCEL : 0;
 
-   // @TODO clamp thrust[0] & thrust[1] vector length to EFFECTIVE_ACCEL
+   if (!con->flying) {
+      vec change;
+      float mag, mag2, fastchange_mag;
+      float goal_vel[3];
+      float forward_speed = (con->buttons & 12)== 4 ?      RUN_SPEED : (con->buttons & 12)== 8 ? -BACK_RUN_SPEED : 0;
+      float side_speed    = (con->buttons &  3)== 1 ? SIDESTEP_SPEED : (con->buttons &  3)== 2 ? -SIDESTEP_SPEED : 0;
+      objspace_to_worldspace(goal_vel, oid, side_speed, forward_speed, 0,0);
 
-   objspace_to_worldspace(world_thrust, oid, thrust[0], thrust[1], 0, 0);
-   world_thrust[2] += thrust[2];
+      mag = (float) sqrt(goal_vel[0]*goal_vel[0] + goal_vel[1]*goal_vel[1]);
+      if (mag > RUN_SPEED) {
+         goal_vel[0] *= RUN_SPEED/mag;
+         goal_vel[1] *= RUN_SPEED/mag;
+      }
 
-   if (!con->flying)
-      world_thrust[2] = 0;
+      mag = (float) sqrt(o->velocity.x * o->velocity.x + o->velocity.y * o->velocity.y);
+      mag2 = (float) sqrt(goal_vel[0] * goal_vel[0] + goal_vel[1] * goal_vel[1]);
 
-   for (i=0; i < 3; ++i) {
-      float acc = world_thrust[i];
-      (&o->velocity.x)[i] += acc*dt;
-   }
+      fastchange_mag = stb_min(mag, mag2);
 
-   if (o->velocity.x || o->velocity.y || o->velocity.z)
-   {
-      float vel = (float) sqrt(square(o->velocity.x)+square(o->velocity.y)+square(o->velocity.z));
-      float newvel = vel;
-      float dec = STATIC_FRICTION + DYNAMIC_FRICTION*vel;
-      newvel = vel - dec*dt;
-      if (newvel < 0)
-         newvel = 0;
-      assert(newvel <= vel);
-      assert(newvel/vel >= 0);
-      assert(newvel/vel <= 1);
-      o->velocity.x *= newvel/vel;
-      o->velocity.y *= newvel/vel;
-      o->velocity.z *= newvel/vel;
+      if (mag2 != 0) {
+         change.x = (goal_vel[0]*fastchange_mag/mag2) - o->velocity.x;
+         change.y = (goal_vel[1]*fastchange_mag/mag2) - o->velocity.y;
+      } else {
+         change.x = goal_vel[0] - o->velocity.x;
+         change.y = goal_vel[1] - o->velocity.y;
+      }
+      change.z = 0;
+      mag = (float) sqrt(change.x * change.x + change.y * change.y);
+      if (mag > 0) {
+         vec schange;
+         schange.x = change.x * MAX_PLAYER_TURN_ACCEL/mag*dt;
+         schange.y = change.y * MAX_PLAYER_TURN_ACCEL/mag*dt;
+         if (fabs(schange.x) >= fabs(change.x))
+            schange.x = change.x;
+         if (fabs(schange.y) >= fabs(change.y))
+            schange.y = change.y;
+         o->velocity.x += schange.x;
+         o->velocity.y += schange.y;
+      }
+
+      change.x = goal_vel[0] - o->velocity.x;
+      change.y = goal_vel[1] - o->velocity.y;
+      change.z = 0;
+      mag = (float) sqrt(change.x * change.x + change.y * change.y);
+      if (mag > MAX_PLAYER_ACCEL) {
+         change.x *= MAX_PLAYER_ACCEL/mag;
+         change.y *= MAX_PLAYER_ACCEL/mag;
+      }
+
+      o->velocity.x += change.x * dt;
+      o->velocity.y += change.y * dt;
+
+   } else {
+      // @TODO clamp thrust[0] & thrust[1] vector length to EFFECTIVE_ACCEL
+      float thrust[3] = { 0,0,0 };
+      float world_thrust[3];
+
+      thrust[0] = (con->buttons &  3)== 1 ? EFFECTIVE_ACCEL : (con->buttons &  3)== 2 ? -EFFECTIVE_ACCEL : 0;
+      thrust[1] = (con->buttons & 12)== 4 ? EFFECTIVE_ACCEL : (con->buttons & 12)== 8 ? -EFFECTIVE_ACCEL : 0;
+      thrust[2] = (con->buttons & 48)==16 ? EFFECTIVE_ACCEL : (con->buttons & 48)==32 ? -EFFECTIVE_ACCEL : 0;
+
+      objspace_to_worldspace(world_thrust, oid, thrust[0], thrust[1], 0, 0);
+      world_thrust[2] += thrust[2];
+
+      for (i=0; i < 3; ++i) {
+         float acc = world_thrust[i];
+         (&o->velocity.x)[i] += acc*dt;
+      }
+
+      if (o->velocity.x || o->velocity.y || o->velocity.z)
+      {
+         float vel = (float) sqrt(square(o->velocity.x)+square(o->velocity.y)+square(o->velocity.z));
+         float newvel = vel;
+         float dec = STATIC_FRICTION + DYNAMIC_FRICTION*vel;
+         newvel = vel - dec*dt;
+         if (newvel < 0)
+            newvel = 0;
+         assert(newvel <= vel);
+         assert(newvel/vel >= 0);
+         assert(newvel/vel <= 1);
+         o->velocity.x *= newvel/vel;
+         o->velocity.y *= newvel/vel;
+         o->velocity.z *= newvel/vel;
+      }
    }
 
    {
@@ -198,18 +258,6 @@ void player_physics(objid oid, player_controls *con, float dt)
          o->position.y = y;
          o->position.z = z;
       }
-
-      #if 0
-      if (!collision_test_box(x,y,z,camera_bounds)) {
-         camloc[0] = x;
-         camloc[1] = y;
-         camloc[2] = z;
-      } else {
-         cam_vel[0] = 0;
-         cam_vel[1] = 0;
-         cam_vel[2] = 0;
-      }
-      #endif
    }
 }
 
