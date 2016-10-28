@@ -90,6 +90,7 @@ extern void add_sprite(float x, float y, float z, int id);
 extern void stop_manager(void);
 extern Bool can_stand(path_behavior *pb, int x, int y, int z, vec3i start);
 extern Bool ai_can_stand(object *o, vec3i target);
+extern Bool can_place_foot(vec location, float x_rad, float y_rad);
 
 typedef struct
 {

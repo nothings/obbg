@@ -741,6 +741,7 @@ vec left_foot;
 vec right_foot;
 int left_foot_planted=0;
 int right_foot_planted=0;
+int left_foot_good, right_foot_good;
 
 void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
 {
@@ -790,48 +791,58 @@ void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
       y_left =  c * mag / 20;
       z_left =  s * 0.4f;
       if (z_left < 0) z_left = 0;
+      z_left += bottom_z + 0.05;
 
       y_right =  -c * mag / 20;
       z_right =  -s * 0.4f;
       if (z_right < 0) z_right = 0;
+      z_right += bottom_z + 0.05;
 
       if (animation_state >= 0 && animation_state <= M_PI) {
          if (!left_foot_planted) {
             objspace_to_worldspace(&left_foot.x, player, -0.35f, y_left, 0, 0);
+            if (fabs(z_left - floor(z_left)) > 0.1f)
+               z_left = floor(z_left) + 0.05;
             left_foot.x += pos.x;
             left_foot.y += pos.y;
             left_foot_planted = True;
-            left_foot.z = z_left+bottom_z+0.05;
+            left_foot.z = z_left;
+            left_foot_good = can_place_foot(left_foot, 0.3,0.3);
          }
 
          objspace_to_worldspace(&right_foot.x, player, 0.35f, y_right, 0, 0);
          right_foot.x += pos.x;
          right_foot.y += pos.y;
-         right_foot.z = z_right+bottom_z+0.05;
+         right_foot.z = z_right;
          right_foot_planted = False;
+         right_foot_good = True;
       } else {
          if (!right_foot_planted) {
             objspace_to_worldspace(&right_foot.x, player, 0.35f, y_right, 0, 0);
+            if (fabs(z_right - floor(z_right)) > 0.1f)
+               z_right = floor(z_left) + 0.05;
             right_foot.x += pos.x;
             right_foot.y += pos.y;
-            right_foot.z = z_right+bottom_z+0.05;
+            right_foot.z = z_right;
             right_foot_planted = True;
+            right_foot_good = can_place_foot(right_foot, 0.3,0.3);
          }
          objspace_to_worldspace(&left_foot.x, player, -0.35f, y_left, 0, 0);
          left_foot.x += pos.x;
          left_foot.y += pos.y;
-         left_foot.z = z_left+bottom_z+0.05;
+         left_foot.z = z_left;
          left_foot_planted = False;
+         left_foot_good = True;
       }
 
-
+      glMaterialfv(GL_FRONT, GL_DIFFUSE , left_foot_good ? mat_diffuse : mat_red);
       glPushMatrix();
       glTranslatef(left_foot.x, left_foot.y, left_foot.z);
       glRotatef(ang.z, 0,0,1);
       stbgl_drawBox(0,0,0, 0.2f,0.4f,0.1f, 1);
       glPopMatrix();
 
-      glMaterialfv(GL_FRONT, GL_DIFFUSE , mat_diffuse );
+      glMaterialfv(GL_FRONT, GL_DIFFUSE , right_foot_good ? mat_diffuse : mat_red);
       glPushMatrix();
       glTranslatef(right_foot.x, right_foot.y, right_foot.z);
       glRotatef(ang.z, 0,0,1);

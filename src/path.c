@@ -1,5 +1,6 @@
 #include "obbg_funcs.h"
 #include <stdlib.h>
+#include <math.h>
 
 //#define OLD_PATHFIND
 
@@ -40,6 +41,34 @@ Bool can_stand(path_behavior *pb, int x, int y, int z, vec3i start)
 Bool can_fit(path_behavior *pb, int x, int y, int z, vec3i start)
 {
    return can_stand_raw(pb,x,y,z,start, False);
+}
+
+Bool can_place_foot(vec location, float x_rad, float y_rad)
+{
+   int i,j;
+   int x0 = (int) floor(location.x - x_rad);
+   int x1 = (int) floor(location.x + x_rad);
+   int y0 = (int) floor(location.y - y_rad);
+   int y1 = (int) floor(location.y + y_rad);
+   int z = (int) floor(location.z);
+   int z_ground = z-1;
+   Bool any_ground = False;
+
+   for (j=y0; j <= y1; ++j) {
+      int ry = j & (MESH_CHUNK_SIZE_Y-1);
+      for (i=x0; i <= x1; ++i) {
+         int rx = i & (MESH_CHUNK_SIZE_X-1);
+         mesh_chunk *mc = get_physics_chunk_for_coord(i,j);
+         if (mc == NULL)
+            return False;
+         if (mc->pc.pathdata[ry][rx].data[z>>4] & (1 << (z&15)))
+            return True;
+         if (z_ground < 0 || (mc->pc.pathdata[ry][rx].data[z_ground>>4] & (1 << (z_ground&15)))) {
+            any_ground = True;
+         }
+      }
+   }
+   return any_ground;
 }
 
 
