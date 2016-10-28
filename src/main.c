@@ -797,9 +797,16 @@ void render_player(vec pos, vec sz, vec ang)
    glPushMatrix();
    glTranslatef(pos.x,pos.y,pos.z);
    glRotatef(ang.z, 0,0,1);
+   glRotatef(ang.x, 1,0,0);
+   glRotatef(ang.y, 0,1,0);
    stbgl_drawBox(0,0,0, sz.x,sz.y,sz.z, 1);
    glPopMatrix();
    glDisable(GL_LIGHTING);
+}
+
+float vec_dot(vec a, vec b)
+{
+   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
 void render_objects(void)
@@ -815,6 +822,10 @@ void render_objects(void)
 
    for (i=1; i < max_player_id; ++i) {
       if (obj[i].valid && (i != player_id || third_person)) {
+         vec ang;
+         vec face;
+         vec move;
+         float forward;
          float (*size)[3] = size_for_type[OTYPE_player];
          sz.x = size[1][0] - size[0][0];
          sz.y = size[1][1] - size[0][1];
@@ -822,8 +833,19 @@ void render_objects(void)
          pos.x = obj[i].position.x + (size[1][0] + size[0][0])/2;
          pos.y = obj[i].position.y + (size[1][1] + size[0][1])/2;
          pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz) + (size[1][2] + size[0][2])/2;
-
-         render_player(pos, sz, obj[i].ang);
+         ang = obj[i].ang;
+         ang.x = 0;
+         face.x = sin(ang.z * M_PI / 180);
+         face.y = -cos(ang.z * M_PI / 180);
+         move = obj[i].velocity;
+         move.z = 0;
+         forward = vec_dot(move, face);
+         if (forward > 0)
+            ang.x = forward * 1;
+         else
+            ang.x = forward * 0.2f;
+            
+         render_player(pos, sz, ang);
       }
    }
 
