@@ -2081,8 +2081,6 @@ static int floori(float x)
    return (int) floor(x);
 }
 
-extern float camera_bounds[2][3]; // @TODO this is a hack
-
 static int face_orig[4][2] = {
    { 0,0 },
    { 1,0 },
@@ -2137,13 +2135,13 @@ static void non_logistics_interactions(void)
       vec pmin, pmax;
       vec3i wmin, wmax;
       vec3i cmin,cmax;
-      pmin.x = player_vacuum_loc.x + camera_bounds[0][0] - 0.25f;
-      pmin.y = player_vacuum_loc.y + camera_bounds[0][1] - 0.25f;
-      pmin.z = player_vacuum_loc.z + camera_bounds[0][2];
+      pmin.x = player_vacuum_loc.x + size_for_type[OTYPE_player][0][0] - 0.25f;
+      pmin.y = player_vacuum_loc.y + size_for_type[OTYPE_player][0][1] - 0.25f;
+      pmin.z = player_vacuum_loc.z + size_for_type[OTYPE_player][0][2];
 
-      pmax.x = player_vacuum_loc.x + camera_bounds[1][0] + 0.25f;
-      pmax.y = player_vacuum_loc.y + camera_bounds[1][1] + 0.25f;
-      pmax.z = player_vacuum_loc.z + camera_bounds[1][2] + 0.25f;
+      pmax.x = player_vacuum_loc.x + size_for_type[OTYPE_player][1][0] + 0.25f;
+      pmax.y = player_vacuum_loc.y + size_for_type[OTYPE_player][1][1] + 0.25f;
+      pmax.z = player_vacuum_loc.z + size_for_type[OTYPE_player][1][2] + 0.25f;
 
       wmin.x = floori(pmin.x);
       wmin.y = floori(pmin.y);

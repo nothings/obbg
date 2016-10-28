@@ -119,8 +119,6 @@ texture_info textures[] =
    0,0,   0,0,   0,0, 0,0,   0,0,   0,0,   0,0,   0,0,
 };
 
-float camera_bounds[2][3];
-
 void game_init(void)
 {
    init_chunk_caches();
@@ -247,13 +245,6 @@ void render_init(void)
    // @TODO: support non-DXT path
    char **files = stb_readdir_recursive("data", "*.crn");
    int i;
-
-   camera_bounds[0][0] = - 0.75f;
-   camera_bounds[0][1] = - 0.75f;
-   camera_bounds[0][2] = - 4.25f;
-   camera_bounds[1][0] = + 0.75f;
-   camera_bounds[1][1] = + 0.75f;
-   camera_bounds[1][2] = + 0.25f;
 
    glGenTextures(2, voxel_tex);
 
@@ -786,6 +777,31 @@ float smoothed_z_for_rendering(vec *pos, interpolate_z *iz)
    return stb_lerp(t, pos->z, iz->old_z);
 }
 
+void render_player(vec pos, vec sz, vec ang)
+{
+   float light_diffuse[] = { 1.0f,1.0f,1.0f,1.0f };
+   float light_ambient[] = { 0.9f,0.9f,0.9f,1.0f };
+   GLfloat light_position[] = { 1.0, 1.0, 2.0, 0.0 };
+   float mat_specular[] = { 0,0,0,0 };
+   float mat_diffuse[]  = { 1.0f,0.9f,0.8f,1.0 };
+   glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+   glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+   glLightfv(GL_LIGHT0, GL_DIFFUSE , light_diffuse);
+   glLightfv(GL_LIGHT0, GL_AMBIENT , light_ambient );
+   glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+   glDisable(GL_BLEND);
+
+   glEnable(GL_LIGHTING);
+   glEnable(GL_LIGHT0);
+   glMatrixMode(GL_MODELVIEW);
+   glPushMatrix();
+   glTranslatef(pos.x,pos.y,pos.z);
+   glRotatef(ang.z, 0,0,1);
+   stbgl_drawBox(0,0,0, sz.x,sz.y,sz.z, 1);
+   glPopMatrix();
+   glDisable(GL_LIGHTING);
+}
+
 void render_objects(void)
 {
    int i;
@@ -799,18 +815,15 @@ void render_objects(void)
 
    for (i=1; i < max_player_id; ++i) {
       if (obj[i].valid && (i != player_id || third_person)) {
-         sz.x = camera_bounds[1][0] - camera_bounds[0][0];
-         sz.y = camera_bounds[1][1] - camera_bounds[0][1];
-         sz.z = camera_bounds[1][2] - camera_bounds[0][2];
-         pos.x = obj[i].position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
-         pos.y = obj[i].position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
-         pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz) + (camera_bounds[1][2] + camera_bounds[0][2])/2;
-         glMatrixMode(GL_MODELVIEW);
-         glTranslatef(pos.x,pos.y,pos.z);
-         glRotatef(obj[i].ang.z, 0,0,1);
-         glPushMatrix();
-         stbgl_drawBox(0,0,0, sz.x,sz.y,sz.z, 1);
-         glPopMatrix();
+         float (*size)[3] = size_for_type[OTYPE_player];
+         sz.x = size[1][0] - size[0][0];
+         sz.y = size[1][1] - size[0][1];
+         sz.z = size[1][2] - size[0][2];
+         pos.x = obj[i].position.x + (size[1][0] + size[0][0])/2;
+         pos.y = obj[i].position.y + (size[1][1] + size[0][1])/2;
+         pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz) + (size[1][2] + size[0][2])/2;
+
+         render_player(pos, sz, obj[i].ang);
       }
    }
 
@@ -895,7 +908,7 @@ void draw_main(void)
    camang[1] = obj[player_id].ang.y;
    camang[2] = obj[player_id].ang.z;
    if (third_person) {
-      objspace_to_worldspace(camloc, player_id, 0,-5,0, third_person_angle);
+      objspace_to_worldspace(camloc, player_id, 0,-7,0, third_person_angle);
       camloc[0] += obj[player_id].position.x;
       camloc[1] += obj[player_id].position.y;
       camloc[2] += smoothed_z_for_rendering(&obj[player_id].position, &obj[player_id].iz);
