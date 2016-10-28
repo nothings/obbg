@@ -385,7 +385,7 @@ void ai_tick(object *o)
          delta.x = (next.x + 0.5f) - o->position.x;
          delta.y = (next.y + 0.5f) - o->position.y;
          delta.z = (next.z + 0.35f + 0.01f) - o->position.z;
-         delta = vec_norm(&delta);
+         vec_norm(&delta, &delta);
 
          o->velocity.x = delta.x * CRITTER_SPEED;
          o->velocity.y = delta.y * CRITTER_SPEED;

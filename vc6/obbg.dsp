@@ -133,6 +133,10 @@ SOURCE=..\stb\stb_image_resize.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\src\stb_vec.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\stb\stb_voxel_render.h
 # End Source File
 # End Group

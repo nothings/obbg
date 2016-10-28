@@ -35,6 +35,10 @@
 // stb_easy_font.h
 #include "stb_easy_font.h" // doesn't require an IMPLEMENTATION
 
+#define STB_VEC_IMPLEMENTATION
+#include "stb_vec.h"
+
+
 char *game_name = "obbg";
 
 #define REVERSE_DEPTH
@@ -411,11 +415,11 @@ void process_tick(float dt)
 {
    dt += pending_dt;
    pending_dt = 0;
-   while (dt > 1.0f/60) {
+   while (dt > 1.0f/240) {
       switch (program_mode) {
          case MODE_server:
             server_net_tick_pre_physics();
-            process_tick_raw(1.0f/60);
+            process_tick_raw(1.0f/240);
             server_net_tick_post_physics();
             break;
          case MODE_client:
@@ -426,11 +430,11 @@ void process_tick(float dt)
             player_vacuum(player_is_vacuuming, &obj[player_id].position);
             client_view_physics(player_id, &client_player_input, dt);
             p_input[player_id] = client_player_input;
-            process_tick_raw(1.0f/60);
+            process_tick_raw(1.0f/240);
             break;
       }
 
-      dt -= 1.0f/60;
+      dt -= 1.0f/240;
    }
    pending_dt += dt;
 }
@@ -645,52 +649,6 @@ void stbgl_drawRectTCArray(float x0, float y0, float x1, float y1, float s0, flo
 Bool third_person=True;
 float player_zoom = 1.0f;
 
-vec vec_add(vec *b, vec *c)
-{
-   vec a;
-   a.x = b->x + c->x;
-   a.y = b->y + c->y;
-   a.z = b->z + c->z;
-   return a;
-}
-
-vec vec_sub(vec *b, vec *c)
-{
-   vec a;
-   a.x = b->x - c->x;
-   a.y = b->y - c->y;
-   a.z = b->z - c->z;
-   return a;
-}
-
-vec vec_add_scale(vec *b, vec *c, float d)
-{
-   vec a;
-   a.x = b->x + d*c->x;
-   a.y = b->y + d*c->y;
-   a.z = b->z + d*c->z;
-   return a;
-}
-
-vec vec_sub_scale(vec *b, vec *c, float d)
-{
-   vec a;
-   a.x = b->x - d*c->x;
-   a.y = b->y - d*c->y;
-   a.z = b->z - d*c->z;
-   return a;
-}
-
-vec vec_norm(vec *a)
-{
-   float len = sqrt(a->x*a->x + a->y*a->y + a->z*a->z);
-   vec b;
-   b.x = a->x / len;
-   b.y = a->y / len;
-   b.z = a->z / len;
-   return b;
-}
-
 int alpha_test_sprites=1;
 
 void render_sprites(void)
@@ -720,12 +678,12 @@ void render_sprites(void)
       vec p0,p1,p2,p3;
 
       // draw shadow
-      p0 = vec_add_scale(&s->pos, &shadow_s_off, s->size);
-      p1 = vec_sub_scale(&s->pos, &shadow_s_off, s->size);
-      p2 = vec_add_scale(&p1, &shadow_t_off, s->size);
-      p3 = vec_add_scale(&p0, &shadow_t_off, s->size);
-      p0 = vec_sub_scale(&p0, &shadow_t_off, s->size);
-      p1 = vec_sub_scale(&p1, &shadow_t_off, s->size);
+      vec_add_scale(&p0, &s->pos, &shadow_s_off, s->size);
+      vec_sub_scale(&p1, &s->pos, &shadow_s_off, s->size);
+      vec_add_scale(&p2, &p1, &shadow_t_off, s->size);
+      vec_add_scale(&p3, &p0, &shadow_t_off, s->size);
+      vec_sub_scale(&p0, &p0, &shadow_t_off, s->size);
+      vec_sub_scale(&p0, &p1, &shadow_t_off, s->size);
       glTexCoord3f(0,1,0); glVertex3fv(&p0.x);
       glTexCoord3f(1,1,0); glVertex3fv(&p1.x);
       glTexCoord3f(1,0,0); glVertex3fv(&p2.x);
@@ -751,12 +709,12 @@ void render_sprites(void)
       vec p0,p1,p2,p3;
       s->pos.z += s->size/2;
 
-      p0 = vec_add_scale(&s->pos, &s_off, s->size);
-      p1 = vec_sub_scale(&s->pos, &s_off, s->size);
-      p2 = vec_add_scale(&p1, &t_off, s->size);
-      p3 = vec_add_scale(&p0, &t_off, s->size);
-      p0 = vec_sub_scale(&p0, &t_off, s->size);
-      p1 = vec_sub_scale(&p1, &t_off, s->size);
+      vec_add_scale(&p0, &s->pos, &s_off, s->size);
+      vec_sub_scale(&p1, &s->pos, &s_off, s->size);
+      vec_add_scale(&p2, &p1, &t_off, s->size);
+      vec_add_scale(&p3, &p0, &t_off, s->size);
+      vec_subeq_scale(&p0, &t_off, s->size);
+      vec_subeq_scale(&p1, &t_off, s->size);
       //glColor3fv(&s->color.x);
       glTexCoord3f(0,1,s->id); glVertex3fv(&p0.x);
       glTexCoord3f(1,1,s->id); glVertex3fv(&p1.x);
@@ -777,11 +735,21 @@ float smoothed_z_for_rendering(vec *pos, interpolate_z *iz)
    return stb_lerp(t, pos->z, iz->old_z);
 }
 
-void render_player(vec pos, vec sz, vec ang)
+float animation_dt;
+float animation_state;
+vec left_foot;
+vec right_foot;
+int left_foot_planted=0;
+int right_foot_planted=0;
+
+void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
 {
+   //float bottom_z = pos.z - sz.z/2;
+      
    float light_diffuse [] = { 1.0f, 1.0f, 1.0f, 1.0f };
    float light_ambient [] = { 0.9f, 0.9f, 0.9f, 1.0f };
    float light_position[] = { 1.0f, 1.0f, 2.0f, 0.0f };
+   float mat_red[]  = { 1.0f,0.2f,0.2f,1.0 };
    float mat_specular[] = { 0,0,0,0 };
    float mat_diffuse[]  = { 1.0f,0.9f,0.8f,1.0 };
    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
@@ -790,6 +758,9 @@ void render_player(vec pos, vec sz, vec ang)
    glLightfv(GL_LIGHT0, GL_AMBIENT , light_ambient );
    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
    glDisable(GL_BLEND);
+
+   pos.z += 0.7f;
+   sz.z -= 1.4f;
 
    glEnable(GL_LIGHTING);
    glEnable(GL_LIGHT0);
@@ -801,12 +772,74 @@ void render_player(vec pos, vec sz, vec ang)
    glRotatef(ang.y, 0,1,0);
    stbgl_drawBox(0,0,0, sz.x,sz.y,sz.z, 1);
    glPopMatrix();
-   glDisable(GL_LIGHTING);
-}
 
-float vec_dot(vec a, vec b)
-{
-   return a.x*b.x + a.y*b.y + a.z*b.z;
+   {
+      float mag;
+      float s,c;
+      float y_left,y_right, z_left,z_right;
+      vec move_vel = obj[player_id].velocity;
+      move_vel.z = 0;
+
+      mag = vec_mag(&move_vel);
+      animation_state += animation_dt*20;// * mag * 1.5;
+      animation_state = fmod(animation_state, 2*M_PI);
+
+      s = -sin(animation_state);
+      c =  cos(animation_state);
+
+      y_left =  c * mag / 20;
+      z_left =  s * 0.4f;
+      if (z_left < 0) z_left = 0;
+
+      y_right =  -c * mag / 20;
+      z_right =  -s * 0.4f;
+      if (z_right < 0) z_right = 0;
+
+      if (animation_state >= 0 && animation_state <= M_PI) {
+         if (!left_foot_planted) {
+            objspace_to_worldspace(&left_foot.x, player, -0.35f, y_left, 0, 0);
+            left_foot.x += pos.x;
+            left_foot.y += pos.y;
+            left_foot_planted = True;
+            left_foot.z = z_left+bottom_z+0.05;
+         }
+
+         objspace_to_worldspace(&right_foot.x, player, 0.35f, y_right, 0, 0);
+         right_foot.x += pos.x;
+         right_foot.y += pos.y;
+         right_foot.z = z_right+bottom_z+0.05;
+         right_foot_planted = False;
+      } else {
+         if (!right_foot_planted) {
+            objspace_to_worldspace(&right_foot.x, player, 0.35f, y_right, 0, 0);
+            right_foot.x += pos.x;
+            right_foot.y += pos.y;
+            right_foot.z = z_right+bottom_z+0.05;
+            right_foot_planted = True;
+         }
+         objspace_to_worldspace(&left_foot.x, player, -0.35f, y_left, 0, 0);
+         left_foot.x += pos.x;
+         left_foot.y += pos.y;
+         left_foot.z = z_left+bottom_z+0.05;
+         left_foot_planted = False;
+      }
+
+
+      glPushMatrix();
+      glTranslatef(left_foot.x, left_foot.y, left_foot.z);
+      glRotatef(ang.z, 0,0,1);
+      stbgl_drawBox(0,0,0, 0.2f,0.4f,0.1f, 1);
+      glPopMatrix();
+
+      glMaterialfv(GL_FRONT, GL_DIFFUSE , mat_diffuse );
+      glPushMatrix();
+      glTranslatef(right_foot.x, right_foot.y, right_foot.z);
+      glRotatef(ang.z, 0,0,1);
+      stbgl_drawBox(0,0,0, 0.2f,0.4f,0.1f, 1);
+      glPopMatrix();
+   }
+
+   glDisable(GL_LIGHTING);
 }
 
 void render_objects(void)
@@ -839,13 +872,13 @@ void render_objects(void)
          face.y = -cos(ang.z * M_PI / 180);
          move = obj[i].velocity;
          move.z = 0;
-         forward = vec_dot(move, face);
+         forward = vec_dot(&move, &face);
          if (forward < 0)
             ang.x = forward * 1.2;
          else
             ang.x = forward * 0.7f;
             
-         render_player(pos, sz, ang);
+         render_player(pos, sz, ang, obj[i].position.z+size[0][2], i);
       }
    }
 
@@ -1074,6 +1107,7 @@ int raw_level_time;
 
 int global_hack;
 int quit;
+float slow_motion = 1.0f;
 
 int loopmode(float dt, int real, int in_client)
 {
@@ -1086,7 +1120,11 @@ int loopmode(float dt, int real, int in_client)
    // don't allow more than 6 frames to update at a time
    if (dt > 0.075) dt = 0.075;
 
+   dt *= slow_motion;
+
    global_timer += dt;
+
+   animation_dt = dt;
 
    carried_dt += dt;
    while (carried_dt > 1.0/TICKRATE) {

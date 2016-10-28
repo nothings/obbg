@@ -4,6 +4,7 @@
 //#define MINIMIZE_MEMORY
 
 #include "stb.h"
+#include "stb_vec.h"
 
 #include <stdlib.h>
 
@@ -69,11 +70,6 @@ typedef struct
 {
    int x,y,z;
 } vec3i;
-
-typedef struct
-{
-   float x,y,z;
-} vec;
 
 typedef struct
 {

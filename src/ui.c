@@ -564,7 +564,7 @@ void throw_thing(void)
       //t = create_object(OTYPE_test + (rand()>>3)%2, obj[player_id].position);
       t = create_object(OTYPE_critter, obj[player_id].position);
       objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,22,0, 0);
-      obj[t].position = vec_add_scale(&obj[t].position, &obj[t].velocity, 1.0);
+      vec_addeq_scale(&obj[t].position, &obj[t].velocity, 1.0);
       memset(&obj[t].velocity, 0, sizeof(vec));
    }
 }
@@ -619,6 +619,7 @@ void test_pathfind(Bool repeat)
 }
 
 extern Bool player_is_vacuuming;
+extern float slow_motion;
 
 void process_key_down(int k, int s, SDL_Keymod mod)
 {
@@ -650,6 +651,8 @@ void process_key_down(int k, int s, SDL_Keymod mod)
    if (s == SDL_SCANCODE_H) global_hack = !global_hack;
    if (s == SDL_SCANCODE_P) debug_render = !debug_render;
    if (s == SDL_SCANCODE_C) show_memory = !show_memory;//examine_outstanding_genchunks();
+
+   if (s == SDL_SCANCODE_B) slow_motion = (slow_motion == 1 ? 0.1f : 1.0f);
 
    #if 0
    if (s == SDL_SCANCODE_O) test_pathfind(False);

@@ -234,19 +234,21 @@ int collision_test_box(collision_geometry *cg, float x, float y, float z, float 
 
 vec find_collision_point(collision_geometry *cg, vec *a, vec *b, float size[2][3], float *p_t)
 {
-   vec delta = vec_sub(b,a);
+   vec delta, m;
    float t0 = 0.0f, t1 = 1.0f;
    int i;
+   vec_sub(&delta, b,a);
    for (i=0; i < 8; ++i) {
       float t = (t0 + t1) / 2.0f;
-      vec m = vec_add_scale(a, &delta, t);
+      vec_add_scale(&m, a, &delta, t);
       if (collision_test_box(cg, m.x, m.y, m.z, size))
          t1 = t;
       else
          t0 = t;
    }
    *p_t = t0;
-   return vec_add_scale(a, &delta, t0);
+   vec_add_scale(&m, a, &delta, t0);
+   return m;
 }
 
 Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground, float bounce)
@@ -271,7 +273,7 @@ Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool
       Bool started_colliding;
       vec v, new_vel;
       // free-fall
-      v = vec_add_scale(pos, vel, dt);
+      vec_add_scale(&v, pos, vel, dt);
 
       gather_collision_geometry(&cg, ix - COLLIDE_BLOB_X/2, iy - COLLIDE_BLOB_Y/2, iz - COLLIDE_BLOB_Z/2);
       started_colliding = collision_test_box(&cg, pos->x, pos->y, pos->z, size);

@@ -91,12 +91,6 @@ extern void stop_manager(void);
 extern Bool can_stand(path_behavior *pb, int x, int y, int z, vec3i start);
 extern Bool ai_can_stand(object *o, vec3i target);
 
-extern vec vec_add(vec *b, vec *c);
-extern vec vec_sub(vec *b, vec *c);
-extern vec vec_add_scale(vec *b, vec *c, float d);
-extern vec vec_sub_scale(vec *b, vec *c, float d);
-extern vec vec_norm(vec *a);
-
 typedef struct
 {
    int bx,by,bz;
