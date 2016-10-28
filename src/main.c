@@ -772,6 +772,20 @@ vec find_foot_placement(vec poly[5])
    return best_place;
 }
 
+#error "TODO"
+
+1. when foot is halfway from previous position to next position,
+   compute placement for next position
+
+2. animate foot from old position to halfway cleanly
+
+3. animate foot from halfway to next position cleanly
+
+4. deal with stopping if foot placement was computed before stopping
+
+5. IK legs to feet
+
+
 void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
 {
    //float bottom_z = pos.z - sz.z/2;
