@@ -505,6 +505,10 @@ extern void update_view(float dx, float dy);
 
 static Bool first_mouse=True;
 
+extern float third_person_angle;
+
+static int lshift,rshift;
+
 void  process_mouse_move(int dx, int dy)
 {
    if (ui_screen != UI_SCREEN_none) {
@@ -518,7 +522,11 @@ void  process_mouse_move(int dx, int dy)
       mouse_x = stb_clamp(mouse_x, 0, screen_x);
       mouse_y = stb_clamp(mouse_y, 0, screen_y);
    } else {
-      update_view((float) dx / screen_x, (float) dy / screen_y);
+      if (lshift || rshift) {
+         third_person_angle += dx/4.0;
+      } else {
+         update_view((float) dx / screen_x, (float) dy / screen_y);
+      }
    }
 }
 
@@ -555,7 +563,7 @@ void throw_thing(void)
       int t;
       //t = create_object(OTYPE_test + (rand()>>3)%2, obj[player_id].position);
       t = create_object(OTYPE_critter, obj[player_id].position);
-      objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,22,0);
+      objspace_to_worldspace(&obj[t].velocity.x, player_id, 0,22,0, 0);
       obj[t].position = vec_add_scale(&obj[t].position, &obj[t].velocity, 1.0);
       memset(&obj[t].velocity, 0, sizeof(vec));
    }
@@ -616,6 +624,11 @@ void process_key_down(int k, int s, SDL_Keymod mod)
 {
    if (k == SDLK_ESCAPE)
       quit = 1;
+
+   if (s == SDL_SCANCODE_LSHIFT)
+      lshift = 1;
+   if (s == SDL_SCANCODE_RSHIFT)
+      rshift = 1;
 
    if (s == SDL_SCANCODE_T)
       throw_thing();
@@ -685,7 +698,7 @@ void process_key_down(int k, int s, SDL_Keymod mod)
    //if (k == '3') obj[player_id].position.x += 65536;
    #if 0
    if (s == SDL_SCANCODE_R) {
-      objspace_to_worldspace(light_vel, player_id, 0,32,0);
+      objspace_to_worldspace(light_vel, player_id, 0,32,0, 0);
       memcpy(light_pos, &obj[player_id].position, sizeof(light_pos));
    }
    #endif
@@ -693,6 +706,10 @@ void process_key_down(int k, int s, SDL_Keymod mod)
 
 void process_key_up(int k, int s)
 {
+   if (s == SDL_SCANCODE_LSHIFT)
+      lshift = 0;
+   if (s == SDL_SCANCODE_RSHIFT)
+      rshift = 0;
    if (s == SDL_SCANCODE_D)   active_control_clear(0);
    if (s == SDL_SCANCODE_A)   active_control_clear(1);
    if (s == SDL_SCANCODE_W)   active_control_clear(2);
@@ -862,7 +879,7 @@ void do_ui_rendering_3d(void)
 
 
    // show wireframe of currently 'selected' block
-   objspace_to_worldspace(&pos[1].x, player_id, 0,9,0);
+   objspace_to_worldspace(&pos[1].x, player_id, 0,9,0, 0);
    pos[0] = obj[player_id].position;
    pos[1].x += pos[0].x;
    pos[1].y += pos[0].y;

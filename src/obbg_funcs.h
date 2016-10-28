@@ -123,7 +123,7 @@ extern int create_object(int type, vec location);
 extern objid allocate_object(void);
 extern objid allocate_player(void);
 extern brain_state *allocate_brain(void);
-extern void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z);
+extern void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z, float z_ang_off);
 
 typedef struct
 {

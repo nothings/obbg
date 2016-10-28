@@ -69,7 +69,7 @@ int create_object(int type, vec location)
 
 float square(float x) { return x*x; }
 
-void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z)
+void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z, float z_ang_off)
 {
    float vec[3] = { cam_x, cam_y, cam_z };
    float t[3];
@@ -81,8 +81,8 @@ void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y,
    t[1] = c*vec[1] - s*vec[2];
    t[2] = s*vec[1] + c*vec[2];
 
-   s = (float) sin(obj[oid].ang.z*M_PI/180);
-   c = (float) cos(obj[oid].ang.z*M_PI/180);
+   s = (float) sin((z_ang_off+obj[oid].ang.z)*M_PI/180);
+   c = (float) cos((z_ang_off+obj[oid].ang.z)*M_PI/180);
    world[0] = c*t[0] - s*t[1];
    world[1] = s*t[0] + c*t[1];
    world[2] = t[2];
@@ -156,7 +156,7 @@ void player_physics(objid oid, player_controls *con, float dt)
 
    // @TODO clamp thrust[0] & thrust[1] vector length to EFFECTIVE_ACCEL
 
-   objspace_to_worldspace(world_thrust, oid, thrust[0], thrust[1], 0);
+   objspace_to_worldspace(world_thrust, oid, thrust[0], thrust[1], 0, 0);
    world_thrust[2] += thrust[2];
 
    if (!con->flying)

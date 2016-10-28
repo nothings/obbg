@@ -10,6 +10,8 @@ obbg:
   : networking
 
 Done in today's stream (48):
+   - fix pathfinding bug
+   - simple critters find paths better
 
 Previous stream (47):
    - fix pathfinding bug

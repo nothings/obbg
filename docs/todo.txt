@@ -1,6 +1,5 @@
    -  upload annotations starting with 22-part2
    -  finish uploading videos
-   -  install photoshop
    -  install sony vegas
    -  sort obbg_funcs.h
 

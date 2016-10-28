@@ -651,7 +651,7 @@ void stbgl_drawRectTCArray(float x0, float y0, float x1, float y1, float s0, flo
    glEnd();
 }
 
-Bool third_person;
+Bool third_person=True;
 float player_zoom = 1.0f;
 
 vec vec_add(vec *b, vec *c)
@@ -715,8 +715,8 @@ void render_sprites(void)
    glBindTexture(GL_TEXTURE_2D_ARRAY_EXT, sprite_tex);
    stbglUniform1i(stbgl_find_uniform(dumb_prog, "tex"), 0);
 
-   objspace_to_worldspace(&s_off.x, player_id, 0.5,0,0);
-   objspace_to_worldspace(&t_off.x, player_id, 0,0,0.5);
+   objspace_to_worldspace(&s_off.x, player_id, 0.5,0,0, 0);
+   objspace_to_worldspace(&t_off.x, player_id, 0,0,0.5, 0);
 
    glColor3f(1,1,1);
 
@@ -805,7 +805,12 @@ void render_objects(void)
          pos.x = obj[i].position.x + (camera_bounds[1][0] + camera_bounds[0][0])/2;
          pos.y = obj[i].position.y + (camera_bounds[1][1] + camera_bounds[0][1])/2;
          pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz) + (camera_bounds[1][2] + camera_bounds[0][2])/2;
-         stbgl_drawBox(pos.x,pos.y,pos.z, sz.x,sz.y,sz.z, 1);
+         glMatrixMode(GL_MODELVIEW);
+         glTranslatef(pos.x,pos.y,pos.z);
+         glRotatef(obj[i].ang.z, 0,0,1);
+         glPushMatrix();
+         stbgl_drawBox(0,0,0, sz.x,sz.y,sz.z, 1);
+         glPopMatrix();
       }
    }
 
@@ -844,6 +849,8 @@ int face_dir[6][3] = {
 };
 
 float global_timer;
+float third_person_angle=0.0f;
+
 void draw_main(void)
 {
    Uint64 start_time, end_time; // render time
@@ -884,20 +891,21 @@ void draw_main(void)
    glLoadIdentity();
    stbgl_initCamera_zup_facing_y();
 
+   camang[0] = obj[player_id].ang.x;
+   camang[1] = obj[player_id].ang.y;
+   camang[2] = obj[player_id].ang.z;
    if (third_person) {
-      objspace_to_worldspace(camloc, player_id, 0,-5,0);
+      objspace_to_worldspace(camloc, player_id, 0,-5,0, third_person_angle);
       camloc[0] += obj[player_id].position.x;
       camloc[1] += obj[player_id].position.y;
       camloc[2] += smoothed_z_for_rendering(&obj[player_id].position, &obj[player_id].iz);
+      camang[2] += third_person_angle;
    } else {
       camloc[0] = obj[player_id].position.x;
       camloc[1] = obj[player_id].position.y;
       camloc[2] = smoothed_z_for_rendering(&obj[player_id].position, &obj[player_id].iz);
    }
 
-   camang[0] = obj[player_id].ang.x;
-   camang[1] = obj[player_id].ang.y;
-   camang[2] = obj[player_id].ang.z;
 #if 1
    glRotatef(-camang[0],1,0,0);
    glRotatef(-camang[2],0,0,1);
