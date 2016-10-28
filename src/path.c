@@ -62,7 +62,7 @@ Bool can_place_foot(vec location, float x_rad, float y_rad)
          if (mc == NULL)
             return False;
          if (mc->pc.pathdata[ry][rx].data[z>>4] & (1 << (z&15)))
-            return True;
+            return False;
          if (z_ground < 0 || (mc->pc.pathdata[ry][rx].data[z_ground>>4] & (1 << (z_ground&15)))) {
             any_ground = True;
          }
