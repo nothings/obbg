@@ -303,11 +303,13 @@ typedef struct
 {
    float hsz_x, hsz_y;   // half-size in x & y
    float height;         // height in z (origin is at base)
+
    float eye_z_offset;   // offset from ht to eye position (stored positive, must subtract)
+   float torso_base_height; // offset from feet to bottom of torso position
 } type_properties;
 
 type_properties type_prop[];
-
+extern Bool third_person;
 typedef int32 objid;
 
 typedef struct

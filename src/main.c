@@ -775,9 +775,6 @@ vec find_foot_placement(vec poly[5])
 #if 0
 #error "TODO"
 
-0. Move position of objects to be on ground/feet
-0. Head above torso, increase player size to match
-
 1. IK legs to feet
 
 2. when foot is halfway from previous position to next position,
@@ -797,12 +794,103 @@ vec find_foot_placement(vec poly[5])
 8b. Adjustable torso position a la Arma 3
 
 9. Lower & tilt torso when one foot is much lower
+
+10. Can't lower torso when in mid-air
+
+11. Sideways tilt around corners
+
+12. draw separate head
 #endif
 
-void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
+static void box_vertex(vec *pt, vec *a, vec *x, vec *y, vec *axis, float sx, float sy, float sz)
+{
+   *pt = *a;
+   vec_addeq_scale(pt, x, sx);
+   vec_addeq_scale(pt, y, sy);
+   vec_addeq_scale(pt, axis, sz);
+}
+
+static void draw_cylinder_from_to(vec *a, vec *b, float radius)
+{
+   vec vertex[8];
+   vec axis, x={1,0,0}, local_x, local_y, local_z;
+   vec_sub(&axis, b, a);
+   vec_cross(&local_y, &axis, &x);
+   vec_normeq(&local_y);
+   vec_cross(&local_x, &axis, &local_y);
+   vec_normeq(&local_x);
+   vec_norm(&local_z, &axis);
+
+   vec_scaleeq(&local_x, radius);
+   vec_scaleeq(&local_y, radius);
+
+   box_vertex(&vertex[0], a, &local_x, &local_y, &axis, -1,-1, 0);
+   box_vertex(&vertex[1], a, &local_x, &local_y, &axis,  1,-1, 0);
+   box_vertex(&vertex[2], a, &local_x, &local_y, &axis, -1, 1, 0);
+   box_vertex(&vertex[3], a, &local_x, &local_y, &axis,  1, 1, 0);
+   box_vertex(&vertex[4], a, &local_x, &local_y, &axis, -1,-1, 1);
+   box_vertex(&vertex[5], a, &local_x, &local_y, &axis,  1,-1, 1);
+   box_vertex(&vertex[6], a, &local_x, &local_y, &axis, -1, 1, 1);
+   box_vertex(&vertex[7], a, &local_x, &local_y, &axis,  1, 1, 1);
+
+   vec_normeq(&local_y);
+   vec_normeq(&local_x);
+
+   glBegin(GL_QUADS);
+      #if 0
+      glNormal3fv(&local_z.x);
+      glColor3f(1,1,0);
+      glVertex3fv(&vertex[7].x);
+      glVertex3fv(&vertex[6].x);
+      glVertex3fv(&vertex[4].x);
+      glVertex3fv(&vertex[5].x);
+
+      vec_scaleeq(&local_z, -1);
+      glNormal3fv(&local_z.x);
+      glColor3f(1,0,1);
+      glVertex3fv(&vertex[2].x);
+      glVertex3fv(&vertex[3].x);
+      glVertex3fv(&vertex[1].x);
+      glVertex3fv(&vertex[0].x);
+      #endif
+
+      glNormal3fv(&local_y.x);
+      glColor3f(0,1,1);
+      glVertex3fv(&vertex[6].x);
+      glVertex3fv(&vertex[7].x);
+      glVertex3fv(&vertex[3].x);
+      glVertex3fv(&vertex[2].x);
+
+      vec_scaleeq(&local_y, -1);
+      glNormal3fv(&local_y.x);
+      glColor3f(0,0,1);
+      glVertex3fv(&vertex[5].x);
+      glVertex3fv(&vertex[4].x);
+      glVertex3fv(&vertex[0].x);
+      glVertex3fv(&vertex[1].x);
+
+      glNormal3fv(&local_x.x);
+      glColor3f(0,1,0);
+      glVertex3fv(&vertex[7].x);
+      glVertex3fv(&vertex[5].x);
+      glVertex3fv(&vertex[1].x);
+      glVertex3fv(&vertex[3].x);
+
+      vec_scaleeq(&local_x, -1);
+      glNormal3fv(&local_x.x);
+      glColor3f(1,0,0);
+      glVertex3fv(&vertex[4].x);
+      glVertex3fv(&vertex[6].x);
+      glVertex3fv(&vertex[2].x);
+      glVertex3fv(&vertex[0].x);
+   glEnd();
+}
+
+void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid player)
 {
    //float bottom_z = pos.z - sz.z/2;
-      
+   vec sz;      
+   float center_z_offset;
    float light_diffuse [] = { 1.0f, 1.0f, 1.0f, 1.0f };
    float light_ambient [] = { 0.9f, 0.9f, 0.9f, 1.0f };
    float light_position[] = { 1.0f, 1.0f, 2.0f, 0.0f };
@@ -810,6 +898,7 @@ void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
    float mat_specular[] = { 0,0,0,0 };
    float mat_diffuse[]  = { 1.0f,0.9f,0.8f,1.0 };
    float mat_green[] = { 0.4f,0.8f,0.4f,1.0 };
+
    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
    glMaterialfv(GL_FRONT, GL_DIFFUSE , mat_diffuse );
    glLightfv(GL_LIGHT0, GL_DIFFUSE , light_diffuse );
@@ -817,19 +906,16 @@ void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
    glDisable(GL_BLEND);
 
-   pos.z += 0.7f;
-   sz.z -= 1.4f;
+   sz.x = 2*tp->hsz_x;
+   sz.y = 2*tp->hsz_y;
+   sz.z = tp->height - tp->torso_base_height;
+
+   center_z_offset = tp->torso_base_height + sz.z/2;
+   pos.z += center_z_offset;
 
    glEnable(GL_LIGHTING);
    glEnable(GL_LIGHT0);
    glMatrixMode(GL_MODELVIEW);
-   glPushMatrix();
-   glTranslatef(pos.x,pos.y,pos.z);
-   glRotatef(ang.z, 0,0,1);
-   glRotatef(ang.x, 1,0,0);
-   glRotatef(ang.y, 0,1,0);
-   stbgl_drawBox(0,0,0, sz.x,sz.y,sz.z, 1);
-   glPopMatrix();
 
    {
       int i;
@@ -917,6 +1003,37 @@ void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
          right_foot_good = True;
       }
 
+      glPushMatrix();
+      glTranslatef(pos.x,pos.y,pos.z);
+      glRotatef(ang.z, 0,0,1);
+      glRotatef(ang.x, 1,0,0);
+      glRotatef(ang.y, 0,1,0);
+      stbgl_drawBox(0,0,0, sz.x,sz.y,sz.z, 1);
+      glPopMatrix();
+
+      {
+         vec left_leg_top;
+         left_leg_top.x = -tp->hsz_x*0.8;
+         left_leg_top.y = 0;
+         left_leg_top.z = tp->torso_base_height - center_z_offset;
+
+         rotate_vector(&left_leg_top, &left_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
+         vec_addeq(&left_leg_top, &pos);
+
+         draw_cylinder_from_to(&left_leg_top, &left_foot, 0.1f);
+      }
+
+      {
+         vec right_leg_top;
+         right_leg_top.x = tp->hsz_x*0.8;
+         right_leg_top.y = 0;
+         right_leg_top.z = tp->torso_base_height - center_z_offset;
+         rotate_vector(&right_leg_top, &right_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
+         vec_addeq(&right_leg_top, &pos);
+
+         draw_cylinder_from_to(&right_leg_top, &right_foot, 0.1f);
+      }
+
       glMaterialfv(GL_FRONT, GL_DIFFUSE , right_foot_good ? mat_diffuse : mat_red);
       glPushMatrix();
       glTranslatef(right_foot.x, right_foot.y, right_foot.z);
@@ -938,7 +1055,6 @@ void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
 void render_objects(void)
 {
    int i;
-   vec sz;
    vec pos;
    glColor3f(1,1,1);
    glDisable(GL_TEXTURE_2D);
@@ -952,13 +1068,10 @@ void render_objects(void)
          vec face;
          vec move;
          float forward;
-         type_properties *p = &type_prop[OTYPE_player];
-         sz.x = 2*p->hsz_x;
-         sz.y = 2*p->hsz_y;
-         sz.z = p->height;
+         type_properties *tp = &type_prop[OTYPE_player];
          pos.x = obj[i].position.x;
          pos.y = obj[i].position.y;
-         pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz) + p->height/2;
+         pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz);
          ang = obj[i].ang;
          ang.x = 0;
          face.x = sin(ang.z * M_PI / 180);
@@ -971,7 +1084,7 @@ void render_objects(void)
          else
             ang.x = forward * 0.7f;
             
-         render_player(pos, sz, ang, obj[i].position.z, i);
+         render_biped(pos, tp, ang, obj[i].position.z, i);
       }
    }
 
@@ -1059,12 +1172,13 @@ void draw_main(void)
       objspace_to_worldspace(camloc, player_id, 0,-7,0, third_person_angle);
       camloc[0] += obj[player_id].position.x;
       camloc[1] += obj[player_id].position.y;
-      camloc[2] += smoothed_z_for_rendering(&obj[player_id].position, &obj[player_id].iz);
+      camloc[2] += smoothed_z_for_rendering(&obj[player_id].position, &obj[player_id].iz) + type_prop[OTYPE_player].height - 0.5f;
       camang[2] += third_person_angle;
    } else {
       camloc[0] = obj[player_id].position.x;
       camloc[1] = obj[player_id].position.y;
-      camloc[2] = smoothed_z_for_rendering(&obj[player_id].position, &obj[player_id].iz);
+      camloc[2] = smoothed_z_for_rendering(&obj[player_id].position, &obj[player_id].iz)
+                   + (type_prop[OTYPE_player].height - type_prop[OTYPE_player].eye_z_offset);
    }
 
 #if 1

@@ -17,15 +17,6 @@
 extern float light_pos[3];
 extern float light_vel[3];
 
-type_properties type_prop[5] =
-{
-   { 0 }, // none
-   { 0.45f, 0.45f, 2.5f, 0.25f }, // player
-   { 0.25f, 0.25f, 0.30f, 0 }, // test
-   { 0.15f, 0.15f, 0.30f, 0 }, // bounce
-   { 0.45f, 0.45f, 2.5f, 0.25f }, // critter
-};
-
 objid player_id;
 
 void world_init(void)
@@ -54,6 +45,16 @@ int create_object(int type, vec location)
 }
 
 float square(float x) { return x*x; }
+
+// z,x,y:
+// yaw, pitch, bank
+
+void rotate_vector(vec *output, vec *input, float ang_x, float ang_y, float ang_z)
+{
+   vec_rotate_y(output, output, ang_y);
+   vec_rotate_x(output, output, ang_x);
+   vec_rotate_z(output, input, ang_z);
+}
 
 void objspace_to_worldspace(float world[3], objid oid, float cam_x, float cam_y, float cam_z, float z_ang_off)
 {

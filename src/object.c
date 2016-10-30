@@ -9,6 +9,15 @@ player_controls p_input[PLAYER_OBJECT_MAX];
 brain_state brains[MAX_BRAINS];
 static int max_brain_id;
 
+type_properties type_prop[5] =
+{
+   { 0 }, // none
+   { 0.45f, 0.45f, 3.5f, 0.25f, 1.4f }, // player
+   { 0.25f, 0.25f, 0.30f, 0,0 }, // test
+   { 0.15f, 0.15f, 0.30f, 0,0 }, // bounce
+   { 0.45f, 0.45f, 2.5f, 0.25f, 1.4f }, // critter
+};
+
 
 objid max_obj_id, max_player_id;
 

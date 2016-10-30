@@ -881,42 +881,44 @@ void do_ui_rendering_3d(void)
    }
 
 
-   // show wireframe of currently 'selected' block
-   objspace_to_worldspace(&pos[1].x, player_id, 0,9,0, 0);
-   pos[0] = obj[player_id].position;
-   pos[1].x += pos[0].x;
-   pos[1].y += pos[0].y;
-   pos[1].z += pos[0].z;
-   selected_block_valid = raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result);
-   if (selected_block_valid) {
-      int block;
-      if (creative)
-         block = actionbar_blocktype[block_choice];
-      else
-         block = blocktype_for_itemtype[inventory_item[3][block_choice]];
-      for (i=0; i < 3; ++i) {
-         selected_block[i] = (&result.bx)[i];
-         selected_block_to_create[i] = (&result.bx)[i] + face_dir[result.face][i];
+   if (!third_person) {
+      // show wireframe of currently 'selected' block
+      objspace_to_worldspace(&pos[1].x, player_id, 0,9,0, 0);
+      pos[0] = obj[player_id].position;
+      pos[1].x += pos[0].x;
+      pos[1].y += pos[0].y;
+      pos[1].z += pos[0].z;
+      selected_block_valid = raycast(pos[0].x, pos[0].y, pos[0].z, pos[1].x, pos[1].y, pos[1].z, &result);
+      if (selected_block_valid) {
+         int block;
+         if (creative)
+            block = actionbar_blocktype[block_choice];
+         else
+            block = blocktype_for_itemtype[inventory_item[3][block_choice]];
+         for (i=0; i < 3; ++i) {
+            selected_block[i] = (&result.bx)[i];
+            selected_block_to_create[i] = (&result.bx)[i] + face_dir[result.face][i];
+         }
+
+         glDepthMask(GL_FALSE);
+         if (block != BT_empty) {
+            //glColor3f(
+            draw_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block, block_rotation);
+            //stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
+         } else {
+            glColor3f(0.7f,1.0f,0.7f);
+            glDisable(GL_CULL_FACE);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            stbgl_drawBox(selected_block[0]+0.5f, selected_block[1]+0.5f, selected_block[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+         }
       }
 
-      glDepthMask(GL_FALSE);
-      if (block != BT_empty) {
-         //glColor3f(
-         draw_block(selected_block_to_create[0], selected_block_to_create[1], selected_block_to_create[2], block, block_rotation);
-         //stbgl_drawBox(selected_block_to_create[0]+0.5f, selected_block_to_create[1]+0.5f, selected_block_to_create[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
-      } else {
-         glColor3f(0.7f,1.0f,0.7f);
-         glDisable(GL_CULL_FACE);
-         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-         stbgl_drawBox(selected_block[0]+0.5f, selected_block[1]+0.5f, selected_block[2]+0.5f, 1.2f, 1.2f, 1.2f, 0);
-         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+      {
+         glEnable(GL_BLEND);
+         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+         draw_instanced_flush(0.4f);
       }
-   }
-
-   {
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-      draw_instanced_flush(0.4f);
    }
    glDepthMask(GL_TRUE);
 }

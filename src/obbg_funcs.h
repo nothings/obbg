@@ -76,6 +76,7 @@ extern void player_vacuum(Bool enable, vec *loc);
 extern Bool available_inventory_slot(int type);
 extern void add_to_inventory(int type);
 extern float smoothed_z_for_rendering(vec *pos, interpolate_z *iz);
+extern void rotate_vector(vec *output, vec *input, float ang_x, float ang_y, float ang_z);
 
 extern int path_find(path_behavior *pb, vec3i start, vec3i dest, vec3i *path, int max_path);
 extern void physics_process_mesh_chunk(mesh_chunk *mc);
