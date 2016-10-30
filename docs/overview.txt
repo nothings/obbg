@@ -12,6 +12,8 @@ obbg:
 Done in today's stream (49):
    - IK
    - better model
+   - better leaning
+   - AIs as bipeds
 
 Previous stream (48):
    - fix pathfinding bug
