@@ -888,9 +888,7 @@ static void draw_cylinder_from_to(vec *a, vec *b, float radius)
 
 void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid player)
 {
-   //float bottom_z = pos.z - sz.z/2;
    vec sz;      
-   float center_z_offset;
    float light_diffuse [] = { 1.0f, 1.0f, 1.0f, 1.0f };
    float light_ambient [] = { 0.9f, 0.9f, 0.9f, 1.0f };
    float light_position[] = { 1.0f, 1.0f, 2.0f, 0.0f };
@@ -908,10 +906,7 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
 
    sz.x = 2*tp->hsz_x;
    sz.y = 2*tp->hsz_y;
-   sz.z = tp->height - tp->torso_base_height;
-
-   center_z_offset = tp->torso_base_height + sz.z/2;
-   pos.z += center_z_offset;
+   sz.z = tp->height;
 
    glEnable(GL_LIGHTING);
    glEnable(GL_LIGHT0);
@@ -1008,7 +1003,7 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
       glRotatef(ang.z, 0,0,1);
       glRotatef(ang.x, 1,0,0);
       glRotatef(ang.y, 0,1,0);
-      stbgl_drawBox(0,0,0, sz.x,sz.y,sz.z, 1);
+      stbgl_drawBoxUncentered(-sz.x/2,-sz.y/2,tp->torso_base_height, sz.x/2,sz.y/2,sz.z, 1);
       glPopMatrix();
 
 
@@ -1026,7 +1021,7 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
 
          left_leg_top.x = -tp->hsz_x*0.8;
          left_leg_top.y = 0;
-         left_leg_top.z = tp->torso_base_height - center_z_offset;
+         left_leg_top.z = tp->torso_base_height;
 
 
          rotate_vector(&left_leg_top, &left_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
@@ -1040,7 +1035,7 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
 
          right_leg_top.x = tp->hsz_x*0.8;
          right_leg_top.y = 0;
-         right_leg_top.z = tp->torso_base_height - center_z_offset;
+         right_leg_top.z = tp->torso_base_height;
          rotate_vector(&right_leg_top, &right_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
          vec_addeq(&right_leg_top, &pos);
 
