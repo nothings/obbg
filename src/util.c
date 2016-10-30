@@ -282,6 +282,9 @@ void obbg_malloc_dump(obbg_malloc_dump_func *f)
    SDL_UnlockMutex(memory_mutex);
 }
 
+// based on Ken Perlin's two-link IK solver http://mrl.nyu.edu/~perlin/ik/index.html
+// original source code http://mrl.nyu.edu/~perlin/ik/ik.java.html
+// licensed under whatever Ken Perlin's license was (it is a mystery)
 extern int stb_two_link_ik(float mid[3], const float begin[3], const float end[3], const float mid_dir[3], float begin_to_mid_len, float mid_to_end_len);
 
 #include <math.h>

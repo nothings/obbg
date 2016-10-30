@@ -162,7 +162,7 @@ void player_physics(objid oid, player_controls *con, float dt)
       float goal_vel[3];
       float forward_speed = (con->buttons & 12)== 4 ?      RUN_SPEED : (con->buttons & 12)== 8 ? -BACK_RUN_SPEED : 0;
       float side_speed    = (con->buttons &  3)== 1 ? SIDESTEP_SPEED : (con->buttons &  3)== 2 ? -SIDESTEP_SPEED : 0;
-      objspace_to_worldspace(goal_vel, oid, side_speed, forward_speed, 0,0);
+      objspace_to_worldspace_flat(goal_vel, oid, side_speed, forward_speed);
 
       mag = (float) sqrt(goal_vel[0]*goal_vel[0] + goal_vel[1]*goal_vel[1]);
       if (mag > RUN_SPEED) {

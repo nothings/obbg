@@ -775,7 +775,7 @@ vec find_foot_placement(vec poly[5])
 #if 0
 #error "TODO"
 
-1. IK legs to feet
+1. draw separate head
 
 2. when foot is halfway from previous position to next position,
    compute placement for next position
@@ -799,7 +799,7 @@ vec find_foot_placement(vec poly[5])
 
 11. Sideways tilt around corners
 
-12. draw separate head
+13. fix body tilt to tilt more while accelerating
 #endif
 
 static void box_vertex(vec *pt, vec *a, vec *x, vec *y, vec *axis, float sx, float sy, float sz)
@@ -886,9 +886,30 @@ static void draw_cylinder_from_to(vec *a, vec *b, float radius)
    glEnd();
 }
 
+typedef struct
+{
+   vec head;
+   vec neck;
+   vec torso;
+   float head_offset_forward; // relative
+   float feet_forward_offset; // absolute
+   float upper_leg_width, lower_leg_width;  // absolute
+   float upper_leg_length, lower_leg_length; // relative
+} skeleton_shape;
+
+skeleton_shape player_skeleton =
+{
+   { .10f,.11f,.13f, },
+   { .05f,.05f,.03f, },
+   { .20f,.13f,.33f, },
+   0.02f, 0.02f,
+   0.12f, 0.08f,
+   0.27f,0.27f-0.015f,
+};
+
 void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid player)
 {
-   vec sz;      
+   skeleton_shape *sk = &player_skeleton;
    float light_diffuse [] = { 1.0f, 1.0f, 1.0f, 1.0f };
    float light_ambient [] = { 0.9f, 0.9f, 0.9f, 1.0f };
    float light_position[] = { 1.0f, 1.0f, 2.0f, 0.0f };
@@ -903,10 +924,6 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
    glLightfv(GL_LIGHT0, GL_AMBIENT , light_ambient );
    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
    glDisable(GL_BLEND);
-
-   sz.x = 2*tp->hsz_x;
-   sz.y = 2*tp->hsz_y;
-   sz.z = tp->height;
 
    glEnable(GL_LIGHTING);
    glEnable(GL_LIGHT0);
@@ -998,66 +1015,84 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
          right_foot_good = True;
       }
 
-      glPushMatrix();
-      glTranslatef(pos.x,pos.y,pos.z);
-      glRotatef(ang.z, 0,0,1);
-      glRotatef(ang.x, 1,0,0);
-      glRotatef(ang.y, 0,1,0);
-      stbgl_drawBoxUncentered(-sz.x/2,-sz.y/2,tp->torso_base_height, sz.x/2,sz.y/2,sz.z, 1);
-      glPopMatrix();
-
-
       {
+         vec head,torso,neck;
          vec forward;
          vec left_leg_top;
          vec left_knee;
          vec right_leg_top;
          vec right_knee;
+         float torso_bottom, torso_top, head_bottom, head_top, neck_bottom, neck_top;
+         float head_offset = sk->head_offset_forward * tp->height;
+
+         vec_scale(&head, &sk->head, tp->height);
+         vec_scale(&neck, &sk->neck, tp->height);
+         vec_scale(&torso, &sk->torso, tp->height);
+
+         glPushMatrix();
+         glTranslatef(pos.x,pos.y,pos.z);
+         glRotatef(ang.z, 0,0,1);
+         glRotatef(ang.x, 1,0,0);
+         glRotatef(ang.y, 0,1,0);
+
+         head_top = tp->height;
+         head_bottom = head_top - head.z;
+         neck_top = head_bottom;
+         neck_bottom = neck_top - neck.z;
+         torso_top = neck_bottom;
+         torso_bottom = torso_top - torso.z;
+
+         stbgl_drawBoxUncentered(-torso.x/2,-torso.y/2,torso_bottom,
+                                  torso.x/2, torso.y/2,torso_top   ,  1);
+         stbgl_drawBoxUncentered( -neck.x/2, -neck.y/2,neck_bottom ,
+                                   neck.x/2,  neck.y/2,neck_top    ,  1);
+         stbgl_drawBoxUncentered( -head.x/2, head_offset-head.y/2,head_bottom ,
+                                   head.x/2, head_offset+head.y/2,head_top    ,  1);
+         glPopMatrix();
 
          forward.x=0;
          forward.y=1;
          forward.z=0;
          rotate_vector(&forward, &forward, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
 
-         left_leg_top.x = -tp->hsz_x*0.8;
+         left_leg_top.x = -torso.x/2 + sk->upper_leg_width;
          left_leg_top.y = 0;
-         left_leg_top.z = tp->torso_base_height;
-
+         left_leg_top.z = torso_bottom;
 
          rotate_vector(&left_leg_top, &left_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
          vec_addeq(&left_leg_top, &pos);
 
-         stb_two_link_ik(&left_knee.x, &left_leg_top.x, &left_foot.x, &forward.x, 0.65f,0.75f);
+         stb_two_link_ik(&left_knee.x, &left_leg_top.x, &left_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height);
          //vec_lerp(&left_knee, &left_leg_top, &left_foot, 0.45f);
 
          draw_cylinder_from_to(&left_leg_top, &left_knee, 0.12f);
          draw_cylinder_from_to(&left_knee, &left_foot, 0.08f);
 
-         right_leg_top.x = tp->hsz_x*0.8;
+         right_leg_top.x = torso.x/2 - sk->upper_leg_width;
          right_leg_top.y = 0;
-         right_leg_top.z = tp->torso_base_height;
+         right_leg_top.z = torso_bottom;
          rotate_vector(&right_leg_top, &right_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
          vec_addeq(&right_leg_top, &pos);
 
-         stb_two_link_ik(&right_knee.x, &right_leg_top.x, &right_foot.x, &forward.x, 0.65f,0.75f);
+         stb_two_link_ik(&right_knee.x, &right_leg_top.x, &right_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height);
          //vec_lerp(&right_knee, &right_leg_top, &right_foot, 0.45f);
 
-         draw_cylinder_from_to(&right_leg_top, &right_knee, 0.12f);
-         draw_cylinder_from_to(&right_knee, &right_foot, 0.08f);
+         draw_cylinder_from_to(&right_leg_top, &right_knee, sk->upper_leg_width);
+         draw_cylinder_from_to(&right_knee, &right_foot, sk->lower_leg_width);
       }
 
       glMaterialfv(GL_FRONT, GL_DIFFUSE , right_foot_good ? mat_diffuse : mat_red);
       glPushMatrix();
       glTranslatef(right_foot.x, right_foot.y, right_foot.z);
       glRotatef(ang.z, 0,0,1);
-      stbgl_drawBox(0,0,0, 0.2f,0.4f,0.1f, 1);
+      stbgl_drawBox(0,sk->feet_forward_offset,0, 0.2f,0.4f,0.1f, 1);
       glPopMatrix();
 
       glMaterialfv(GL_FRONT, GL_DIFFUSE , left_foot_good ? mat_green : mat_red);
       glPushMatrix();
       glTranslatef(left_foot.x, left_foot.y, left_foot.z);
       glRotatef(ang.z, 0,0,1);
-      stbgl_drawBox(0,0,0, 0.2f,0.4f,0.1f, 1);
+      stbgl_drawBox(0,sk->feet_forward_offset,0, 0.2f,0.4f,0.1f, 1);
       glPopMatrix();
    }
 
