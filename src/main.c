@@ -772,19 +772,33 @@ vec find_foot_placement(vec poly[5])
    return best_place;
 }
 
+#if 0
 #error "TODO"
 
-1. when foot is halfway from previous position to next position,
+0. Move position of objects to be on ground/feet
+
+1. IK legs to feet
+
+2. when foot is halfway from previous position to next position,
    compute placement for next position
 
-2. animate foot from old position to halfway cleanly
+3. animate foot from old position to halfway cleanly
 
-3. animate foot from halfway to next position cleanly
+4. animate foot from halfway to next position cleanly
 
-4. deal with stopping if foot placement was computed before stopping
+5. deal with stopping if foot placement was computed before stopping
 
-5. IK legs to feet
+6. Treat foot as point for sampling
 
+7. Better foot placement search w/o searching
+
+8. Standing still - walking - running states w/ different gaits
+8b. Adjustable torso position a la Arma 3
+
+9. Lower & tilt torso when one foot is much lower
+
+10. Head above torso, increase player size to match
+#endif
 
 void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
 {
@@ -833,23 +847,23 @@ void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
       s = -sin(animation_state);
       c =  cos(animation_state);
 
-      y_left =  c * mag / 20;
-      z_left =  s * 0.4f;
-      if (z_left < 0) z_left = 0;
-      z_left += bottom_z + 0.05;
-
-      y_right =  -c * mag / 20;
-      z_right =  -s * 0.4f;
+      y_right =  c * mag / 20;
+      z_right =  s * 0.4f;
       if (z_right < 0) z_right = 0;
       z_right += bottom_z + 0.05;
 
+      y_left =  -c * mag / 20;
+      z_left =  -s * 0.4f;
+      if (z_left < 0) z_left = 0;
+      z_left += bottom_z + 0.05;
+
       if (animation_state >= 0 && animation_state <= M_PI) {
-         if (!left_foot_planted) {
+         if (!right_foot_planted) {
             vec poly[5];
 
-            objspace_to_worldspace_flat(&left_foot.x, player, 0.35f, y_left);
-            if (fabs(z_left - floor(z_left)) > 0.1f)
-               z_left = floor(z_left) + 0.05;
+            objspace_to_worldspace_flat(&right_foot.x, player, 0.35f, y_right);
+            if (fabs(z_right - floor(z_right)) > 0.1f)
+               z_right = floor(z_right) + 0.05;
 
             objspace_to_worldspace_flat(&poly[0].x, player, 0.35f, 0.0);
             objspace_to_worldspace_flat(&poly[1].x, player, 0.6  ,-0.4);
@@ -859,27 +873,27 @@ void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
             for (i=0; i < 5; ++i) {
                poly[i].x += pos.x;
                poly[i].y += pos.y;
-               poly[i].z = z_left;
+               poly[i].z = z_right;
                vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
             }
-            left_foot = find_foot_placement(poly);
-            left_foot_planted = True;
-            left_foot_good = can_place_foot(left_foot, 0.15f,0.15f);
+            right_foot = find_foot_placement(poly);
+            right_foot_planted = True;
+            right_foot_good = can_place_foot(right_foot, 0.15f,0.15f);
          }
 
-         objspace_to_worldspace_flat(&right_foot.x, player, -0.35f, y_right);
-         right_foot.x += pos.x;
-         right_foot.y += pos.y;
-         right_foot.z = z_right;
-         right_foot_planted = False;
-         right_foot_good = True;
+         objspace_to_worldspace_flat(&left_foot.x, player, -0.35f, y_left);
+         left_foot.x += pos.x;
+         left_foot.y += pos.y;
+         left_foot.z = z_left;
+         left_foot_planted = False;
+         left_foot_good = True;
       } else {
-         if (!right_foot_planted) {
+         if (!left_foot_planted) {
             vec poly[5];
 
-            objspace_to_worldspace_flat(&right_foot.x, player, -0.35f, y_right);
-            if (fabs(z_right - floor(z_right)) > 0.1f)
-               z_right = floor(z_right) + 0.05;
+            objspace_to_worldspace_flat(&left_foot.x, player, -0.35f, y_left);
+            if (fabs(z_left - floor(z_left)) > 0.1f)
+               z_left = floor(z_left) + 0.05;
 
             objspace_to_worldspace_flat(&poly[0].x, player, - 0.35f, 0.0);
             objspace_to_worldspace_flat(&poly[1].x, player, - 0.6  ,-0.4);
@@ -889,31 +903,31 @@ void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
             for (i=0; i < 5; ++i) {
                poly[i].x += pos.x;
                poly[i].y += pos.y;
-               poly[i].z += z_right;
+               poly[i].z += z_left;
                vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
             }
-            right_foot = find_foot_placement(poly);
-            right_foot_planted = True;
-            right_foot_good = can_place_foot(right_foot, 0.15f,0.15f);
+            left_foot = find_foot_placement(poly);
+            left_foot_planted = True;
+            left_foot_good = can_place_foot(left_foot, 0.15f,0.15f);
          }
-         objspace_to_worldspace_flat(&left_foot.x, player, 0.35f, y_left);
-         left_foot.x += pos.x;
-         left_foot.y += pos.y;
-         left_foot.z = z_left;
-         left_foot_planted = False;
-         left_foot_good = True;
+         objspace_to_worldspace_flat(&right_foot.x, player, 0.35f, y_right);
+         right_foot.x += pos.x;
+         right_foot.y += pos.y;
+         right_foot.z = z_right;
+         right_foot_planted = False;
+         right_foot_good = True;
       }
 
-      glMaterialfv(GL_FRONT, GL_DIFFUSE , left_foot_good ? mat_diffuse : mat_red);
+      glMaterialfv(GL_FRONT, GL_DIFFUSE , right_foot_good ? mat_diffuse : mat_red);
       glPushMatrix();
-      glTranslatef(left_foot.x, left_foot.y, left_foot.z);
+      glTranslatef(right_foot.x, right_foot.y, right_foot.z);
       glRotatef(ang.z, 0,0,1);
       stbgl_drawBox(0,0,0, 0.2f,0.4f,0.1f, 1);
       glPopMatrix();
 
-      glMaterialfv(GL_FRONT, GL_DIFFUSE , right_foot_good ? mat_green : mat_red);
+      glMaterialfv(GL_FRONT, GL_DIFFUSE , left_foot_good ? mat_green : mat_red);
       glPushMatrix();
-      glTranslatef(right_foot.x, right_foot.y, right_foot.z);
+      glTranslatef(left_foot.x, left_foot.y, left_foot.z);
       glRotatef(ang.z, 0,0,1);
       stbgl_drawBox(0,0,0, 0.2f,0.4f,0.1f, 1);
       glPopMatrix();

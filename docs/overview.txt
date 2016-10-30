@@ -9,7 +9,9 @@ obbg:
   : save/load to disk
   : networking
 
-Done in today's stream (48):
+Done in today's stream (49):
+
+Previous stream (48):
    - fix pathfinding bug
    - simple critters find paths better
    - render player w/ facetted lighting
