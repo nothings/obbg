@@ -775,8 +775,6 @@ vec find_foot_placement(vec poly[5])
 #if 0
 #error "TODO"
 
-1. draw separate head
-
 2. when foot is halfway from previous position to next position,
    compute placement for next position
 
@@ -799,6 +797,7 @@ vec find_foot_placement(vec poly[5])
 
 11. Sideways tilt around corners
 
+12. don't stretch the legs
 13. fix body tilt to tilt more while accelerating
 #endif
 
@@ -1062,7 +1061,10 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
          rotate_vector(&left_leg_top, &left_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
          vec_addeq(&left_leg_top, &pos);
 
-         stb_two_link_ik(&left_knee.x, &left_leg_top.x, &left_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height);
+         if (!stb_two_link_ik(&left_knee.x, &left_leg_top.x, &left_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height)) {
+            // couldn't reach foot position
+            vec_lerp(&left_foot, &left_leg_top, &left_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
+         }
          //vec_lerp(&left_knee, &left_leg_top, &left_foot, 0.45f);
 
          draw_cylinder_from_to(&left_leg_top, &left_knee, 0.12f);
@@ -1074,7 +1076,9 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
          rotate_vector(&right_leg_top, &right_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
          vec_addeq(&right_leg_top, &pos);
 
-         stb_two_link_ik(&right_knee.x, &right_leg_top.x, &right_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height);
+         if (!stb_two_link_ik(&right_knee.x, &right_leg_top.x, &right_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height)) {
+            vec_lerp(&right_foot, &right_leg_top, &right_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
+         }
          //vec_lerp(&right_knee, &right_leg_top, &right_foot, 0.45f);
 
          draw_cylinder_from_to(&right_leg_top, &right_knee, sk->upper_leg_width);
