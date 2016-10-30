@@ -786,6 +786,7 @@ typedef struct
    float feet_forward_offset; // absolute
    float upper_leg_width, lower_leg_width;  // absolute
    float upper_leg_length, lower_leg_length; // relative
+   float foot_spacing;
 } skeleton_shape;
 
 skeleton_shape player_skeleton =
@@ -798,6 +799,7 @@ skeleton_shape player_skeleton =
    0.02f, 0.02f,
    0.12f, 0.08f,
    0.27f,0.27f-0.015f,
+   0.10f,
 };
 
 biped_animation_state biped[2000];
@@ -951,6 +953,7 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
       ba->gait = mag >= 0.01f ? GAIT_running : GAIT_stopped;
 
       if (ba->gait != GAIT_stopped) {
+         float foot_spacing = sk->foot_spacing*tp->height/2;
          ba->phase += animation_dt / sk->cycle_period[ba->gait] * 2 * M_PI;// * mag * 1.5;
          ba->phase = fmod(ba->phase, 2*M_PI);
 
@@ -971,15 +974,15 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
             if (!ba->right_foot_planted) {
                vec poly[5];
 
-               objspace_to_worldspace_flat(&ba->right_foot.x, o, 0.35f, y_right);
+               objspace_to_worldspace_flat(&ba->right_foot.x, o, foot_spacing, y_right);
                if (fabs(z_right - floor(z_right)) > 0.1f)
                   z_right = floor(z_right) + 0.05;
 
-               objspace_to_worldspace_flat(&poly[0].x, o, 0.35f, 0.0);
-               objspace_to_worldspace_flat(&poly[1].x, o, 0.6  ,-0.4);
-               objspace_to_worldspace_flat(&poly[2].x, o, 0.6  , 0.4);
-               objspace_to_worldspace_flat(&poly[3].x, o, 0.22 ,-0.4);
-               objspace_to_worldspace_flat(&poly[4].x, o, 0.22 , 0.4);
+               objspace_to_worldspace_flat(&poly[0].x, o, foot_spacing, 0.0);
+               objspace_to_worldspace_flat(&poly[1].x, o, foot_spacing-0.2  ,-0.4);
+               objspace_to_worldspace_flat(&poly[2].x, o, foot_spacing-0.2  , 0.4);
+               objspace_to_worldspace_flat(&poly[3].x, o, foot_spacing+0.2  ,-0.4);
+               objspace_to_worldspace_flat(&poly[4].x, o, foot_spacing+0.2  , 0.4);
                for (i=0; i < 5; ++i) {
                   poly[i].x += pos.x;
                   poly[i].y += pos.y;
@@ -991,7 +994,7 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
                ba->right_foot_good = can_place_foot(ba->right_foot, 0.15f,0.15f);
             }
 
-            objspace_to_worldspace_flat(&ba->left_foot.x, o, -0.35f, y_left);
+            objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
             ba->left_foot.x += pos.x;
             ba->left_foot.y += pos.y;
             ba->left_foot.z = z_left;
@@ -1001,15 +1004,15 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
             if (!ba->left_foot_planted) {
                vec poly[5];
 
-               objspace_to_worldspace_flat(&ba->left_foot.x, o, -0.35f, y_left);
+               objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
                if (fabs(z_left - floor(z_left)) > 0.1f)
                   z_left = floor(z_left) + 0.05;
 
-               objspace_to_worldspace_flat(&poly[0].x, o, - 0.35f, 0.0);
-               objspace_to_worldspace_flat(&poly[1].x, o, - 0.6  ,-0.4);
-               objspace_to_worldspace_flat(&poly[2].x, o, - 0.6  , 0.4);
-               objspace_to_worldspace_flat(&poly[3].x, o, - 0.22 ,-0.4);
-               objspace_to_worldspace_flat(&poly[4].x, o, - 0.22 , 0.4);
+               objspace_to_worldspace_flat(&poly[0].x, o, -foot_spacing, 0.0);
+               objspace_to_worldspace_flat(&poly[1].x, o, -foot_spacing-0.2  ,-0.4);
+               objspace_to_worldspace_flat(&poly[2].x, o, -foot_spacing-0.2  , 0.4);
+               objspace_to_worldspace_flat(&poly[3].x, o, -foot_spacing+0.2  ,-0.4);
+               objspace_to_worldspace_flat(&poly[4].x, o, -foot_spacing+0.2  , 0.4);
                for (i=0; i < 5; ++i) {
                   poly[i].x += pos.x;
                   poly[i].y += pos.y;
@@ -1020,7 +1023,7 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
                ba->left_foot_planted = True;
                ba->left_foot_good = can_place_foot(ba->left_foot, 0.15f,0.15f);
             }
-            objspace_to_worldspace_flat(&ba->right_foot.x, o, 0.35f, y_right);
+            objspace_to_worldspace_flat(&ba->right_foot.x, o, foot_spacing, y_right);
             ba->right_foot.x += pos.x;
             ba->right_foot.y += pos.y;
             ba->right_foot.z = z_right;
