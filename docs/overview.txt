@@ -10,6 +10,8 @@ obbg:
   : networking
 
 Done in today's stream (49):
+   - IK
+   - better model
 
 Previous stream (48):
    - fix pathfinding bug
