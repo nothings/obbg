@@ -745,7 +745,7 @@ void do_ui_rendering_2d(void)
    glDisable(GL_DEPTH_TEST);
    glDisable(GL_TEXTURE_2D);
 
-   {
+   if (!third_person) {
       float cx = screen_x / 2.0f;
       float cy = screen_y / 2.0f;
       glColor3f(1,1,1);
