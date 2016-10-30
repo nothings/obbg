@@ -776,6 +776,7 @@ vec find_foot_placement(vec poly[5])
 #error "TODO"
 
 0. Move position of objects to be on ground/feet
+0. Head above torso, increase player size to match
 
 1. IK legs to feet
 
@@ -796,8 +797,6 @@ vec find_foot_placement(vec poly[5])
 8b. Adjustable torso position a la Arma 3
 
 9. Lower & tilt torso when one foot is much lower
-
-10. Head above torso, increase player size to match
 #endif
 
 void render_player(vec pos, vec sz, vec ang, float bottom_z, objid player)
@@ -953,13 +952,13 @@ void render_objects(void)
          vec face;
          vec move;
          float forward;
-         float (*size)[3] = size_for_type[OTYPE_player];
-         sz.x = size[1][0] - size[0][0];
-         sz.y = size[1][1] - size[0][1];
-         sz.z = size[1][2] - size[0][2];
-         pos.x = obj[i].position.x + (size[1][0] + size[0][0])/2;
-         pos.y = obj[i].position.y + (size[1][1] + size[0][1])/2;
-         pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz) + (size[1][2] + size[0][2])/2;
+         type_properties *p = &type_prop[OTYPE_player];
+         sz.x = 2*p->hsz_x;
+         sz.y = 2*p->hsz_y;
+         sz.z = p->height;
+         pos.x = obj[i].position.x;
+         pos.y = obj[i].position.y;
+         pos.z = smoothed_z_for_rendering(&obj[i].position, &obj[i].iz) + p->height/2;
          ang = obj[i].ang;
          ang.x = 0;
          face.x = sin(ang.z * M_PI / 180);
@@ -972,7 +971,7 @@ void render_objects(void)
          else
             ang.x = forward * 0.7f;
             
-         render_player(pos, sz, ang, obj[i].position.z+size[0][2], i);
+         render_player(pos, sz, ang, obj[i].position.z, i);
       }
    }
 
@@ -980,17 +979,17 @@ void render_objects(void)
       object *o = &obj[i];
       if (o->valid) {
          vec center;
-         float (*sz)[3] = size_for_type[o->type];
+         type_properties *p = &type_prop[o->type];
          if (o->on_ground)
             glColor3f(0.85f,0.95f,1.0f);
          else
             glColor3f(1.0f,1.0f,0.9f);
          if (o->type == OTYPE_critter)
             glColor3f(1.0f,1.0f,0.6f);
-         center.x = o->position.x + (sz[1][0]+sz[0][0])/2;
-         center.y = o->position.y + (sz[1][1]+sz[0][1])/2;
-         center.z = o->position.z + (sz[1][2]+sz[0][2])/2;
-         stbgl_drawBox(center.x, center.y, center.z, sz[1][0]-sz[0][0], sz[1][1]-sz[0][1], sz[1][2]-sz[0][2], 1);
+         center.x = o->position.x;
+         center.y = o->position.y;
+         center.z = o->position.z + p->height/2;
+         stbgl_drawBox(center.x, center.y, center.z, p->hsz_x*2, p->hsz_y*2, p->height, 1);
       }
    }
 

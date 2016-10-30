@@ -539,7 +539,7 @@ void trigger_pathfind(Bool spread)
          vec3i target;
          target.x = (int) floor(obj[player_id].position.x);
          target.y = (int) floor(obj[player_id].position.y);
-         target.z = (int) floor(obj[player_id].position.z + size_for_type[OTYPE_player][0][2] + 0.01f);
+         target.z = (int) floor(obj[player_id].position.z + 0.01f);
 
          if (spread) {
             target.x += (rand() >> 4) % 50 - 25;
@@ -603,7 +603,7 @@ void test_pathfind(Bool repeat)
 
    end.x = (int) floor(obj[player_id].position.x);
    end.y = (int) floor(obj[player_id].position.y);
-   end.z = (int) floor(obj[player_id].position.z + size_for_type[OTYPE_player][0][2] + 0.01f);
+   end.z = (int) floor(obj[player_id].position.z + 0.01f);
 
    for (j=0; j <= 64; ++j)
       for (i=0; i <= 64; ++i)

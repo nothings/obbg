@@ -251,8 +251,19 @@ vec find_collision_point(collision_geometry *cg, vec *a, vec *b, float size[2][3
    return m;
 }
 
-Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground, float bounce)
+void compute_size(float size[2][3], type_properties *tp)
 {
+   size[0][0] = -tp->hsz_x ;
+   size[0][1] = -tp->hsz_y ;
+   size[0][2] =  0         ;
+   size[1][0] =  tp->hsz_x ;
+   size[1][1] =  tp->hsz_y ;
+   size[1][2] =  tp->height;
+}
+
+Bool physics_move_inanimate(vec *pos, vec *vel, float dt, type_properties *tp, Bool on_ground, float bounce)
+{
+   float size[2][3];
    int ix,iy,iz;
    float x = pos->x;
    float y = pos->y;
@@ -261,6 +272,8 @@ Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool
    float dy = vel->y * dt;
    float dz = vel->z * dt;
    collision_geometry cg;
+
+   compute_size(size, tp);
 
    ix = (int) floor(x);
    iy = (int) floor(y);
@@ -352,15 +365,15 @@ Bool physics_move_inanimate(vec *pos, vec *vel, float dt, float size[2][3], Bool
    return False;
 }
 
-Bool physics_move_animate(vec *pos, vec *vel, float dt, float size[2][3], Bool on_ground, float bounce)
+Bool physics_move_animate(vec *pos, vec *vel, float dt, type_properties *tp, Bool on_ground, float bounce)
 {
    if (!on_ground)
-      return physics_move_inanimate(pos,vel,dt,size,on_ground,bounce);
+      return physics_move_inanimate(pos,vel,dt,tp,on_ground,bounce);
    else
-      return physics_move_walkable(pos, vel, dt, size, NULL);
+      return physics_move_walkable(pos, vel, dt, tp, NULL);
 }
 
-int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interpolate_z *lerpz)
+int physics_move_walkable(vec *pos, vec *vel, float dt, type_properties *tp, interpolate_z *lerpz)
 {
    int result=0;
    int ix,iy,iz;
@@ -372,6 +385,8 @@ int physics_move_walkable(vec *pos, vec *vel, float dt, float size[2][3], interp
    float dy = vel->y * dt;
    float dz = vel->z * dt;
    collision_geometry cg;
+   float size[2][3];
+   compute_size(size, tp);
 
    ix = (int) floor(x);
    iy = (int) floor(y);

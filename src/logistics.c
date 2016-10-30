@@ -2135,13 +2135,13 @@ static void non_logistics_interactions(void)
       vec pmin, pmax;
       vec3i wmin, wmax;
       vec3i cmin,cmax;
-      pmin.x = player_vacuum_loc.x + size_for_type[OTYPE_player][0][0] - 0.25f;
-      pmin.y = player_vacuum_loc.y + size_for_type[OTYPE_player][0][1] - 0.25f;
-      pmin.z = player_vacuum_loc.z + size_for_type[OTYPE_player][0][2];
+      pmin.x = player_vacuum_loc.x - type_prop[OTYPE_player].hsz_x - 0.25f;
+      pmin.y = player_vacuum_loc.y - type_prop[OTYPE_player].hsz_y - 0.25f;
+      pmin.z = player_vacuum_loc.z;
 
-      pmax.x = player_vacuum_loc.x + size_for_type[OTYPE_player][1][0] + 0.25f;
-      pmax.y = player_vacuum_loc.y + size_for_type[OTYPE_player][1][1] + 0.25f;
-      pmax.z = player_vacuum_loc.z + size_for_type[OTYPE_player][1][2] + 0.25f;
+      pmax.x = player_vacuum_loc.x + type_prop[OTYPE_player].hsz_x + 0.25f;
+      pmax.y = player_vacuum_loc.y + type_prop[OTYPE_player].hsz_y + 0.25f;
+      pmax.z = player_vacuum_loc.z + type_prop[OTYPE_player].height + 0.25f;
 
       wmin.x = floori(pmin.x);
       wmin.y = floori(pmin.y);

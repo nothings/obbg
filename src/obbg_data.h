@@ -299,7 +299,14 @@ typedef struct
    arena_chunk **allocs;
 } mesh_chunk;
 
-float size_for_type[][2][3];
+typedef struct
+{
+   float hsz_x, hsz_y;   // half-size in x & y
+   float height;         // height in z (origin is at base)
+   float eye_z_offset;   // offset from ht to eye position (stored positive, must subtract)
+} type_properties;
+
+type_properties type_prop[];
 
 typedef int32 objid;
 

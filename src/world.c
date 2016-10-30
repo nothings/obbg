@@ -17,27 +17,13 @@
 extern float light_pos[3];
 extern float light_vel[3];
 
-float size_for_type[5][2][3] =
+type_properties type_prop[5] =
 {
-   { // OTYPE_none
-      { 0 }, { 0 },
-   },
-   { // OTYPE_player
-      { - 0.45f, - 0.45f, - 2.25f },
-      {   0.45f,   0.45f,   0.25f },
-   },
-   { // OTYPE_test
-      {  -0.25f, -0.25f, -0.15f },
-      {   0.25f,  0.25f,  0.15f },
-   },
-   { // OTYPE_bounce
-      {  -0.15f, -0.15f, -0.15f },
-      {   0.15f,  0.15f,  0.15f },
-   },
-   { // OTYPE_critter
-      { - 0.45f, - 0.45f, - 0.25f },
-      {   0.45f,   0.45f,   2.25f },
-   },
+   { 0 }, // none
+   { 0.45f, 0.45f, 2.5f, 0.25f }, // player
+   { 0.25f, 0.25f, 0.30f, 0 }, // test
+   { 0.15f, 0.15f, 0.30f, 0 }, // bounce
+   { 0.45f, 0.45f, 2.5f, 0.25f }, // critter
 };
 
 objid player_id;
@@ -263,7 +249,7 @@ void player_physics(objid oid, player_controls *con, float dt)
       z = o->position.z + o->velocity.z * dt;
 
       if (!con->flying) {
-         if (!physics_move_walkable(&o->position, &o->velocity, dt, size_for_type[o->type], &o->iz))
+         if (!physics_move_walkable(&o->position, &o->velocity, dt, &type_prop[o->type], &o->iz))
             o->velocity.z -= GRAVITY_IN_BLOCKS * dt;
       } else {
          o->position.x = x;
@@ -305,19 +291,20 @@ void ai_pathfind(object *o, vec3i target)
 {
    int x0,y0,x1,y1;
    int i,j;
-   float (*size)[3] = size_for_type[OTYPE_critter];
+   type_properties *tp = &type_prop[OTYPE_critter];
    path_behavior pb = { 0 };
    vec3i start;
    int len;
 
    ai_set_behavior(&pb, o);
 
-   x0 = (int) floor(o->position.x + size[0][0]);
-   y0 = (int) floor(o->position.y + size[0][1]);
-   x1 = (int) floor(o->position.x + size[1][0]);
-   y1 = (int) floor(o->position.y + size[1][1]);
+   x0 = (int) floor(o->position.x - tp->hsz_x);
+   y0 = (int) floor(o->position.y - tp->hsz_y);
+   x1 = (int) floor(o->position.x + tp->hsz_x);
+   y1 = (int) floor(o->position.y + tp->hsz_y);
 
-   start.z = (int) floor(o->position.z + size_for_type[OTYPE_critter][0][2] + 0.01f);
+   start.z = (int) floor(o->position.z + 0.01f);
+
    for (j=y0; j <= y1; ++j) {
       for (i=x0; i <= x1; ++i) {
          start.x = i;
@@ -415,11 +402,11 @@ void object_physics(objid oid, float dt)
    switch (o->type) {
       case OTYPE_test:
       case OTYPE_bounce:
-         o->on_ground = physics_move_inanimate(&o->position, &o->velocity, dt, size_for_type[o->type], o->on_ground, bouncy[o->type]);
+         o->on_ground = physics_move_inanimate(&o->position, &o->velocity, dt, &type_prop[o->type], o->on_ground, bouncy[o->type]);
          break;
       case OTYPE_critter:
          ai_tick(o);
-         o->on_ground = physics_move_animate(&o->position, &o->velocity, dt, size_for_type[o->type], o->on_ground, bouncy[o->type]);
+         o->on_ground = physics_move_animate(&o->position, &o->velocity, dt, &type_prop[o->type], o->on_ground, bouncy[o->type]);
          break;
    }
 }
