@@ -740,9 +740,9 @@ float smoothed_z_for_rendering(vec *pos, interpolate_z *iz)
 //   - when foot is halfway from previous position to next position, compute placement for next position
 //   - animate foot from old position to halfway cleanly
 //   - animate foot from halfway to next position cleanly
-//   - deal with stopping if foot placement was computed before stopping
 // - gaits/states
 //   - Standing still - walking - running states w/ different gaits
+//   - deal with stopping if foot placement was computed before stopping
 //   - adjustable torso position a la Arma 3
 // - torso position
 //   - lower & tilt torso when one foot is much lower
@@ -771,14 +771,15 @@ typedef struct
 
 enum
 {
-   GAIT_stopped,
    GAIT_walking,
    GAIT_running,
+   GAIT_stopped,
+   GAIT_stopping,
 };
 
 typedef struct
 {
-   float cycle_period[3];
+   float cycle_period[2];
    vec head;
    vec neck;
    vec torso;
@@ -791,7 +792,7 @@ typedef struct
 
 skeleton_shape player_skeleton =
 {
-   { 0, 1.2f, 0.4f }, // gait times
+   { 1.2f, 0.4f }, // gait times
 
    { .10f,.11f,.13f, },
    { .05f,.05f,.03f, },
