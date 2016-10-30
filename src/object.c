@@ -15,7 +15,7 @@ type_properties type_prop[5] =
    { 0.45f, 0.45f, 3.5f, 0.25f, 1.75f }, // player
    { 0.25f, 0.25f, 0.30f, 0,0 }, // test
    { 0.15f, 0.15f, 0.30f, 0,0 }, // bounce
-   { 0.45f, 0.45f, 2.5f, 0.25f, 1.25f }, // critter
+   { 0.45f, 0.45f, 2.85f, 0.25f, 1.25f }, // critter
 };
 
 

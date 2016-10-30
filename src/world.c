@@ -390,6 +390,8 @@ void ai_tick(object *o)
          o->velocity.x = delta.x * CRITTER_SPEED;
          o->velocity.y = delta.y * CRITTER_SPEED;
          o->velocity.z = delta.z * CRITTER_SPEED;
+
+         o->ang.z = (float) atan2(-o->velocity.x, o->velocity.y) * 180 / M_PI;
       }
 
       assert(b->path_position+1 < b->path_length);

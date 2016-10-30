@@ -735,13 +735,39 @@ float smoothed_z_for_rendering(vec *pos, interpolate_z *iz)
    return stb_lerp(t, pos->z, iz->old_z);
 }
 
+// TODO 
+// - per-biped state
+// - foot placement
+//   - when foot is halfway from previous position to next position, compute placement for next position
+//   - animate foot from old position to halfway cleanly
+//   - animate foot from halfway to next position cleanly
+//   - deal with stopping if foot placement was computed before stopping
+// - foot placement search
+//   - treat foot as point for sampling
+//   - better foot placement search w/o searching
+// - gaits/states
+//   - Standing still - walking - running states w/ different gaits
+//   - adjustable torso position a la Arma 3
+// - torso position
+//   - lower & tilt torso when one foot is much lower
+//   - can't lower torso when in mid-air
+//   - sideways tilt around corners
+//   - fix body tilt to tilt more while accelerating
+// - arm animation
+// - cleanup
+//   - consistent size-independent skeleton
+//   - more data-driven
+
 float animation_dt;
-float animation_state;
-vec left_foot;
-vec right_foot;
-int left_foot_planted=0;
-int right_foot_planted=0;
-int left_foot_good, right_foot_good;
+typedef struct
+{
+   float animation_state;
+   vec left_foot;
+   vec right_foot;
+   int left_foot_planted;
+   int right_foot_planted;
+   int left_foot_good, right_foot_good;
+} biped_animation_state;
 
 vec find_foot_placement(vec poly[5])
 {
@@ -771,35 +797,6 @@ vec find_foot_placement(vec poly[5])
    }
    return best_place;
 }
-
-#if 0
-#error "TODO"
-
-2. when foot is halfway from previous position to next position,
-   compute placement for next position
-
-3. animate foot from old position to halfway cleanly
-
-4. animate foot from halfway to next position cleanly
-
-5. deal with stopping if foot placement was computed before stopping
-
-6. Treat foot as point for sampling
-
-7. Better foot placement search w/o searching
-
-8. Standing still - walking - running states w/ different gaits
-8b. Adjustable torso position a la Arma 3
-
-9. Lower & tilt torso when one foot is much lower
-
-10. Can't lower torso when in mid-air
-
-11. Sideways tilt around corners
-
-12. don't stretch the legs
-13. fix body tilt to tilt more while accelerating
-#endif
 
 static void box_vertex(vec *pt, vec *a, vec *x, vec *y, vec *axis, float sx, float sy, float sz)
 {
@@ -906,7 +903,9 @@ skeleton_shape player_skeleton =
    0.27f,0.27f-0.015f,
 };
 
-void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid player)
+biped_animation_state biped[2000];
+
+void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o)
 {
    skeleton_shape *sk = &player_skeleton;
    float light_diffuse [] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -933,15 +932,16 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
       float mag;
       float s,c;
       float y_left,y_right, z_left,z_right;
-      vec move_vel = obj[player_id].velocity;
+      vec move_vel = obj[o].velocity;
+      biped_animation_state *ba = &biped[o];
       move_vel.z = 0;
 
       mag = vec_mag(&move_vel);
-      animation_state += animation_dt*20;// * mag * 1.5;
-      animation_state = fmod(animation_state, 2*M_PI);
+      ba->animation_state += animation_dt*20;// * mag * 1.5;
+      ba->animation_state = fmod(ba->animation_state, 2*M_PI);
 
-      s = -sin(animation_state);
-      c =  cos(animation_state);
+      s = -sin(ba->animation_state);
+      c =  cos(ba->animation_state);
 
       y_right =  c * mag / 20;
       z_right =  s * 0.4f;
@@ -953,65 +953,65 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
       if (z_left < 0) z_left = 0;
       z_left += bottom_z + 0.05;
 
-      if (animation_state >= 0 && animation_state <= M_PI) {
-         if (!right_foot_planted) {
+      if (ba->animation_state >= 0 && ba->animation_state <= M_PI) {
+         if (!ba->right_foot_planted) {
             vec poly[5];
 
-            objspace_to_worldspace_flat(&right_foot.x, player, 0.35f, y_right);
+            objspace_to_worldspace_flat(&ba->right_foot.x, o, 0.35f, y_right);
             if (fabs(z_right - floor(z_right)) > 0.1f)
                z_right = floor(z_right) + 0.05;
 
-            objspace_to_worldspace_flat(&poly[0].x, player, 0.35f, 0.0);
-            objspace_to_worldspace_flat(&poly[1].x, player, 0.6  ,-0.4);
-            objspace_to_worldspace_flat(&poly[2].x, player, 0.6  , 0.4);
-            objspace_to_worldspace_flat(&poly[3].x, player, 0.22 ,-0.4);
-            objspace_to_worldspace_flat(&poly[4].x, player, 0.22 , 0.4);
+            objspace_to_worldspace_flat(&poly[0].x, o, 0.35f, 0.0);
+            objspace_to_worldspace_flat(&poly[1].x, o, 0.6  ,-0.4);
+            objspace_to_worldspace_flat(&poly[2].x, o, 0.6  , 0.4);
+            objspace_to_worldspace_flat(&poly[3].x, o, 0.22 ,-0.4);
+            objspace_to_worldspace_flat(&poly[4].x, o, 0.22 , 0.4);
             for (i=0; i < 5; ++i) {
                poly[i].x += pos.x;
                poly[i].y += pos.y;
                poly[i].z = z_right;
                vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
             }
-            right_foot = find_foot_placement(poly);
-            right_foot_planted = True;
-            right_foot_good = can_place_foot(right_foot, 0.15f,0.15f);
+            ba->right_foot = find_foot_placement(poly);
+            ba->right_foot_planted = True;
+            ba->right_foot_good = can_place_foot(ba->right_foot, 0.15f,0.15f);
          }
 
-         objspace_to_worldspace_flat(&left_foot.x, player, -0.35f, y_left);
-         left_foot.x += pos.x;
-         left_foot.y += pos.y;
-         left_foot.z = z_left;
-         left_foot_planted = False;
-         left_foot_good = True;
+         objspace_to_worldspace_flat(&ba->left_foot.x, o, -0.35f, y_left);
+         ba->left_foot.x += pos.x;
+         ba->left_foot.y += pos.y;
+         ba->left_foot.z = z_left;
+         ba->left_foot_planted = False;
+         ba->left_foot_good = True;
       } else {
-         if (!left_foot_planted) {
+         if (!ba->left_foot_planted) {
             vec poly[5];
 
-            objspace_to_worldspace_flat(&left_foot.x, player, -0.35f, y_left);
+            objspace_to_worldspace_flat(&ba->left_foot.x, o, -0.35f, y_left);
             if (fabs(z_left - floor(z_left)) > 0.1f)
                z_left = floor(z_left) + 0.05;
 
-            objspace_to_worldspace_flat(&poly[0].x, player, - 0.35f, 0.0);
-            objspace_to_worldspace_flat(&poly[1].x, player, - 0.6  ,-0.4);
-            objspace_to_worldspace_flat(&poly[2].x, player, - 0.6  , 0.4);
-            objspace_to_worldspace_flat(&poly[3].x, player, - 0.22 ,-0.4);
-            objspace_to_worldspace_flat(&poly[4].x, player, - 0.22 , 0.4);
+            objspace_to_worldspace_flat(&poly[0].x, o, - 0.35f, 0.0);
+            objspace_to_worldspace_flat(&poly[1].x, o, - 0.6  ,-0.4);
+            objspace_to_worldspace_flat(&poly[2].x, o, - 0.6  , 0.4);
+            objspace_to_worldspace_flat(&poly[3].x, o, - 0.22 ,-0.4);
+            objspace_to_worldspace_flat(&poly[4].x, o, - 0.22 , 0.4);
             for (i=0; i < 5; ++i) {
                poly[i].x += pos.x;
                poly[i].y += pos.y;
                poly[i].z += z_left;
                vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
             }
-            left_foot = find_foot_placement(poly);
-            left_foot_planted = True;
-            left_foot_good = can_place_foot(left_foot, 0.15f,0.15f);
+            ba->left_foot = find_foot_placement(poly);
+            ba->left_foot_planted = True;
+            ba->left_foot_good = can_place_foot(ba->left_foot, 0.15f,0.15f);
          }
-         objspace_to_worldspace_flat(&right_foot.x, player, 0.35f, y_right);
-         right_foot.x += pos.x;
-         right_foot.y += pos.y;
-         right_foot.z = z_right;
-         right_foot_planted = False;
-         right_foot_good = True;
+         objspace_to_worldspace_flat(&ba->right_foot.x, o, 0.35f, y_right);
+         ba->right_foot.x += pos.x;
+         ba->right_foot.y += pos.y;
+         ba->right_foot.z = z_right;
+         ba->right_foot_planted = False;
+         ba->right_foot_good = True;
       }
 
       {
@@ -1061,14 +1061,12 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
          rotate_vector(&left_leg_top, &left_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
          vec_addeq(&left_leg_top, &pos);
 
-         if (!stb_two_link_ik(&left_knee.x, &left_leg_top.x, &left_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height)) {
+         if (!stb_two_link_ik(&left_knee.x, &left_leg_top.x, &ba->left_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height))
             // couldn't reach foot position
-            vec_lerp(&left_foot, &left_leg_top, &left_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
-         }
-         //vec_lerp(&left_knee, &left_leg_top, &left_foot, 0.45f);
+            vec_lerp(&ba->left_foot, &left_leg_top, &left_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
 
          draw_cylinder_from_to(&left_leg_top, &left_knee, 0.12f);
-         draw_cylinder_from_to(&left_knee, &left_foot, 0.08f);
+         draw_cylinder_from_to(&left_knee, &ba->left_foot, 0.08f);
 
          right_leg_top.x = torso.x/2 - sk->upper_leg_width;
          right_leg_top.y = 0;
@@ -1076,25 +1074,23 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
          rotate_vector(&right_leg_top, &right_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
          vec_addeq(&right_leg_top, &pos);
 
-         if (!stb_two_link_ik(&right_knee.x, &right_leg_top.x, &right_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height)) {
-            vec_lerp(&right_foot, &right_leg_top, &right_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
-         }
-         //vec_lerp(&right_knee, &right_leg_top, &right_foot, 0.45f);
+         if (!stb_two_link_ik(&right_knee.x, &right_leg_top.x, &ba->right_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height))
+            vec_lerp(&ba->right_foot, &right_leg_top, &right_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
 
          draw_cylinder_from_to(&right_leg_top, &right_knee, sk->upper_leg_width);
-         draw_cylinder_from_to(&right_knee, &right_foot, sk->lower_leg_width);
+         draw_cylinder_from_to(&right_knee, &ba->right_foot, sk->lower_leg_width);
       }
 
-      glMaterialfv(GL_FRONT, GL_DIFFUSE , right_foot_good ? mat_diffuse : mat_red);
+      glMaterialfv(GL_FRONT, GL_DIFFUSE , ba->right_foot_good ? mat_diffuse : mat_red);
       glPushMatrix();
-      glTranslatef(right_foot.x, right_foot.y, right_foot.z);
+      glTranslatef(ba->right_foot.x, ba->right_foot.y, ba->right_foot.z);
       glRotatef(ang.z, 0,0,1);
       stbgl_drawBox(0,sk->feet_forward_offset,0, 0.2f,0.4f,0.1f, 1);
       glPopMatrix();
 
-      glMaterialfv(GL_FRONT, GL_DIFFUSE , left_foot_good ? mat_green : mat_red);
+      glMaterialfv(GL_FRONT, GL_DIFFUSE , ba->left_foot_good ? mat_green : mat_red);
       glPushMatrix();
-      glTranslatef(left_foot.x, left_foot.y, left_foot.z);
+      glTranslatef(ba->left_foot.x, ba->left_foot.y, ba->left_foot.z);
       glRotatef(ang.z, 0,0,1);
       stbgl_drawBox(0,sk->feet_forward_offset,0, 0.2f,0.4f,0.1f, 1);
       glPopMatrix();
@@ -1153,7 +1149,10 @@ void render_objects(void)
          center.x = o->position.x;
          center.y = o->position.y;
          center.z = o->position.z + p->height/2;
-         stbgl_drawBox(center.x, center.y, center.z, p->hsz_x*2, p->hsz_y*2, p->height, 1);
+         if (o->type == OTYPE_critter)
+            render_biped(obj[i].position, p, obj[i].ang, obj[i].position.z, i);
+         else
+            stbgl_drawBox(center.x, center.y, center.z, p->hsz_x*2, p->hsz_y*2, p->height, 1);
       }
    }
 
