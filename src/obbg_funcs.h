@@ -57,6 +57,7 @@ extern void load_edits(void);
 extern void init_mesh_building(void);
 extern void do_ui_rendering_3d(void);
 extern void do_ui_rendering_2d(void);
+extern int stb_two_link_ik(float mid[3], const float begin[3], const float end[3], const float mid_dir[3], float begin_to_mid_len, float mid_to_end_len);
 
 extern void ai_pathfind(object *o, vec3i target);
 extern mesh_chunk *build_mesh_chunk_for_coord(mesh_chunk *mc, int x, int y);

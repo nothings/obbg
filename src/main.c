@@ -1011,27 +1011,44 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid p
       stbgl_drawBox(0,0,0, sz.x,sz.y,sz.z, 1);
       glPopMatrix();
 
+
       {
+         vec forward;
          vec left_leg_top;
+         vec left_knee;
+         vec right_leg_top;
+         vec right_knee;
+
+         forward.x=0;
+         forward.y=1;
+         forward.z=0;
+         rotate_vector(&forward, &forward, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
+
          left_leg_top.x = -tp->hsz_x*0.8;
          left_leg_top.y = 0;
          left_leg_top.z = tp->torso_base_height - center_z_offset;
 
+
          rotate_vector(&left_leg_top, &left_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
          vec_addeq(&left_leg_top, &pos);
 
-         draw_cylinder_from_to(&left_leg_top, &left_foot, 0.1f);
-      }
+         stb_two_link_ik(&left_knee.x, &left_leg_top.x, &left_foot.x, &forward.x, 0.65f,0.75f);
+         //vec_lerp(&left_knee, &left_leg_top, &left_foot, 0.45f);
 
-      {
-         vec right_leg_top;
+         draw_cylinder_from_to(&left_leg_top, &left_knee, 0.12f);
+         draw_cylinder_from_to(&left_knee, &left_foot, 0.08f);
+
          right_leg_top.x = tp->hsz_x*0.8;
          right_leg_top.y = 0;
          right_leg_top.z = tp->torso_base_height - center_z_offset;
          rotate_vector(&right_leg_top, &right_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
          vec_addeq(&right_leg_top, &pos);
 
-         draw_cylinder_from_to(&right_leg_top, &right_foot, 0.1f);
+         stb_two_link_ik(&right_knee.x, &right_leg_top.x, &right_foot.x, &forward.x, 0.65f,0.75f);
+         //vec_lerp(&right_knee, &right_leg_top, &right_foot, 0.45f);
+
+         draw_cylinder_from_to(&right_leg_top, &right_knee, 0.12f);
+         draw_cylinder_from_to(&right_knee, &right_foot, 0.08f);
       }
 
       glMaterialfv(GL_FRONT, GL_DIFFUSE , right_foot_good ? mat_diffuse : mat_red);

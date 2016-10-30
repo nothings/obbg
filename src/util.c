@@ -281,3 +281,92 @@ void obbg_malloc_dump(obbg_malloc_dump_func *f)
    }
    SDL_UnlockMutex(memory_mutex);
 }
+
+extern int stb_two_link_ik(float mid[3], const float begin[3], const float end[3], const float mid_dir[3], float begin_to_mid_len, float mid_to_end_len);
+
+#include <math.h>
+static float stbik__dot(float *p1, float *p2)
+{
+   return p1[0]*p2[0] + p1[1]*p2[1] + p1[2]*p2[2];
+}
+
+static float stbik__len(float *v)
+{
+   return (float) sqrt(stbik__dot(v,v));
+}
+
+static void stbik__normalize(float *v)
+{
+   float inv_len = 1.0f / stbik__len(v);
+   v[0] *= inv_len;
+   v[1] *= inv_len;
+   v[2] *= inv_len;
+}
+
+static void stbik__cross(float *c, float *a, float *b)
+{
+   c[0] = a[1]*b[2] - a[2]*b[1];
+   c[1] = a[2]*b[0] - a[0]*b[2];
+   c[2] = a[0]*b[1] - a[1]*b[0];
+}
+
+static void stbik__rot(float *dst, float *m, float *src)
+{
+   dst[0] = stbik__dot(&m[0], src);
+   dst[1] = stbik__dot(&m[3], src);
+   dst[2] = stbik__dot(&m[6], src);
+}
+
+static float stbik__find_d(float a, float b, float c)
+{
+   float r = (c+(a*a-b*b)/c)/2;
+   if (r < 0) return 0;
+   if (r > a) return a;
+   return r;
+}
+
+static float stbik__find_e(float a, float d)
+{
+   return (float) sqrt(a*a-d*d);
+}
+
+static void stbik__define_m(float *m, float *m_inv, float *p, float *d)
+{
+   float d_dot_x;
+   float *x=m_inv+0, *y=m_inv+3, *z=m_inv+6;
+   int i;
+   for (i=0; i < 3; ++i)
+      x[i] = p[i];
+   stbik__normalize(x);
+   d_dot_x = stbik__dot(d,x);
+   for (i=0; i < 3; ++i)
+      y[i] = d[i] - d_dot_x * x[i];
+   stbik__normalize(y);
+   stbik__cross(z,x,y);
+   for (i=0; i < 3; ++i) {
+      m[i*3+0] = x[i];
+      m[i*3+1] = y[i];
+      m[i*3+2] = z[i];
+   }
+}
+
+int stb_two_link_ik(float q[3], const float start[3], const float P[3], const float D[3], float a, float b)
+{
+   float p[3] = { P[0] - start[0], P[1] - start[1], P[2] - start[2] };
+   float *dv = (float *) D;
+   float m[9], m_inv[9], d, e, s[3];
+   float r[3];
+
+   stbik__define_m(m,m_inv, p,dv);
+   stbik__rot(r, m_inv, p);
+   d = stbik__find_d(a,b,stbik__len(r));
+   e = stbik__find_e(a,d);
+   s[0] = d;
+   s[1] = e;
+   s[2] = 0;
+   stbik__rot(q, m, s);
+   q[0] += start[0];
+   q[1] += start[1];
+   q[2] += start[2];
+   return (d > 0) && (d < a);
+}
