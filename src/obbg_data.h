@@ -482,6 +482,7 @@ extern int program_mode;
 extern player_controls p_input[PLAYER_OBJECT_MAX];
 extern int global_hack;
 extern int view_distance;
+extern float global_timer;
 
 extern void *memory_mutex, *prof_mutex;
 

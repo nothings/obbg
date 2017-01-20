@@ -87,6 +87,18 @@ void objspace_to_worldspace_flat(float world[3], objid oid, float cam_x, float c
    world[2] = 0;
 }
 
+void worldspace_to_objspace_flat(float world[3], objid oid, float cam_x, float cam_y)
+{
+   float vec[3] = { cam_x, cam_y, 0 };
+   float s,c;
+
+   s = (float) sin((-obj[oid].ang.z)*M_PI/180);
+   c = (float) cos((-obj[oid].ang.z)*M_PI/180);
+   world[0] = c*cam_x - s*cam_y;
+   world[1] = s*cam_x + c*cam_y;
+   world[2] = 0;
+}
+
 float pending_view_x;
 float pending_view_z = 180+75;
 

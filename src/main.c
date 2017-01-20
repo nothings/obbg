@@ -763,7 +763,8 @@ typedef struct
    int gait;
    float phase;
    vec left_foot;
-   vec right_foot;
+   vec right_foot, old_right_foot;
+   float old_time, old_right_z_fixup, old_left_z_fixup;
    int left_foot_planted;
    int right_foot_planted;
    int left_foot_good, right_foot_good;
@@ -925,6 +926,7 @@ void update_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
 {
    skeleton_shape *sk = &player_skeleton;
    int i;
+   float vel[3];
    float mag;
    float s,c;
    float y_left,y_right, z_left,z_right;
@@ -932,65 +934,106 @@ void update_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
    biped_animation_state *ba = &biped[o];
    move_vel.z = 0;
 
+   worldspace_to_objspace_flat(vel, o, move_vel.x, move_vel.y);
    mag = vec_mag(&move_vel);
 
    ba->gait = mag >= 0.01f ? GAIT_running : GAIT_stopped;
 
    if (ba->gait != GAIT_stopped) {
+      float foot_place_distance = mag / 12;
       float foot_spacing = sk->foot_spacing*tp->height/2;
-      ba->phase += animation_dt / sk->cycle_period[ba->gait] * 2 * M_PI;// * mag * 1.5;
-      ba->phase = fmod(ba->phase, 2*M_PI);
+      ba->phase += animation_dt / sk->cycle_period[ba->gait];// * mag * 1.5;
+      ba->phase = fmod(ba->phase, 1);
 
-      s = -sin(ba->phase);
-      c =  cos(ba->phase);
+      s = -sin(ba->phase * 2 * M_PI);
+      c =  cos(ba->phase * 2 * M_PI);
 
-      y_right =  c * mag / 20;
+      y_right =  0;
       z_right =  s * 0.4f;
       if (z_right < 0) z_right = 0;
-      z_right += bottom_z + 0.05;
 
       y_left =  -c * mag / 20;
       z_left =  -s * 0.4f;
       if (z_left < 0) z_left = 0;
       z_left += bottom_z + 0.05;
 
-      if (!ba->right_foot_planted || ba->phase >= M_PI) {
+      if (!ba->right_foot_planted || ba->phase >= 0.5) {
          vec poly[5], foot;
+         float rel_phase;
+         float time_to_foot_impact, last_time_step;
+         vec old = ba->right_foot;
+         old.z -= ba->old_right_z_fixup;
 
          ba->right_foot_planted = False;
 
-         objspace_to_worldspace_flat(&ba->right_foot.x, o, foot_spacing, y_right);
-         if (fabs(z_right - floor(z_right)) > 0.1f)
-            z_right = floor(z_right) + 0.05;
+         rel_phase = 2*(ba->phase-0.5);
+         if (rel_phase < 0) rel_phase = 1;
 
-         objspace_to_worldspace_flat(&poly[0].x, o, foot_spacing      , 0.0);
-         objspace_to_worldspace_flat(&poly[1].x, o, foot_spacing-0.2  ,-0.4);
-         objspace_to_worldspace_flat(&poly[2].x, o, foot_spacing-0.2  , 0.4);
-         objspace_to_worldspace_flat(&poly[3].x, o, foot_spacing+0.2  ,-0.4);
-         objspace_to_worldspace_flat(&poly[4].x, o, foot_spacing+0.2  , 0.4);
+         time_to_foot_impact = (1 - rel_phase) * sk->cycle_period[ba->gait] / 2;
+         y_right = foot_place_distance + vel[1] * time_to_foot_impact;
+
+         objspace_to_worldspace_flat(&ba->right_foot.x, o, foot_spacing, y_right);
+
+         // last position: ba->old_right_foot  (needs to be corrected by IK)
+         // new goal:  pos.x + ba->right_foot.x, pos.y + ba->right_foot.y, z_right
+
+         //   lerp(time_to_foot_impact, new_goal, old_position);
+         // last time was: ba->old_timer
+
+         last_time_step = global_timer - ba->old_time;
+
+         objspace_to_worldspace_flat(&poly[0].x, o, foot_spacing      , y_right);
+         objspace_to_worldspace_flat(&poly[1].x, o, foot_spacing-0.2  , y_right-0.4);
+         objspace_to_worldspace_flat(&poly[2].x, o, foot_spacing-0.2  , y_right+0.4);
+         objspace_to_worldspace_flat(&poly[3].x, o, foot_spacing+0.2  , y_right-0.4);
+         objspace_to_worldspace_flat(&poly[4].x, o, foot_spacing+0.2  , y_right+0.4);
          for (i=0; i < 5; ++i) {
             poly[i].x += pos.x;
             poly[i].y += pos.y;
-            poly[i].z = z_right;
-            vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
+            poly[i].z += bottom_z+1.0;
+            //vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
          }
          foot = find_foot_placement(poly);
 
-         if (ba->phase >= M_PI) {
-            objspace_to_worldspace_flat(&ba->right_foot.x, o, foot_spacing, y_right);
-            ba->right_foot.x += pos.x;
-            ba->right_foot.y += pos.y;
-            ba->right_foot.z = z_right;
+         //        |--------------|------------------------------|
+         //    -last_time_step    0                   time_to_foot_impact
+         //       old_position    ????                      new_goal
+         //
+         //    stb_linear_remap(0, -last_time_step, time_to_foot_impact, old_position, new_goal)
+
+
+         #if 1
+         if (-last_time_step != time_to_foot_impact) {
+            ba->right_foot.x = stb_linear_remap(0, -last_time_step, time_to_foot_impact, old.x, foot.x);
+            ba->right_foot.y = stb_linear_remap(0, -last_time_step, time_to_foot_impact, old.y, foot.y);
+            ba->right_foot.z = stb_linear_remap(0, -last_time_step, time_to_foot_impact, old.z, foot.z);
+            if (time_to_foot_impact == 0) {
+               assert(ba->right_foot.x == foot.x);
+               assert(ba->right_foot.y == foot.y);
+               assert(ba->right_foot.z == foot.z);
+            }
+            foot = ba->right_foot;
+         }
+         #endif
+
+
+         if (ba->phase >= 0.5) {
+            ba->right_foot = foot;
             ba->right_foot_planted = False;
             ba->right_foot_good = True;
+            ba->old_right_foot = ba->right_foot;
+            ba->right_foot.z += z_right;
+            ba->old_right_z_fixup = z_right;
          } else {
             ba->right_foot = foot;
             ba->right_foot_planted = True;
             ba->right_foot_good = can_place_foot(ba->right_foot, 0.15f,0.15f);
+            ba->old_right_foot = ba->right_foot;
+            ba->old_right_z_fixup = 0;
          }
       }
 
-      if (!ba->left_foot_planted && ba->phase <= M_PI) {
+      if (!ba->left_foot_planted && ba->phase <= 0.5) {
          vec poly[5], foot;
          ba->left_foot_planted = False;
 
@@ -1011,11 +1054,12 @@ void update_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
          }
          foot = find_foot_placement(poly);
 
-         if (ba->phase <= M_PI) {
+         if (ba->phase <= 0.5) {
             objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
             ba->left_foot.x += pos.x;
             ba->left_foot.y += pos.y;
             ba->left_foot.z = z_left;
+            ba->left_foot = foot;
             ba->left_foot_planted = False;
             ba->left_foot_good = True;
          } else {
@@ -1025,6 +1069,7 @@ void update_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
          }
       }
    }
+   ba->old_time = global_timer;
 }
 
 void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o)
@@ -1037,6 +1082,7 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
    float mat_specular[] = { 0,0,0,0 };
    float mat_diffuse[]  = { 1.0f,0.9f,0.8f,1.0 };
    float mat_green[] = { 0.4f,0.8f,0.4f,1.0 };
+   float mat_planted[] = { 0.3f,0.4f,1.0f,1.0 };
 
    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
    glMaterialfv(GL_FRONT, GL_DIFFUSE , mat_diffuse );
@@ -1059,11 +1105,13 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
       vec left_knee;
       vec right_leg_top;
       vec right_knee;
+      vec right_foot_orig;
       float torso_bottom, torso_top, head_bottom, head_top, neck_bottom, neck_top;
       float head_offset = sk->head_offset_forward * tp->height;
 
       move_vel.z = 0;
       update_biped(pos, tp, ang, bottom_z, o);
+      right_foot_orig = ba->right_foot;
 
       vec_scale(&head, &sk->head, tp->height);
       vec_scale(&neck, &sk->neck, tp->height);
@@ -1121,7 +1169,7 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
       draw_cylinder_from_to(&right_leg_top, &right_knee, sk->upper_leg_width);
       draw_cylinder_from_to(&right_knee, &ba->right_foot, sk->lower_leg_width);
 
-      glMaterialfv(GL_FRONT, GL_DIFFUSE , ba->right_foot_good ? mat_diffuse : mat_red);
+      glMaterialfv(GL_FRONT, GL_DIFFUSE , ba->right_foot_planted ? mat_planted : ba->right_foot_good ? mat_diffuse : mat_red);
       glPushMatrix();
       glTranslatef(ba->right_foot.x, ba->right_foot.y, ba->right_foot.z);
       glRotatef(ang.z, 0,0,1);
