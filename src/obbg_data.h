@@ -63,7 +63,7 @@ typedef int Bool;
 #define LOGI_CHUNK_SIZE_Y           (1 << LOGI_CHUNK_SIZE_Y_LOG2)
 #define LOGI_CHUNK_SIZE_Z           (1 << LOGI_CHUNK_SIZE_Z_LOG2)
 
-#define LONG_TICK_LENGTH   12
+#define LONG_TICK_LENGTH   48
 #define GRAVITY_IN_BLOCKS  20.0f
 
 typedef struct

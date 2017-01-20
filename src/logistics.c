@@ -2059,7 +2059,7 @@ void logistics_tick(void)
       logistics_texture_scroll -= 1.0;
 
    ++logistics_ticks;
-   tex_anim_offset = ((logistics_ticks >> 3) & 3) * 16;
+   tex_anim_offset = ((logistics_ticks >> 5) & 3) * 16;
 
    ++logistics_long_tick;
    if (logistics_long_tick > LONG_TICK_LENGTH)
