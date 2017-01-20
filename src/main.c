@@ -805,6 +805,9 @@ skeleton_shape player_skeleton =
 
 biped_animation_state biped[2000];
 
+// Attempt to find a foot placement within the
+// 4-sided polygon poly[1..4], with preference
+// for poly[0].
 vec find_foot_placement(vec poly[5])
 {
    float best_dist=99999999.0f, dist;
@@ -918,6 +921,112 @@ static void draw_cylinder_from_to(vec *a, vec *b, float radius)
    glEnd();
 }
 
+void update_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o)
+{
+   skeleton_shape *sk = &player_skeleton;
+   int i;
+   float mag;
+   float s,c;
+   float y_left,y_right, z_left,z_right;
+   vec move_vel = obj[o].velocity;
+   biped_animation_state *ba = &biped[o];
+   move_vel.z = 0;
+
+   mag = vec_mag(&move_vel);
+
+   ba->gait = mag >= 0.01f ? GAIT_running : GAIT_stopped;
+
+   if (ba->gait != GAIT_stopped) {
+      float foot_spacing = sk->foot_spacing*tp->height/2;
+      ba->phase += animation_dt / sk->cycle_period[ba->gait] * 2 * M_PI;// * mag * 1.5;
+      ba->phase = fmod(ba->phase, 2*M_PI);
+
+      s = -sin(ba->phase);
+      c =  cos(ba->phase);
+
+      y_right =  c * mag / 20;
+      z_right =  s * 0.4f;
+      if (z_right < 0) z_right = 0;
+      z_right += bottom_z + 0.05;
+
+      y_left =  -c * mag / 20;
+      z_left =  -s * 0.4f;
+      if (z_left < 0) z_left = 0;
+      z_left += bottom_z + 0.05;
+
+      if (!ba->right_foot_planted || ba->phase >= M_PI) {
+         vec poly[5], foot;
+
+         ba->right_foot_planted = False;
+
+         objspace_to_worldspace_flat(&ba->right_foot.x, o, foot_spacing, y_right);
+         if (fabs(z_right - floor(z_right)) > 0.1f)
+            z_right = floor(z_right) + 0.05;
+
+         objspace_to_worldspace_flat(&poly[0].x, o, foot_spacing      , 0.0);
+         objspace_to_worldspace_flat(&poly[1].x, o, foot_spacing-0.2  ,-0.4);
+         objspace_to_worldspace_flat(&poly[2].x, o, foot_spacing-0.2  , 0.4);
+         objspace_to_worldspace_flat(&poly[3].x, o, foot_spacing+0.2  ,-0.4);
+         objspace_to_worldspace_flat(&poly[4].x, o, foot_spacing+0.2  , 0.4);
+         for (i=0; i < 5; ++i) {
+            poly[i].x += pos.x;
+            poly[i].y += pos.y;
+            poly[i].z = z_right;
+            vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
+         }
+         foot = find_foot_placement(poly);
+
+         if (ba->phase >= M_PI) {
+            objspace_to_worldspace_flat(&ba->right_foot.x, o, foot_spacing, y_right);
+            ba->right_foot.x += pos.x;
+            ba->right_foot.y += pos.y;
+            ba->right_foot.z = z_right;
+            ba->right_foot_planted = False;
+            ba->right_foot_good = True;
+         } else {
+            ba->right_foot = foot;
+            ba->right_foot_planted = True;
+            ba->right_foot_good = can_place_foot(ba->right_foot, 0.15f,0.15f);
+         }
+      }
+
+      if (!ba->left_foot_planted && ba->phase <= M_PI) {
+         vec poly[5], foot;
+         ba->left_foot_planted = False;
+
+         objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
+         if (fabs(z_left - floor(z_left)) > 0.1f)
+            z_left = floor(z_left) + 0.05;
+
+         objspace_to_worldspace_flat(&poly[0].x, o, -foot_spacing      , 0.0);
+         objspace_to_worldspace_flat(&poly[1].x, o, -foot_spacing-0.2  ,-0.4);
+         objspace_to_worldspace_flat(&poly[2].x, o, -foot_spacing-0.2  , 0.4);
+         objspace_to_worldspace_flat(&poly[3].x, o, -foot_spacing+0.2  ,-0.4);
+         objspace_to_worldspace_flat(&poly[4].x, o, -foot_spacing+0.2  , 0.4);
+         for (i=0; i < 5; ++i) {
+            poly[i].x += pos.x;
+            poly[i].y += pos.y;
+            poly[i].z += z_left;
+            vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
+         }
+         foot = find_foot_placement(poly);
+
+         if (ba->phase <= M_PI) {
+            objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
+            ba->left_foot.x += pos.x;
+            ba->left_foot.y += pos.y;
+            ba->left_foot.z = z_left;
+            ba->left_foot_planted = False;
+            ba->left_foot_good = True;
+         } else {
+            ba->left_foot = foot;
+            ba->left_foot_planted = True;
+            ba->left_foot_good = can_place_foot(ba->left_foot, 0.15f,0.15f);
+         }
+      }
+   }
+}
+
 void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o)
 {
    skeleton_shape *sk = &player_skeleton;
@@ -941,164 +1050,76 @@ void render_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
    glMatrixMode(GL_MODELVIEW);
 
    {
-      int i;
-      float mag;
-      float s,c;
-      float y_left,y_right, z_left,z_right;
       vec move_vel = obj[o].velocity;
       biped_animation_state *ba = &biped[o];
+
+      vec head,torso,neck;
+      vec forward;
+      vec left_leg_top;
+      vec left_knee;
+      vec right_leg_top;
+      vec right_knee;
+      float torso_bottom, torso_top, head_bottom, head_top, neck_bottom, neck_top;
+      float head_offset = sk->head_offset_forward * tp->height;
+
       move_vel.z = 0;
+      update_biped(pos, tp, ang, bottom_z, o);
 
-      mag = vec_mag(&move_vel);
+      vec_scale(&head, &sk->head, tp->height);
+      vec_scale(&neck, &sk->neck, tp->height);
+      vec_scale(&torso, &sk->torso, tp->height);
 
-      ba->gait = mag >= 0.01f ? GAIT_running : GAIT_stopped;
+      glPushMatrix();
+      glTranslatef(pos.x,pos.y,pos.z);
+      glRotatef(ang.z, 0,0,1);
+      glRotatef(ang.x, 1,0,0);
+      glRotatef(ang.y, 0,1,0);
 
-      if (ba->gait != GAIT_stopped) {
-         float foot_spacing = sk->foot_spacing*tp->height/2;
-         ba->phase += animation_dt / sk->cycle_period[ba->gait] * 2 * M_PI;// * mag * 1.5;
-         ba->phase = fmod(ba->phase, 2*M_PI);
+      head_top = tp->height;
+      head_bottom = head_top - head.z;
+      neck_top = head_bottom;
+      neck_bottom = neck_top - neck.z;
+      torso_top = neck_bottom;
+      torso_bottom = torso_top - torso.z;
 
-         s = -sin(ba->phase);
-         c =  cos(ba->phase);
+      stbgl_drawBoxUncentered(-torso.x/2,-torso.y/2,torso_bottom,
+                               torso.x/2, torso.y/2,torso_top   ,  1);
+      stbgl_drawBoxUncentered( -neck.x/2, -neck.y/2,neck_bottom ,
+                                neck.x/2,  neck.y/2,neck_top    ,  1);
+      stbgl_drawBoxUncentered( -head.x/2, head_offset-head.y/2,head_bottom ,
+                                head.x/2, head_offset+head.y/2,head_top    ,  1);
+      glPopMatrix();
 
-         y_right =  c * mag / 20;
-         z_right =  s * 0.4f;
-         if (z_right < 0) z_right = 0;
-         z_right += bottom_z + 0.05;
+      forward.x=0;
+      forward.y=1;
+      forward.z=0;
+      rotate_vector(&forward, &forward, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
 
-         y_left =  -c * mag / 20;
-         z_left =  -s * 0.4f;
-         if (z_left < 0) z_left = 0;
-         z_left += bottom_z + 0.05;
+      left_leg_top.x = -torso.x/2 + sk->upper_leg_width;
+      left_leg_top.y = 0;
+      left_leg_top.z = torso_bottom;
 
-         if (ba->phase >= 0 && ba->phase <= M_PI) {
-            if (!ba->right_foot_planted) {
-               vec poly[5];
+      rotate_vector(&left_leg_top, &left_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
+      vec_addeq(&left_leg_top, &pos);
 
-               objspace_to_worldspace_flat(&ba->right_foot.x, o, foot_spacing, y_right);
-               if (fabs(z_right - floor(z_right)) > 0.1f)
-                  z_right = floor(z_right) + 0.05;
+      if (!stb_two_link_ik(&left_knee.x, &left_leg_top.x, &ba->left_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height))
+         // couldn't reach foot position
+         vec_lerp(&ba->left_foot, &left_leg_top, &left_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
 
-               objspace_to_worldspace_flat(&poly[0].x, o, foot_spacing, 0.0);
-               objspace_to_worldspace_flat(&poly[1].x, o, foot_spacing-0.2  ,-0.4);
-               objspace_to_worldspace_flat(&poly[2].x, o, foot_spacing-0.2  , 0.4);
-               objspace_to_worldspace_flat(&poly[3].x, o, foot_spacing+0.2  ,-0.4);
-               objspace_to_worldspace_flat(&poly[4].x, o, foot_spacing+0.2  , 0.4);
-               for (i=0; i < 5; ++i) {
-                  poly[i].x += pos.x;
-                  poly[i].y += pos.y;
-                  poly[i].z = z_right;
-                  vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
-               }
-               ba->right_foot = find_foot_placement(poly);
-               ba->right_foot_planted = True;
-               ba->right_foot_good = can_place_foot(ba->right_foot, 0.15f,0.15f);
-            }
+      draw_cylinder_from_to(&left_leg_top, &left_knee, 0.12f);
+      draw_cylinder_from_to(&left_knee, &ba->left_foot, 0.08f);
 
-            objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
-            ba->left_foot.x += pos.x;
-            ba->left_foot.y += pos.y;
-            ba->left_foot.z = z_left;
-            ba->left_foot_planted = False;
-            ba->left_foot_good = True;
-         } else {
-            if (!ba->left_foot_planted) {
-               vec poly[5];
+      right_leg_top.x = torso.x/2 - sk->upper_leg_width;
+      right_leg_top.y = 0;
+      right_leg_top.z = torso_bottom;
+      rotate_vector(&right_leg_top, &right_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
+      vec_addeq(&right_leg_top, &pos);
 
-               objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
-               if (fabs(z_left - floor(z_left)) > 0.1f)
-                  z_left = floor(z_left) + 0.05;
+      if (!stb_two_link_ik(&right_knee.x, &right_leg_top.x, &ba->right_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height))
+         vec_lerp(&ba->right_foot, &right_leg_top, &right_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
 
-               objspace_to_worldspace_flat(&poly[0].x, o, -foot_spacing, 0.0);
-               objspace_to_worldspace_flat(&poly[1].x, o, -foot_spacing-0.2  ,-0.4);
-               objspace_to_worldspace_flat(&poly[2].x, o, -foot_spacing-0.2  , 0.4);
-               objspace_to_worldspace_flat(&poly[3].x, o, -foot_spacing+0.2  ,-0.4);
-               objspace_to_worldspace_flat(&poly[4].x, o, -foot_spacing+0.2  , 0.4);
-               for (i=0; i < 5; ++i) {
-                  poly[i].x += pos.x;
-                  poly[i].y += pos.y;
-                  poly[i].z += z_left;
-                  vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
-               }
-               ba->left_foot = find_foot_placement(poly);
-               ba->left_foot_planted = True;
-               ba->left_foot_good = can_place_foot(ba->left_foot, 0.15f,0.15f);
-            }
-            objspace_to_worldspace_flat(&ba->right_foot.x, o, foot_spacing, y_right);
-            ba->right_foot.x += pos.x;
-            ba->right_foot.y += pos.y;
-            ba->right_foot.z = z_right;
-            ba->right_foot_planted = False;
-            ba->right_foot_good = True;
-         }
-      }
-
-      {
-         vec head,torso,neck;
-         vec forward;
-         vec left_leg_top;
-         vec left_knee;
-         vec right_leg_top;
-         vec right_knee;
-         float torso_bottom, torso_top, head_bottom, head_top, neck_bottom, neck_top;
-         float head_offset = sk->head_offset_forward * tp->height;
-
-         vec_scale(&head, &sk->head, tp->height);
-         vec_scale(&neck, &sk->neck, tp->height);
-         vec_scale(&torso, &sk->torso, tp->height);
-
-         glPushMatrix();
-         glTranslatef(pos.x,pos.y,pos.z);
-         glRotatef(ang.z, 0,0,1);
-         glRotatef(ang.x, 1,0,0);
-         glRotatef(ang.y, 0,1,0);
-
-         head_top = tp->height;
-         head_bottom = head_top - head.z;
-         neck_top = head_bottom;
-         neck_bottom = neck_top - neck.z;
-         torso_top = neck_bottom;
-         torso_bottom = torso_top - torso.z;
-
-         stbgl_drawBoxUncentered(-torso.x/2,-torso.y/2,torso_bottom,
-                                  torso.x/2, torso.y/2,torso_top   ,  1);
-         stbgl_drawBoxUncentered( -neck.x/2, -neck.y/2,neck_bottom ,
-                                   neck.x/2,  neck.y/2,neck_top    ,  1);
-         stbgl_drawBoxUncentered( -head.x/2, head_offset-head.y/2,head_bottom ,
-                                   head.x/2, head_offset+head.y/2,head_top    ,  1);
-         glPopMatrix();
-
-         forward.x=0;
-         forward.y=1;
-         forward.z=0;
-         rotate_vector(&forward, &forward, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
-
-         left_leg_top.x = -torso.x/2 + sk->upper_leg_width;
-         left_leg_top.y = 0;
-         left_leg_top.z = torso_bottom;
-
-         rotate_vector(&left_leg_top, &left_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
-         vec_addeq(&left_leg_top, &pos);
-
-         if (!stb_two_link_ik(&left_knee.x, &left_leg_top.x, &ba->left_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height))
-            // couldn't reach foot position
-            vec_lerp(&ba->left_foot, &left_leg_top, &left_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
-
-         draw_cylinder_from_to(&left_leg_top, &left_knee, 0.12f);
-         draw_cylinder_from_to(&left_knee, &ba->left_foot, 0.08f);
-
-         right_leg_top.x = torso.x/2 - sk->upper_leg_width;
-         right_leg_top.y = 0;
-         right_leg_top.z = torso_bottom;
-         rotate_vector(&right_leg_top, &right_leg_top, ang.x*M_PI/180,ang.y*M_PI/180,ang.z*M_PI/180);
-         vec_addeq(&right_leg_top, &pos);
-
-         if (!stb_two_link_ik(&right_knee.x, &right_leg_top.x, &ba->right_foot.x, &forward.x, sk->upper_leg_length*tp->height, sk->lower_leg_length*tp->height))
-            vec_lerp(&ba->right_foot, &right_leg_top, &right_knee, (sk->upper_leg_length+sk->lower_leg_length)/sk->upper_leg_length);
-
-         draw_cylinder_from_to(&right_leg_top, &right_knee, sk->upper_leg_width);
-         draw_cylinder_from_to(&right_knee, &ba->right_foot, sk->lower_leg_width);
-      }
+      draw_cylinder_from_to(&right_leg_top, &right_knee, sk->upper_leg_width);
+      draw_cylinder_from_to(&right_knee, &ba->right_foot, sk->lower_leg_width);
 
       glMaterialfv(GL_FRONT, GL_DIFFUSE , ba->right_foot_good ? mat_diffuse : mat_red);
       glPushMatrix();
