@@ -736,10 +736,10 @@ float smoothed_z_for_rendering(vec *pos, interpolate_z *iz)
 }
 
 // TODO 
-// - foot placement
-//   - when foot is halfway from previous position to next position, compute placement for next position
-//   - animate foot from old position to halfway cleanly
-//   - animate foot from halfway to next position cleanly
+// + foot placement
+//   x when foot is halfway from previous position to next position, compute placement for next position
+//   + animate foot from old position to halfway cleanly
+//   + animate foot from halfway to next position cleanly
 // - gaits/states
 //   - Standing still - walking - running states w/ different gaits
 //   - deal with stopping if foot placement was computed before stopping
@@ -763,7 +763,7 @@ typedef struct
    int gait;
    float phase;
    vec left_foot;
-   vec right_foot, old_right_foot;
+   vec right_foot;
    float old_time, old_right_z_fixup, old_left_z_fixup;
    int left_foot_planted;
    int right_foot_planted;
@@ -952,10 +952,9 @@ void update_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
       z_right =  s * 0.4f;
       if (z_right < 0) z_right = 0;
 
-      y_left =  -c * mag / 20;
+      y_left =  0;
       z_left =  -s * 0.4f;
       if (z_left < 0) z_left = 0;
-      z_left += bottom_z + 0.05;
 
       if (!ba->right_foot_planted || ba->phase >= 0.5) {
          vec poly[5], foot;
@@ -1002,7 +1001,6 @@ void update_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
          //    stb_linear_remap(0, -last_time_step, time_to_foot_impact, old_position, new_goal)
 
 
-         #if 1
          if (-last_time_step != time_to_foot_impact) {
             ba->right_foot.x = stb_linear_remap(0, -last_time_step, time_to_foot_impact, old.x, foot.x);
             ba->right_foot.y = stb_linear_remap(0, -last_time_step, time_to_foot_impact, old.y, foot.y);
@@ -1014,58 +1012,90 @@ void update_biped(vec pos, type_properties *tp, vec ang, float bottom_z, objid o
             }
             foot = ba->right_foot;
          }
-         #endif
 
 
          if (ba->phase >= 0.5) {
             ba->right_foot = foot;
             ba->right_foot_planted = False;
             ba->right_foot_good = True;
-            ba->old_right_foot = ba->right_foot;
             ba->right_foot.z += z_right;
             ba->old_right_z_fixup = z_right;
          } else {
             ba->right_foot = foot;
             ba->right_foot_planted = True;
             ba->right_foot_good = can_place_foot(ba->right_foot, 0.15f,0.15f);
-            ba->old_right_foot = ba->right_foot;
             ba->old_right_z_fixup = 0;
          }
       }
 
-      if (!ba->left_foot_planted && ba->phase <= 0.5) {
+      if (!ba->left_foot_planted || ba->phase < 0.5) {
          vec poly[5], foot;
+         float rel_phase;
+         float time_to_foot_impact, last_time_step;
+         vec old = ba->left_foot;
+         old.z -= ba->old_left_z_fixup;
+
          ba->left_foot_planted = False;
 
-         objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
-         if (fabs(z_left - floor(z_left)) > 0.1f)
-            z_left = floor(z_left) + 0.05;
+         rel_phase = 2*(ba->phase);
+         if (rel_phase > 1) rel_phase = 1;
 
-         objspace_to_worldspace_flat(&poly[0].x, o, -foot_spacing      , 0.0);
-         objspace_to_worldspace_flat(&poly[1].x, o, -foot_spacing-0.2  ,-0.4);
-         objspace_to_worldspace_flat(&poly[2].x, o, -foot_spacing-0.2  , 0.4);
-         objspace_to_worldspace_flat(&poly[3].x, o, -foot_spacing+0.2  ,-0.4);
-         objspace_to_worldspace_flat(&poly[4].x, o, -foot_spacing+0.2  , 0.4);
+         time_to_foot_impact = (1 - rel_phase) * sk->cycle_period[ba->gait] / 2;
+         y_left = foot_place_distance + vel[1] * time_to_foot_impact;
+
+         objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
+
+         // last position: ba->old_left_foot  (needs to be corrected by IK)
+         // new goal:  pos.x + ba->left_foot.x, pos.y + ba->left_foot.y, z_left
+
+         //   lerp(time_to_foot_impact, new_goal, old_position);
+         // last time was: ba->old_timer
+
+         last_time_step = global_timer - ba->old_time;
+
+         objspace_to_worldspace_flat(&poly[0].x, o, -foot_spacing      , y_left);
+         objspace_to_worldspace_flat(&poly[1].x, o, -foot_spacing-0.2  , y_left-0.4);
+         objspace_to_worldspace_flat(&poly[2].x, o, -foot_spacing-0.2  , y_left+0.4);
+         objspace_to_worldspace_flat(&poly[3].x, o, -foot_spacing+0.2  , y_left-0.4);
+         objspace_to_worldspace_flat(&poly[4].x, o, -foot_spacing+0.2  , y_left+0.4);
          for (i=0; i < 5; ++i) {
             poly[i].x += pos.x;
             poly[i].y += pos.y;
-            poly[i].z += z_left;
-            vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
+            poly[i].z += bottom_z+1.0;
+            //vec_addeq_scale(&poly[i], &move_vel, 0.1f); // @TODO tune 5.0f
          }
          foot = find_foot_placement(poly);
 
-         if (ba->phase <= 0.5) {
-            objspace_to_worldspace_flat(&ba->left_foot.x, o, -foot_spacing, y_left);
-            ba->left_foot.x += pos.x;
-            ba->left_foot.y += pos.y;
-            ba->left_foot.z = z_left;
+         //        |--------------|------------------------------|
+         //    -last_time_step    0                   time_to_foot_impact
+         //       old_position    ????                      new_goal
+         //
+         //    stb_linear_remap(0, -last_time_step, time_to_foot_impact, old_position, new_goal)
+
+
+         if (-last_time_step != time_to_foot_impact) {
+            ba->left_foot.x = stb_linear_remap(0, -last_time_step, time_to_foot_impact, old.x, foot.x);
+            ba->left_foot.y = stb_linear_remap(0, -last_time_step, time_to_foot_impact, old.y, foot.y);
+            ba->left_foot.z = stb_linear_remap(0, -last_time_step, time_to_foot_impact, old.z, foot.z);
+            if (time_to_foot_impact == 0) {
+               assert(ba->left_foot.x == foot.x);
+               assert(ba->left_foot.y == foot.y);
+               assert(ba->left_foot.z == foot.z);
+            }
+            foot = ba->left_foot;
+         }
+
+         if (ba->phase < 0.5) {
             ba->left_foot = foot;
             ba->left_foot_planted = False;
             ba->left_foot_good = True;
+            ba->left_foot.z += z_left;
+            ba->old_left_z_fixup = z_left;
          } else {
             ba->left_foot = foot;
             ba->left_foot_planted = True;
             ba->left_foot_good = can_place_foot(ba->left_foot, 0.15f,0.15f);
+            ba->old_left_z_fixup = 0;
          }
       }
    }
