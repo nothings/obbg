@@ -12,8 +12,8 @@
    -  balancer should only swap if one or the other lane is moving
 
 Factorio-esque features:
-   -  basic pickers (factorio "inserters")
-   -  conveyor belts - factorio & factoryidle & infinifactory
+   +  basic pickers (factorio "inserters")
+   +  conveyor belts - factorio & factoryidle & infinifactory
    -  drills - factorio & modded minecraft
       +  real driller machines (attached to specific block types that have ore)
    -  furnaces - factorio & minecraft

@@ -10,7 +10,10 @@ obbg:
   : networking
 
 
-Done in today's stream (49):
+Done in today's stream (50):
+   - Continuous foot motion
+
+Previous stream (49):
    - IK
    - better model
    - better leaning
