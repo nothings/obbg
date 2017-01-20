@@ -12,6 +12,7 @@ obbg:
 
 Done in today's stream (50):
    - Continuous foot motion
+   - Fix logistics speed bug
 
 Previous stream (49):
    - IK

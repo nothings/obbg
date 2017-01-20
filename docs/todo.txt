@@ -2,6 +2,7 @@
    -  finish uploading videos
    -  install sony vegas
    -  sort obbg_funcs.h
+   -  shadows
 
    -  add mesh cache with explicit storing of coordinates & call function to access it instead of accessing inline
    -  why is set_mesh_chunk_for_coord either
@@ -216,6 +217,7 @@ Ideas:
 
    Look prettier:
    -  add skylight
+   -  shadowing (try caching terrain-only shadowmaps so don't have to redraw all terrain every frame)
    -  more work on terrain -- zmc pseudo-wang tile approach
    -  fix depth fighting when far from origin
    -  dynamically set view distance
