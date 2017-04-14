@@ -1,6 +1,6 @@
 # obbg - Open Block Building Game
 
-This is an in-progress demo (game?) that uses / demonstrates
+This is a retired, unfinished demo (game?) that uses / demonstrates
 stb_voxel_render.h.
 
 See docs/overview.txt for information about the scope
