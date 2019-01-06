@@ -2,7 +2,7 @@
 #define INCLUDE_OBBG_FUNCS_H
 
 #include "obbg_data.h"
-#include "sdl.h"
+#include "SDL.h"
 
 extern void error(char *s);
 extern void ods(char *fmt, ...);
